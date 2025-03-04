@@ -1,0 +1,3 @@
+### Test API Inventario
+GET http://localhost:8001/items
+Authorization: Bearer TOKEN

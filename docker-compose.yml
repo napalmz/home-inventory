@@ -1,0 +1,49 @@
+services:
+  backend:
+    build: ./backend
+    container_name: inventory-backend
+    ports:
+      - "8001:8000"
+    depends_on:
+      - db
+    env_file:
+      - backend/.env
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:15
+    container_name: inventory-db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: inventory
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  db_backup:
+    image: postgres:15
+    container_name: inventory-db-backup
+    depends_on:
+      - db
+    volumes:
+      - ./db_backups:/backups
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: inventory
+    command: >
+      sh -c "while true; do pg_dump -U admin -h db -F c inventory > /backups/db_backup_$(date +'%Y-%m-%d_%H-%M-%S').dump; sleep 86400; done"
+
+volumes:
+  pgdata:
