@@ -39,3 +39,19 @@ class GroupResponse(GroupBase):
 
     class Config:
         from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class InventoryCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class InventoryResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+
+    class Config:
+        orm_mode = True

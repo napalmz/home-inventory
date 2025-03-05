@@ -1,6 +1,12 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from base import Base  # IMPORTA DA base.py
+from enum import Enum
+
+class RoleEnum(str, Enum):
+    admin = "admin"
+    moderator = "moderator"
+    viewer = "viewer"
 
 # Definizione dei ruoli
 class Role(Base):
