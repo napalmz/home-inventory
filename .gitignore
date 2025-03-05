@@ -1,5 +1,7 @@
 __pycache__/
+backend/__pycache__/
 *.pyc
 .env
 venv/
 docker-volume/
+db_backups/

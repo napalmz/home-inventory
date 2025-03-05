@@ -1,21 +1,43 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Table
 from sqlalchemy.orm import relationship
-from database import Base
-import enum
+from base import Base  # IMPORTA DA base.py
 
-class RoleEnum(str, enum.Enum):
-    admin = "admin"
-    moderator = "moderator"
-    viewer = "viewer"
+# Definizione dei ruoli
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
+# Associazione tra utenti e gruppi
+user_group_association = Table(
+    "user_group_association",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id")),
+    Column("group_id", Integer, ForeignKey("groups.id")),
+)
+
+class Group(Base):
+    __tablename__ = "groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"))
+
+    role = relationship("Role")
+    users = relationship("User", secondary=user_group_association, back_populates="groups")
 
 class User(Base):
     __tablename__ = "users"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    #password = Column(String)
-    hashed_password = Column(String, nullable=False)
-    role = Column(Enum(RoleEnum), default=RoleEnum.viewer, nullable=False)
+    hashed_password = Column(String)
+
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
+    role = relationship("Role")
+
+    groups = relationship("Group", secondary=user_group_association, back_populates="users")
 
 class Inventory(Base):
     __tablename__ = "inventories"

@@ -1,22 +1,41 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
-class UserCreate(BaseModel):
+class RoleBase(BaseModel):
+    name: str
+
+class RoleCreate(RoleBase):
+    pass
+
+class RoleResponse(RoleBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class UserBase(BaseModel):
     username: str
+
+class UserCreate(UserBase):
     password: str
 
-class UserResponse(BaseModel):
+class UserResponse(UserBase):
     id: int
-    username: str
+    role_id: Optional[int]
 
-class InventoryCreate(BaseModel):
+    class Config:
+        from_attributes = True
+
+class GroupBase(BaseModel):
     name: str
 
-class InventoryResponse(BaseModel):
-    id: int
-    name: str
-    owner_id: int
+class GroupCreate(GroupBase):
+    role_id: int
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+class GroupResponse(GroupBase):
+    id: int
+    role_id: int
+    users: List[UserResponse] = []
+
+    class Config:
+        from_attributes = True
