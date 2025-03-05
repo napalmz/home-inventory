@@ -1,7 +1,11 @@
+### Python ###
+# Byte-compiled / optimized / DLL files
 __pycache__/
-backend/__pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
 .env
 venv/
 docker-volume/
 db_backups/
+.DS_Store
