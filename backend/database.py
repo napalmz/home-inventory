@@ -14,17 +14,16 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+"""Crea le tabelle nel database"""
+print("Creating database tables...")
+Base.metadata.create_all(bind=engine)
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-def create_tables():
-    """Crea le tabelle nel database"""
-    print("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
 
 def init_roles(db: Session):
     role_names = ["admin", "moderator", "viewer"]
