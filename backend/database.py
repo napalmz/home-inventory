@@ -2,8 +2,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
 from dotenv import load_dotenv
-from models import Role, RoleEnum
+from models import User, Role, RoleEnum
 from base import Base  # IMPORTA DA base.py
+from routes.auth import router as hash_password
 
 load_dotenv()  # Carica le variabili dal file .env
 
@@ -34,5 +35,23 @@ def init_roles(db: Session):
             db.add(new_role)
     db.commit()
 
-#Inizializzo tabelle prima di tutto
-create_tables()
+def create_admin_user():
+    admin_username = "ADMIN"
+    admin_password = os.getenv("ADMIN_PASSWORD")  # La password viene letta da un ENV
+    if not admin_password:
+        print("Errore: Variabile d'ambiente ADMIN_PASSWORD non impostata!")
+        return
+
+    db: Session = SessionLocal()
+    admin_user = db.query(User).filter(User.username == admin_username).first()
+    
+    if not admin_user:
+        hashed_password = hash_password(admin_password)
+        new_admin = User(username=admin_username, hashed_password=hashed_password, role=RoleEnum.admin)
+        db.add(new_admin)
+        db.commit()
+        print("✅ Utente ADMIN creato con successo")
+    else:
+        print("ℹ️ Utente ADMIN già esistente")
+
+    db.close()
