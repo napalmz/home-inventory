@@ -1,9 +1,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
+#from base import Base  # IMPORTA DA base.py
 from dotenv import load_dotenv
-from models import User, Role, RoleEnum
-from base import Base  # IMPORTA DA base.py
+from models import User, Role, RoleEnum, Base
 from routes.auth import router as hash_password
 
 load_dotenv()  # Carica le variabili dal file .env
@@ -12,11 +12,12 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@inventory-db/
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
-"""Crea le tabelle nel database"""
-print("Creating database tables...")
-Base.metadata.create_all(bind=engine)
+def init_db():
+    print("Creazione delle tabelle...")
+    print("Modelli registrati:", Base.metadata.tables.keys())
+    Base.metadata.create_all(bind=engine)
+    print("Tabelle create con successo!")
 
 def get_db():
     db = SessionLocal()
@@ -34,14 +35,14 @@ def init_roles(db: Session):
             db.add(new_role)
     db.commit()
 
-def create_admin_user():
+def create_admin_user(db: Session):
     admin_username = "ADMIN"
     admin_password = os.getenv("ADMIN_PASSWORD")  # La password viene letta da un ENV
     if not admin_password:
         print("Errore: Variabile d'ambiente ADMIN_PASSWORD non impostata!")
         return
 
-    db: Session = SessionLocal()
+    #db: Session = SessionLocal()
     admin_user = db.query(User).filter(User.username == admin_username).first()
     
     if not admin_user:
@@ -52,5 +53,3 @@ def create_admin_user():
         print("✅ Utente ADMIN creato con successo")
     else:
         print("ℹ️ Utente ADMIN già esistente")
-
-    db.close()
