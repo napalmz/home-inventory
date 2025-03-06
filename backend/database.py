@@ -4,7 +4,7 @@ import os
 #from base import Base  # IMPORTA DA base.py
 from dotenv import load_dotenv
 from models import User, Role, RoleEnum, Base
-from routes.auth import router as hash_password
+from routes.auth import hash_password
 
 load_dotenv()  # Carica le variabili dal file .env
 
@@ -14,10 +14,10 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
-    print("Creazione delle tabelle...")
-    print("Modelli registrati:", Base.metadata.tables.keys())
+    print("ℹ️ Creazione delle tabelle...")
+    print("ℹ️ Modelli registrati:", Base.metadata.tables.keys())
     Base.metadata.create_all(bind=engine)
-    print("Tabelle create con successo!")
+    print("✅ Tabelle create con successo!")
 
 def get_db():
     db = SessionLocal()
@@ -39,17 +39,23 @@ def create_admin_user(db: Session):
     admin_username = "ADMIN"
     admin_password = os.getenv("ADMIN_PASSWORD")  # La password viene letta da un ENV
     if not admin_password:
-        print("Errore: Variabile d'ambiente ADMIN_PASSWORD non impostata!")
+        print("❌ Errore: Variabile d'ambiente ADMIN_PASSWORD non impostata!")
         return
 
-    #db: Session = SessionLocal()
-    admin_user = db.query(User).filter(User.username == admin_username).first()
-    
-    if not admin_user:
-        hashed_password = hash_password(admin_password)
-        new_admin = User(username=admin_username, hashed_password=hashed_password, role=RoleEnum.admin)
-        db.add(new_admin)
-        db.commit()
-        print("✅ Utente ADMIN creato con successo")
-    else:
+    # Controlla se esiste già l'utente admin
+    existing_admin = db.query(User).filter(User.username == admin_username).first()
+    if existing_admin:
         print("ℹ️ Utente ADMIN già esistente")
+        return
+
+    # Recupera il ruolo 'admin' dal database
+    admin_role = db.query(Role).filter(Role.name == "admin").first()
+    if not admin_role:
+        print("⚠️ Ruolo admin non trovato. Assicurati che init_roles() l'abbia creato.")
+        return
+    
+    hashed = hash_password(admin_password)
+    new_admin = User(username=admin_username, hashed_password=hashed, role=admin_role)
+    db.add(new_admin)
+    db.commit()
+    print("✅ Utente ADMIN creato con successo")
