@@ -1,7 +1,7 @@
 import os
 from sqlalchemy.orm import Session
 from fastapi import FastAPI
-from database import engine, Base, SessionLocal, init_roles
+from database import engine, Base, SessionLocal, init_roles, create_tables
 from models import User, RoleEnum
 from routes.auth import router as auth_router, hash_password
 from routes.inventory import router as inventory_router
@@ -31,13 +31,11 @@ def create_admin_user():
 
 app = FastAPI()
 
-Base.metadata.create_all(bind=engine)
-
 db = SessionLocal()
+create_tables()
 init_roles(db)
-db.close()
-
 create_admin_user()
+db.close()
 
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])

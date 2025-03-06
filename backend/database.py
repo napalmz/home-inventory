@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
 from dotenv import load_dotenv
-from models import Role
+from models import Role, RoleEnum
 from base import Base  # IMPORTA DA base.py
 
 load_dotenv()  # Carica le variabili dal file .env
@@ -13,15 +13,17 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Crea le tabelle se non esistono
-Base.metadata.create_all(bind=engine)
-
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+def create_tables():
+    """Crea le tabelle nel database"""
+    print("Creating database tables...")
+    Base.metadata.create_all(bind=engine)
 
 def init_roles(db: Session):
     role_names = ["admin", "moderator", "viewer"]
@@ -31,3 +33,6 @@ def init_roles(db: Session):
             new_role = Role(name=role_name)
             db.add(new_role)
     db.commit()
+
+#Inizializzo tabelle prima di tutto
+create_tables()
