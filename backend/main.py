@@ -15,6 +15,7 @@ create_admin_user(db)
 db.close()
 
 app = FastAPI()
+app.openapi_schema = None  # Rigenera lo schema alla prima richiesta
 
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
