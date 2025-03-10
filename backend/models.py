@@ -6,6 +6,7 @@ from enum import Enum
 
 Base = declarative_base()
 
+################################################
 class LoggingData:
     data_ins = Column(DateTime, server_default=func.now(), nullable=False)
     data_mod = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -27,11 +28,13 @@ class LoggingData:
     def user_mod_rel(cls):
         return relationship("User", foreign_keys=[cls.user_mod])
 
+################################################
 class RoleEnum(str, Enum):
     admin = "admin"
     moderator = "moderator"
     viewer = "viewer"
 
+################################################
 # Definizione dei ruoli
 class Role(Base, LoggingData):
     __tablename__ = "roles"
@@ -41,6 +44,7 @@ class Role(Base, LoggingData):
 
     users = relationship("User", back_populates="role", foreign_keys="[User.role_id]")
 
+################################################
 # Associazione tra utenti e gruppi
 class UserGroupAssociation(Base, LoggingData):
     __tablename__ = "user_group_association"
@@ -51,9 +55,8 @@ class UserGroupAssociation(Base, LoggingData):
     # Relazioni esplicite con Foreign Keys
     user = relationship("User", back_populates="group_associations", foreign_keys=[user_id])
     group = relationship("Group", back_populates="user_associations", foreign_keys=[group_id])
-    #user = relationship("User", back_populates="group_associations", overlaps="groups")
-    #group = relationship("Group", back_populates="user_associations", overlaps="users")
 
+################################################
 class User(Base, LoggingData):
     __tablename__ = "users"
 
@@ -66,11 +69,11 @@ class User(Base, LoggingData):
     role = relationship("Role", foreign_keys=[role_id])
     
     # Relazione con UserGroupAssociation con chiave esplicita
-    # Relazione Many-to-Many con Group tramite user_group_association con Foreign Keys esplicite
     group_associations = relationship("UserGroupAssociation",
                                       back_populates="user",
                                       foreign_keys="[UserGroupAssociation.user_id]"
                                     )
+    # Relazione Many-to-Many con Group tramite user_group_association con Foreign Keys esplicite
     groups = relationship("Group",
                           secondary="user_group_association",
                           primaryjoin="User.id == UserGroupAssociation.user_id",
@@ -78,6 +81,7 @@ class User(Base, LoggingData):
                           back_populates="users"
                         )
 
+################################################
 class Group(Base, LoggingData):
     __tablename__ = "groups"
 
@@ -88,11 +92,11 @@ class Group(Base, LoggingData):
     role = relationship("Role")
 
     # Relazione esplicita con UserGroupAssociation
-    # Relazione Many-to-Many con User con chiavi esplicite
     user_associations = relationship("UserGroupAssociation",
                                      back_populates="group",
                                      foreign_keys="[UserGroupAssociation.group_id]"
                                     )
+    # Relazione Many-to-Many con User con chiavi esplicite
     users = relationship("User",
                          secondary="user_group_association",
                          primaryjoin="Group.id == UserGroupAssociation.group_id",
@@ -101,6 +105,7 @@ class Group(Base, LoggingData):
                          overlaps="group_associations,user"
                         )
 
+################################################
 class Inventory(Base, LoggingData):
     __tablename__ = "inventories"
     
@@ -109,6 +114,7 @@ class Inventory(Base, LoggingData):
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", foreign_keys=[owner_id])
 
+################################################
 class Item(Base, LoggingData):
     __tablename__ = "items"
     
@@ -117,6 +123,7 @@ class Item(Base, LoggingData):
     qty = Column(Integer, index=True)
     inventory_id = Column(Integer, ForeignKey("inventories.id"))
 
+################################################
 class SharedInventory(Base, LoggingData):
     __tablename__ = "shared_inventories"
 
