@@ -1,82 +1,91 @@
-from __future__ import annotations  # Necessario per risolvere ForwardRef automaticamente
+from __future__ import annotations
 from typing import List, Optional
 from pydantic import BaseModel
 
-##############################################################
-# Modello per la creazione di un nuovo utente
-class UserCreate(BaseModel):
+################################################
+# Modello per i ruoli
+class RoleBase(BaseModel):
+    name: str
+
+class RoleCreate(RoleBase):
+    pass
+
+class RoleResponse(RoleBase):
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+RoleResponse.model_rebuild()
+
+################################################
+# Modello per gli utenti
+class UserBase(BaseModel):
     username: str
-    password: str
 
-# Modello per la visualizzazione delle informazioni dell'utente
-class User(BaseModel):
+class UserCreate(UserBase):
+    password: str  # La password non viene restituita nelle risposte
+
+class UserResponse(UserBase):
     id: int
-    username: str
-    role: str
-
+    role: Optional[RoleResponse]
+    
     class Config:
         from_attributes = True
 
-User.model_rebuild()  # ✅ Ricostruisce il modello
+UserResponse.model_rebuild()
 
-##############################################################
-# Modello per la creazione di un nuovo gruppo
-class GroupCreate(BaseModel):
+################################################
+# Modello per i gruppi
+class GroupBase(BaseModel):
     name: str
 
-# Modello per la visualizzazione delle informazioni del gruppo
-class Group(BaseModel):
+class GroupCreate(GroupBase):
+    pass
+
+class GroupResponse(GroupBase):
     id: int
-    name: str
-
+    users: List[UserResponse] = []
+    
     class Config:
         from_attributes = True
 
-Group.model_rebuild()  # ✅ Ricostruisce il modello
+GroupResponse.model_rebuild()
 
-##############################################################
-# Modello per la creazione di un nuovo inventario
-class InventoryCreate(BaseModel):
+################################################
+# Modello per la creazione e risposta di un inventario
+class InventoryBase(BaseModel):
     name: str
 
-# Modello per la visualizzazione delle informazioni dell'inventario
-class Inventory(BaseModel):
+class InventoryCreate(InventoryBase):
+    pass
+
+class InventoryResponse(InventoryBase):
     id: int
-    name: str
-    owner: "User"  # ✅ Usa una stringa per evitare errori di ForwardRef
-
+    owner: UserResponse  # Riferimento all'utente proprietario
+    
     class Config:
         from_attributes = True
 
-Inventory.model_rebuild()  # ✅ Ricostruisce il modello
+InventoryResponse.model_rebuild()
 
-class InventoryResponse(Inventory):
+################################################
+# Modello per gli elementi di un inventario
+class InventoryItemBase(BaseModel):
+    name: str
+    quantity: int
+
+class InventoryItemCreate(InventoryItemBase):
+    pass
+
+class InventoryItemResponse(InventoryItemBase):
     id: int
-    name: str
-    owner: "User"  # ✅ Usa una stringa per evitare errori di ForwardRef
-
-    class Config:
-        from_attributes = True
-
-InventoryResponse.model_rebuild()  # ✅ Ricostruisce il modello
-
-##############################################################
-# Modello per la creazione di un nuovo item
-class ItemCreate(BaseModel):
-    name: str
-    qty: int
-
-# Modello per la visualizzazione delle informazioni dell'item
-class Item(BaseModel):
-    id: int
-    name: str
-    qty: int
     inventory_id: int
-
+    
     class Config:
         from_attributes = True
 
-Item.model_rebuild()  # ✅ Ricostruisce il modello
+InventoryItemResponse.model_rebuild()
 
 ##############################################################
 # Modello per la gestione del token di accesso
@@ -88,17 +97,4 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-##############################################################
-# Modello per la creazione di un nuovo ruolo
-class RoleCreate(BaseModel):
-    name: str
-
-# Modello per la visualizzazione delle informazioni dei ruoli
-class Role(BaseModel):
-    id: int
-    name: str
-
-    class Config:
-        from_attributes = True
-
-Role.model_rebuild()  # ✅ Ricostruisce il modello
+Token.model_rebuild()
