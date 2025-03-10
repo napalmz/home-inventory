@@ -7,3 +7,4 @@ passlib
 jwt
 python-multipart
 python-jose
+alembic

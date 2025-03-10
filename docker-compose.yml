@@ -13,6 +13,7 @@ services:
       - backend/.env
     volumes:
       - ./backend:/app
+    entrypoint: ["/app/entrypoint.sh"]
 
 #  frontend:
 #    build: ./frontend

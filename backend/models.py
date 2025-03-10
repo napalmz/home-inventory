@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, func
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base, Session
 from enum import Enum
@@ -7,8 +7,8 @@ from enum import Enum
 Base = declarative_base()
 
 class LoggingData:
-    data_ins = Column(DateTime, default=lambda: datetime.now(datetime.UTC), nullable=False)
-    data_mod = Column(DateTime, default=lambda: datetime.now(datetime.UTC), onupdate=lambda: datetime.now(datetime.UTC), nullable=False)
+    data_ins = Column(DateTime, server_default=func.now(), nullable=False)
+    data_mod = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     @declared_attr
     def user_ins(cls):
@@ -17,6 +17,15 @@ class LoggingData:
     @declared_attr
     def user_mod(cls):
         return Column(Integer, ForeignKey('users.id'), nullable=True)
+
+    # Esplicita le relazioni per evitare ambiguità
+    @declared_attr
+    def user_ins_rel(cls):
+        return relationship("User", foreign_keys=[cls.user_ins])
+
+    @declared_attr
+    def user_mod_rel(cls):
+        return relationship("User", foreign_keys=[cls.user_mod])
 
 class RoleEnum(str, Enum):
     admin = "admin"
@@ -30,6 +39,8 @@ class Role(Base, LoggingData):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
 
+    users = relationship("User", back_populates="role", foreign_keys="[User.role_id]")
+
 # Associazione tra utenti e gruppi
 class UserGroupAssociation(Base, LoggingData):
     __tablename__ = "user_group_association"
@@ -37,19 +48,9 @@ class UserGroupAssociation(Base, LoggingData):
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     group_id = Column(Integer, ForeignKey("groups.id"), primary_key=True)
 
-    # Relazioni con User e Group
-    user = relationship("User", back_populates="group_associations")
-    group = relationship("Group", back_populates="user_associations")
-
-class Group(Base, LoggingData):
-    __tablename__ = "groups"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True)
-    role_id = Column(Integer, ForeignKey("roles.id"))
-
-    role = relationship("Role")
-    user_links = relationship("UserGroupAssociation", back_populates="group")
+    # Relazioni con User e Group, specificando foreign_keys
+    user = relationship("User", back_populates="group_associations", foreign_keys=[user_id])
+    group = relationship("Group", back_populates="user_associations", foreign_keys=[group_id])
 
 class User(Base, LoggingData):
     __tablename__ = "users"
@@ -59,8 +60,22 @@ class User(Base, LoggingData):
     hashed_password = Column(String)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
 
+    # Esplicita la foreign key nella relazione con Role
+    role = relationship("Role", foreign_keys=[role_id])
+
+    group_associations = relationship("UserGroupAssociation", back_populates="user")
+    groups = relationship("Group", secondary="user_group_association", back_populates="users")
+
+class Group(Base, LoggingData):
+    __tablename__ = "groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"))
+
     role = relationship("Role")
-    group_links = relationship("UserGroupAssociation", back_populates="user")
+    user_associations = relationship("UserGroupAssociation", back_populates="group")
+    users = relationship("User", secondary="user_group_association", back_populates="groups")
 
 class Inventory(Base, LoggingData):
     __tablename__ = "inventories"
