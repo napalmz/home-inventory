@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import os
-#from base import Base  # IMPORTA DA base.py
 from dotenv import load_dotenv
 from models import User, Role, RoleEnum, Base
 from routes.auth import hash_password
