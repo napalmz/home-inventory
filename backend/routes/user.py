@@ -5,16 +5,16 @@ import crud, schemas
 
 router = APIRouter()
 
-@router.post("/users/", response_model=schemas.UserResponse)
+@router.post("/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     hashed_password = user.password  # Qui andrebbe la funzione di hashing
     return crud.create_user(db, user, hashed_password)
 
-@router.post("/roles/", response_model=schemas.RoleResponse)
+@router.post("/roles/", response_model=schemas.Role)
 def create_role(role: schemas.RoleCreate, db: Session = Depends(get_db)):
     return crud.create_role(db, role.name)
 
-@router.post("/groups/", response_model=schemas.GroupResponse)
+@router.post("/groups/", response_model=schemas.Group)
 def create_group(group: schemas.GroupCreate, db: Session = Depends(get_db)):
     return crud.create_group(db, group.name, group.role_id)
 

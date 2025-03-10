@@ -8,14 +8,6 @@ class UserCreate(BaseModel):
     username: str
     password: str
 
-class UserResponse(BaseModel):
-    id: int
-    username: str
-    role: str
-
-    class Config:
-        from_attributes = True
-
 # Modello per la visualizzazione delle informazioni dell'utente
 class User(BaseModel):
     id: int
@@ -25,69 +17,66 @@ class User(BaseModel):
     class Config:
         from_attributes = True
 
+User.model_rebuild()  # ✅ Ricostruisce il modello
+
 ##############################################################
 # Modello per la creazione di un nuovo gruppo
 class GroupCreate(BaseModel):
     name: str
 
-class GroupResponse(BaseModel):
-    id: int
-    name: str
-
-    class Config:
-        from_attributes = True
-
 # Modello per la visualizzazione delle informazioni del gruppo
 class Group(BaseModel):
     id: int
     name: str
-    users: List['User'] = []
 
     class Config:
         from_attributes = True
+
+Group.model_rebuild()  # ✅ Ricostruisce il modello
 
 ##############################################################
 # Modello per la creazione di un nuovo inventario
 class InventoryCreate(BaseModel):
     name: str
-    description: Optional[str] = None
-
-class InventoryResponse(BaseModel):
-    id: int
-    name: str
-    description: Optional[str] = None
-    owner_id: int
-
-    class Config:
-        from_attributes = True
 
 # Modello per la visualizzazione delle informazioni dell'inventario
 class Inventory(BaseModel):
     id: int
     name: str
-    description: Optional[str] = None
-    owner_id: int
+    owner: "User"  # ✅ Usa una stringa per evitare errori di ForwardRef
 
     class Config:
         from_attributes = True
+
+Inventory.model_rebuild()  # ✅ Ricostruisce il modello
+
+class InventoryResponse(Inventory):
+    id: int
+    name: str
+    owner: "User"  # ✅ Usa una stringa per evitare errori di ForwardRef
+
+    class Config:
+        from_attributes = True
+
+InventoryResponse.model_rebuild()  # ✅ Ricostruisce il modello
 
 ##############################################################
 # Modello per la creazione di un nuovo item
 class ItemCreate(BaseModel):
     name: str
-    description: Optional[str] = None
-    quantity: int
+    qty: int
 
 # Modello per la visualizzazione delle informazioni dell'item
 class Item(BaseModel):
     id: int
     name: str
-    description: Optional[str] = None
-    quantity: int
+    qty: int
     inventory_id: int
 
     class Config:
         from_attributes = True
+
+Item.model_rebuild()  # ✅ Ricostruisce il modello
 
 ##############################################################
 # Modello per la gestione del token di accesso
@@ -104,13 +93,6 @@ class TokenData(BaseModel):
 class RoleCreate(BaseModel):
     name: str
 
-class RoleResponse(BaseModel):
-    id: int
-    name: str
-
-    class Config:
-        from_attributes = True
-
 # Modello per la visualizzazione delle informazioni dei ruoli
 class Role(BaseModel):
     id: int
@@ -119,7 +101,4 @@ class Role(BaseModel):
     class Config:
         from_attributes = True
 
-##############################################################
-# Dopo la definizione di tutte le classi Pydantic
-for model in BaseModel.__subclasses__():
-    model.model_rebuild()
+Role.model_rebuild()  # ✅ Ricostruisce il modello

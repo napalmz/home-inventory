@@ -67,10 +67,16 @@ class User(Base, LoggingData):
     
     # Relazione con UserGroupAssociation con chiave esplicita
     # Relazione Many-to-Many con Group tramite user_group_association con Foreign Keys esplicite
-    group_associations = relationship("UserGroupAssociation", back_populates="user", foreign_keys="[UserGroupAssociation.user_id]")
-    groups = relationship("Group", secondary="user_group_association", primaryjoin="User.id == UserGroupAssociation.user_id", secondaryjoin="Group.id == UserGroupAssociation.group_id", back_populates="users")
-    #group_associations = relationship("UserGroupAssociation", back_populates="user", overlaps="groups")
-    #groups = relationship("Group", secondary="user_group_association", back_populates="users", overlaps="user_associations")
+    group_associations = relationship("UserGroupAssociation",
+                                      back_populates="user",
+                                      foreign_keys="[UserGroupAssociation.user_id]"
+                                    )
+    groups = relationship("Group",
+                          secondary="user_group_association",
+                          primaryjoin="User.id == UserGroupAssociation.user_id",
+                          secondaryjoin="Group.id == UserGroupAssociation.group_id",
+                          back_populates="users"
+                        )
 
 class Group(Base, LoggingData):
     __tablename__ = "groups"
@@ -83,10 +89,17 @@ class Group(Base, LoggingData):
 
     # Relazione esplicita con UserGroupAssociation
     # Relazione Many-to-Many con User con chiavi esplicite
-    user_associations = relationship("UserGroupAssociation", back_populates="group", foreign_keys="[UserGroupAssociation.group_id]")
-    users = relationship("User", secondary="user_group_association", primaryjoin="Group.id == UserGroupAssociation.group_id", secondaryjoin="User.id == UserGroupAssociation.user_id", back_populates="groups")
-    #user_associations = relationship("UserGroupAssociation", back_populates="group", overlaps="users")
-    #users = relationship("User", secondary="user_group_association", back_populates="groups", overlaps="group_associations")
+    user_associations = relationship("UserGroupAssociation",
+                                     back_populates="group",
+                                     foreign_keys="[UserGroupAssociation.group_id]"
+                                    )
+    users = relationship("User",
+                         secondary="user_group_association",
+                         primaryjoin="Group.id == UserGroupAssociation.group_id",
+                         secondaryjoin="User.id == UserGroupAssociation.user_id",
+                         back_populates="groups",
+                         overlaps="group_associations,user"
+                        )
 
 class Inventory(Base, LoggingData):
     __tablename__ = "inventories"
