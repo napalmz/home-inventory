@@ -1,9 +1,22 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Table
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
+from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base, Session
-#from base import Base  # IMPORTA DA base.py
 from enum import Enum
 
 Base = declarative_base()
+
+class LoggingData:
+    data_ins = Column(DateTime, default=lambda: datetime.now(datetime.UTC), nullable=False)
+    data_mod = Column(DateTime, default=lambda: datetime.now(datetime.UTC), onupdate=lambda: datetime.now(datetime.UTC), nullable=False)
+
+    @declared_attr
+    def user_ins(cls):
+        return Column(Integer, ForeignKey('users.id'), nullable=False)
+
+    @declared_attr
+    def user_mod(cls):
+        return Column(Integer, ForeignKey('users.id'), nullable=True)
 
 class RoleEnum(str, Enum):
     admin = "admin"
@@ -11,21 +24,24 @@ class RoleEnum(str, Enum):
     viewer = "viewer"
 
 # Definizione dei ruoli
-class Role(Base):
+class Role(Base, LoggingData):
     __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
 
 # Associazione tra utenti e gruppi
-user_group_association = Table(
-    "user_group_association",
-    Base.metadata,
-    Column("user_id", Integer, ForeignKey("users.id")),
-    Column("group_id", Integer, ForeignKey("groups.id")),
-)
+class UserGroupAssociation(Base, LoggingData):
+    __tablename__ = "user_group_association"
 
-class Group(Base):
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    group_id = Column(Integer, ForeignKey("groups.id"), primary_key=True)
+
+    # Relazioni con User e Group
+    user = relationship("User", back_populates="group_associations")
+    group = relationship("Group", back_populates="user_associations")
+
+class Group(Base, LoggingData):
     __tablename__ = "groups"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -33,9 +49,9 @@ class Group(Base):
     role_id = Column(Integer, ForeignKey("roles.id"))
 
     role = relationship("Role")
-    users = relationship("User", secondary=user_group_association, back_populates="groups")
+    user_links = relationship("UserGroupAssociation", back_populates="group")
 
-class User(Base):
+class User(Base, LoggingData):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -44,9 +60,9 @@ class User(Base):
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
 
     role = relationship("Role")
-    groups = relationship("Group", secondary=user_group_association, back_populates="users")
+    group_links = relationship("UserGroupAssociation", back_populates="user")
 
-class Inventory(Base):
+class Inventory(Base, LoggingData):
     __tablename__ = "inventories"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -54,7 +70,7 @@ class Inventory(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User")
 
-class Item(Base):
+class Item(Base, LoggingData):
     __tablename__ = "items"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -62,7 +78,7 @@ class Item(Base):
     qty = Column(Integer, index=True)
     inventory_id = Column(Integer, ForeignKey("inventories.id"))
 
-class SharedInventory(Base):
+class SharedInventory(Base, LoggingData):
     __tablename__ = "shared_inventories"
 
     id = Column(Integer, primary_key=True, index=True)
