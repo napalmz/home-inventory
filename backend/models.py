@@ -12,7 +12,7 @@ class LoggingData:
 
     @declared_attr
     def user_ins(cls):
-        return Column(Integer, ForeignKey('users.id'), nullable=False)
+        return Column(Integer, ForeignKey('users.id'), nullable=True)
 
     @declared_attr
     def user_mod(cls):
@@ -48,9 +48,11 @@ class UserGroupAssociation(Base, LoggingData):
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     group_id = Column(Integer, ForeignKey("groups.id"), primary_key=True)
 
-    # Relazioni con User e Group, specificando foreign_keys
+    # Relazioni esplicite con Foreign Keys
     user = relationship("User", back_populates="group_associations", foreign_keys=[user_id])
     group = relationship("Group", back_populates="user_associations", foreign_keys=[group_id])
+    #user = relationship("User", back_populates="group_associations", overlaps="groups")
+    #group = relationship("Group", back_populates="user_associations", overlaps="users")
 
 class User(Base, LoggingData):
     __tablename__ = "users"
@@ -60,11 +62,15 @@ class User(Base, LoggingData):
     hashed_password = Column(String)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
 
-    # Esplicita la foreign key nella relazione con Role
+    # Relazioni esplicite
     role = relationship("Role", foreign_keys=[role_id])
-
-    group_associations = relationship("UserGroupAssociation", back_populates="user")
-    groups = relationship("Group", secondary="user_group_association", back_populates="users")
+    
+    # Relazione con UserGroupAssociation con chiave esplicita
+    # Relazione Many-to-Many con Group tramite user_group_association con Foreign Keys esplicite
+    group_associations = relationship("UserGroupAssociation", back_populates="user", foreign_keys="[UserGroupAssociation.user_id]")
+    groups = relationship("Group", secondary="user_group_association", primaryjoin="User.id == UserGroupAssociation.user_id", secondaryjoin="Group.id == UserGroupAssociation.group_id", back_populates="users")
+    #group_associations = relationship("UserGroupAssociation", back_populates="user", overlaps="groups")
+    #groups = relationship("Group", secondary="user_group_association", back_populates="users", overlaps="user_associations")
 
 class Group(Base, LoggingData):
     __tablename__ = "groups"
@@ -74,8 +80,13 @@ class Group(Base, LoggingData):
     role_id = Column(Integer, ForeignKey("roles.id"))
 
     role = relationship("Role")
-    user_associations = relationship("UserGroupAssociation", back_populates="group")
-    users = relationship("User", secondary="user_group_association", back_populates="groups")
+
+    # Relazione esplicita con UserGroupAssociation
+    # Relazione Many-to-Many con User con chiavi esplicite
+    user_associations = relationship("UserGroupAssociation", back_populates="group", foreign_keys="[UserGroupAssociation.group_id]")
+    users = relationship("User", secondary="user_group_association", primaryjoin="Group.id == UserGroupAssociation.group_id", secondaryjoin="User.id == UserGroupAssociation.user_id", back_populates="groups")
+    #user_associations = relationship("UserGroupAssociation", back_populates="group", overlaps="users")
+    #users = relationship("User", secondary="user_group_association", back_populates="groups", overlaps="group_associations")
 
 class Inventory(Base, LoggingData):
     __tablename__ = "inventories"
@@ -83,7 +94,7 @@ class Inventory(Base, LoggingData):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     owner_id = Column(Integer, ForeignKey("users.id"))
-    owner = relationship("User")
+    owner = relationship("User", foreign_keys=[owner_id])
 
 class Item(Base, LoggingData):
     __tablename__ = "items"

@@ -1,6 +1,8 @@
+from __future__ import annotations  # Necessario per risolvere ForwardRef automaticamente
 from typing import List, Optional
 from pydantic import BaseModel
 
+##############################################################
 # Modello per la creazione di un nuovo utente
 class UserCreate(BaseModel):
     username: str
@@ -23,6 +25,7 @@ class User(BaseModel):
     class Config:
         from_attributes = True
 
+##############################################################
 # Modello per la creazione di un nuovo gruppo
 class GroupCreate(BaseModel):
     name: str
@@ -38,11 +41,12 @@ class GroupResponse(BaseModel):
 class Group(BaseModel):
     id: int
     name: str
-    users: List[User] = []
+    users: List['User'] = []
 
     class Config:
         from_attributes = True
 
+##############################################################
 # Modello per la creazione di un nuovo inventario
 class InventoryCreate(BaseModel):
     name: str
@@ -67,6 +71,7 @@ class Inventory(BaseModel):
     class Config:
         from_attributes = True
 
+##############################################################
 # Modello per la creazione di un nuovo item
 class ItemCreate(BaseModel):
     name: str
@@ -84,6 +89,7 @@ class Item(BaseModel):
     class Config:
         from_attributes = True
 
+##############################################################
 # Modello per la gestione del token di accesso
 class Token(BaseModel):
     access_token: str
@@ -93,6 +99,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+##############################################################
 # Modello per la creazione di un nuovo ruolo
 class RoleCreate(BaseModel):
     name: str
@@ -111,3 +118,8 @@ class Role(BaseModel):
 
     class Config:
         from_attributes = True
+
+##############################################################
+# Dopo la definizione di tutte le classi Pydantic
+for model in BaseModel.__subclasses__():
+    model.model_rebuild()
