@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from models import User, RoleEnum
-from database import SessionLocal
-from dependencies import role_required, get_db
+from dependencies import role_required
 
 router = APIRouter()
+
+def get_db_local():
+    from database import get_db  # Import qui dentro
+    db = get_db()
 
 @router.put("/users/{user_id}/role/")
 def update_user_role(
     user_id: int,
-    new_role: RoleEnum,
-    db: Session = Depends(get_db),
+    new_role: str,  # Cambiato da RoleEnum a str
+    db: Session = Depends(get_db_local),
     admin=Depends(role_required(RoleEnum.admin))
 ):
     user = db.query(User).filter(User.id == user_id).first()
@@ -18,9 +21,14 @@ def update_user_role(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
     
-    if user.role == RoleEnum.admin and new_role != RoleEnum.admin:
+    if user.role == RoleEnum.admin.value and new_role != RoleEnum.admin.value:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Non puoi rimuovere un amministratore")
 
-    user.role = new_role
+    # Converte il ruolo stringa in enum
+    try:
+        user.role = RoleEnum(new_role)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ruolo non valido")
+
     db.commit()
-    return {"message": f"Ruolo di {user.username} aggiornato a {user.role}"}
+    return {"message": f"Ruolo di {user.username} aggiornato a {user.role.value}"}
