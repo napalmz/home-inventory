@@ -1,15 +1,7 @@
-from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from database import SessionLocal
+from fastapi import Depends, HTTPException
+from database import SessionLocal, get_db
 from models import User, RoleEnum
 from routes.auth import router as get_current_user
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 def role_required(required_role: RoleEnum):  # ✅ Accetta RoleEnum invece di str
     def dependency(user: User = Depends(get_current_user)):

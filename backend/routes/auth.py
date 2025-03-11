@@ -31,7 +31,7 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MINUTES):
-    expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_delta)
+    expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=expires_delta)
     to_encode = data.copy()
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -57,8 +57,9 @@ def get_current_user(security_scopes: SecurityScopes,
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido")
 
 @router.post("/register/", response_model=dict)
-def register(user: UserCreate,
-             db: Session = Depends(get_db_local)
+def register(
+    user: UserCreate,
+    db: Session = Depends(get_db_local)
 ):
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
@@ -70,11 +71,25 @@ def register(user: UserCreate,
     return {"message": "Utente registrato con successo"}
 
 @router.post("/login/", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(),
-          db: Session = Depends(get_db_local)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db_local)
 ):
+    print(f"🔍 DEBUG: db ricevuto in login -> {db}")  # ✅ Debug
+
+    if db is None:  # ✅ Debug: Controlla se db è None
+        raise HTTPException(status_code=500, detail="Errore interno: database non disponibile")
+
     user = db.query(User).filter(User.username == form_data.username).first()
+
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenziali non valide")
+    
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/debug/db")
+def debug_db(db: Session = Depends(get_db_local)):
+    print(f"🔍 DEBUG: db ricevuto in endpoint -> {db}")  # ✅ Debug
+    return {"message": "DB ricevuto", "db_type": str(type(db))}

@@ -1,15 +1,15 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
-import os
+from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
 from models import User, Role, RoleEnum, Base
 from routes.auth import hash_password
+import os
 
 load_dotenv()  # Carica le variabili dal file .env
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@inventory-db/inventory")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL)  # ✅ `echo=True` per vedere le query SQL
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
@@ -19,10 +19,18 @@ def init_db():
     print("✅ Tabelle create con successo!")
 
 def get_db():
+    print("🔍 DEBUG: get_db() chiamato")  # ✅ Debug
     db = SessionLocal()
+    
+    if db is None:
+        print("❌ ERRORE: La sessione DB è None!")  # ✅ Debug in caso di errore
+    else:
+        print("✅ SUCCESSO: Sessione DB creata correttamente")  # ✅ Debug
+
     try:
         yield db
     finally:
+        print("🔄 DEBUG: Chiusura sessione DB")  # ✅ Debug quando il DB viene chiuso
         db.close()
 
 def init_roles_and_admin(db: Session):
