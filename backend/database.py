@@ -58,38 +58,3 @@ def init_roles_and_admin(db: Session):
     for role in role_objects.values():
         role.user_ins = admin_user.id  # 👈 Ora assegniamo l'utente
     db.commit()
-'''
-def init_roles(db: Session):
-    role_names = ["admin", "moderator", "viewer"]
-    for role_name in role_names:
-        existing_role = db.query(Role).filter(Role.name == role_name).first()
-        if not existing_role:
-            new_role = Role(name=role_name, user_ins=1)
-            db.add(new_role)
-    db.commit()
-
-def create_admin_user(db: Session):
-    admin_username = "ADMIN"
-    admin_password = os.getenv("ADMIN_PASSWORD")  # La password viene letta da un ENV
-    if not admin_password:
-        print("❌ Errore: Variabile d'ambiente ADMIN_PASSWORD non impostata!")
-        return
-
-    # Controlla se esiste già l'utente admin
-    existing_admin = db.query(User).filter(User.username == admin_username).first()
-    if existing_admin:
-        print("ℹ️ Utente ADMIN già esistente")
-        return
-
-    # Recupera il ruolo 'admin' dal database
-    admin_role = db.query(Role).filter(Role.name == "admin").first()
-    if not admin_role:
-        print("⚠️ Ruolo admin non trovato. Assicurati che init_roles() l'abbia creato.")
-        return
-    
-    hashed = hash_password(admin_password)
-    new_admin = User(username=admin_username, hashed_password=hashed, role=admin_role)
-    db.add(new_admin)
-    db.commit()
-    print("✅ Utente ADMIN creato con successo")
-'''

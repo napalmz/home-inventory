@@ -36,7 +36,10 @@ def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MIN
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(security_scopes: SecurityScopes, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db_local)):
+def get_current_user(security_scopes: SecurityScopes,
+                     token: str = Depends(oauth2_scheme),
+                     db: Session = Depends(get_db_local)
+):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -45,12 +48,18 @@ def get_current_user(security_scopes: SecurityScopes, token: str = Depends(oauth
         user = db.query(User).filter(User.username == username).first()
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utente non trovato")
+        if user.role is None:
+            raise HTTPException(status_code=403, detail="Accesso negato: ruolo non assegnato")
+        if user.is_blocked:  # ✅ Blocca l'accesso agli utenti disabilitati
+            raise HTTPException(status_code=403, detail="Utente bloccato. Accesso negato.")
         return user
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido")
 
 @router.post("/register/", response_model=dict)
-def register(user: UserCreate, db: Session = Depends(get_db_local)):
+def register(user: UserCreate,
+             db: Session = Depends(get_db_local)
+):
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username già in uso")
@@ -61,7 +70,9 @@ def register(user: UserCreate, db: Session = Depends(get_db_local)):
     return {"message": "Utente registrato con successo"}
 
 @router.post("/login/", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db_local)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(),
+          db: Session = Depends(get_db_local)
+):
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenziali non valide")

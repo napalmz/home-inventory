@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean, func
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base, Session
 from enum import Enum
@@ -64,6 +64,7 @@ class User(Base, LoggingData):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
+    is_blocked = Column(Boolean, default=False)
 
     # Relazioni esplicite
     role = relationship("Role", foreign_keys=[role_id])

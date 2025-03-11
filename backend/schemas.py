@@ -39,15 +39,21 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     hashed_password: str  # La password non viene restituita nelle risposte
 
+class UserUpdate(UserBase):
+    role_id: Optional[int] = None
+    is_blocked: Optional[bool] = None  # ✅ Permette di aggiornare lo stato bloccato
+
 class UserResponse(UserBase, LoggingResponse):
     id: int
     role: Optional['RoleResponse']
+    is_blocked: bool
     
     class Config:
         from_attributes = True
 
 UserBase.model_rebuild()
 UserCreate.model_rebuild()
+UserUpdate.model_rebuild()
 UserResponse.model_rebuild()
 
 ################################################
