@@ -1,20 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from models import User, RoleEnum
-from dependencies import role_required
+from dependencies import get_db, role_required
 
 router = APIRouter()
-
-def get_db_local():
-    from database import get_db  # Import qui dentro
-    db = get_db()
 
 @router.put("/users/{user_id}/role/")
 def update_user_role(
     user_id: int,
     new_role: str,  # Cambiato da RoleEnum a str
-    db: Session = Depends(get_db_local),
-    admin=Depends(role_required(RoleEnum.admin))
+    db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(User.id == user_id).first()
     
@@ -31,4 +26,5 @@ def update_user_role(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ruolo non valido")
 
     db.commit()
+
     return {"message": f"Ruolo di {user.username} aggiornato a {user.role.value}"}

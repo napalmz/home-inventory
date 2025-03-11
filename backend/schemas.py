@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -10,6 +10,8 @@ class LoggingResponse(BaseModel):
     data_mod: datetime
     user_ins: Optional[int] = None  # ID dell'utente che ha creato il record
     user_mod: Optional[int] = None  # ID dell'utente che ha modificato il record
+
+LoggingResponse.model_rebuild()
 
 ################################################
 # Modello per i ruoli
@@ -25,6 +27,8 @@ class RoleResponse(RoleBase, LoggingResponse):
     class Config:
         from_attributes = True
 
+RoleBase.model_rebuild()
+RoleCreate.model_rebuild()
 RoleResponse.model_rebuild()
 
 ################################################
@@ -42,6 +46,8 @@ class UserResponse(UserBase, LoggingResponse):
     class Config:
         from_attributes = True
 
+UserBase.model_rebuild()
+UserCreate.model_rebuild()
 UserResponse.model_rebuild()
 
 ################################################
@@ -59,6 +65,8 @@ class GroupResponse(GroupBase, LoggingResponse):
     class Config:
         from_attributes = True
 
+GroupBase.model_rebuild()
+GroupCreate.model_rebuild()
 GroupResponse.model_rebuild()
 
 ################################################
@@ -76,6 +84,8 @@ class InventoryResponse(InventoryBase, LoggingResponse):
     class Config:
         from_attributes = True
 
+InventoryBase.model_rebuild()
+InventoryCreate.model_rebuild()
 InventoryResponse.model_rebuild()
 
 ################################################
@@ -94,6 +104,8 @@ class InventoryItemResponse(InventoryItemBase, LoggingResponse):
     class Config:
         from_attributes = True
 
+InventoryItemBase.model_rebuild()
+InventoryItemCreate.model_rebuild()
 InventoryItemResponse.model_rebuild()
 
 ##############################################################
@@ -107,3 +119,4 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 Token.model_rebuild()
+TokenData.model_rebuild()

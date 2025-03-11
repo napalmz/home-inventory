@@ -6,6 +6,9 @@ from routes.admin import router as admin_router
 from routes.auth import router as auth_router
 from routes.inventory import router as inventory_router
 from routes.user import router as user_router
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 db = SessionLocal()
 init_db()
