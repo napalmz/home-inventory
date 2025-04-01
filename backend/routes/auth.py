@@ -8,6 +8,7 @@ import datetime
 import os
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, SecurityScopes
 from dotenv import load_dotenv
+from dependencies import get_db
 
 load_dotenv()
 
@@ -20,9 +21,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-def get_db_local():
+'''def get_db_local():
     from database import get_db  # Import qui dentro
-    db = get_db()
+    db = get_db()'''
 
 def hash_password(password: str):
     return pwd_context.hash(password)
@@ -38,7 +39,7 @@ def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MIN
 
 def get_current_user(security_scopes: SecurityScopes,
                      token: str = Depends(oauth2_scheme),
-                     db: Session = Depends(get_db_local)
+                     db: Session = Depends(get_db)
 ):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -59,7 +60,7 @@ def get_current_user(security_scopes: SecurityScopes,
 @router.post("/register/", response_model=dict)
 def register(
     user: UserCreate,
-    db: Session = Depends(get_db_local)
+    db: Session = Depends(get_db)
 ):
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
@@ -73,7 +74,7 @@ def register(
 @router.post("/login/", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db_local)
+    db: Session = Depends(get_db)
 ):
     print(f"🔍 DEBUG: db ricevuto in login -> {db}")  # ✅ Debug
 
@@ -90,6 +91,6 @@ def login(
 
 
 @router.get("/debug/db")
-def debug_db(db: Session = Depends(get_db_local)):
+def debug_db(db: Session = Depends(get_db)):
     print(f"🔍 DEBUG: db ricevuto in endpoint -> {db}")  # ✅ Debug
     return {"message": "DB ricevuto", "db_type": str(type(db))}

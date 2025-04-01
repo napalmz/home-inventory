@@ -1,11 +1,12 @@
 import os
 from sqlalchemy.orm import Session
 from fastapi import FastAPI
-from database import SessionLocal, init_db, init_roles_and_admin, get_db
+from database import SessionLocal, init_db
 from routes.admin import router as admin_router
 from routes.auth import router as auth_router
 from routes.inventory import router as inventory_router
 from routes.user import router as user_router
+from dependencies import init_roles_and_admin
 import logging
 
 logging.basicConfig(level=logging.INFO)
