@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-#from database import get_db
 from dependencies import get_db
 from models import User, Inventory, SharedInventory
 from schemas import InventoryCreate, InventoryResponse

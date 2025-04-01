@@ -1,36 +1,25 @@
 from fastapi import Depends, HTTPException
-import database
+from database import SessionLocal, Session
 from models import User, RoleEnum, Role
-from routes.auth import router as get_current_user, hash_password
 import os
 
-def role_required(required_role: RoleEnum):  # ✅ Accetta RoleEnum invece di str
-    def dependency(user: User = Depends(get_current_user)):
-        if user.role is None:
-            raise HTTPException(status_code=403, detail="Accesso negato: ruolo non assegnato")
-        
-        if user.role != required_role:  # ✅ Confronto con RoleEnum
-            raise HTTPException(status_code=403, detail="Accesso negato: permessi insufficienti")
-        
-        return user
-    return dependency
-
 def get_db():
-    print("🔍 DEBUG: get_db() chiamato")  # ✅ Debug
-    db = database.SessionLocal()
+    #print("🔍 DEBUG: get_db() chiamato")  # ✅ Debug
+    db = SessionLocal()
     
     if db is None:
         print("❌ ERRORE: La sessione DB è None!")  # ✅ Debug in caso di errore 
-    else:
-        print("✅ SUCCESSO: Sessione DB creata correttamente")  # ✅ Debug
+   # else:
+   #     print("✅ SUCCESSO: Sessione DB creata correttamente")  # ✅ Debug
 
     try:
         yield db
     finally:
-        print("🔄 DEBUG: Chiusura sessione DB")  # ✅ Debug quando il DB viene chiuso
+        #print("🔄 DEBUG: Chiusura sessione DB")  # ✅ Debug quando il DB viene chiuso
         db.close()
 
-def init_roles_and_admin(db: database.Session):
+def init_roles_and_admin(db: Session):
+    from routes.auth import hash_password
     role_objects = {}
     admin_username = "admin"
 
