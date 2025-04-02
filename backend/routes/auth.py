@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from models import User
+from models import User, RoleEnum, Role
 from schemas import UserCreate, Token
 from passlib.context import CryptContext
 from jose import jwt
@@ -8,7 +8,7 @@ import datetime
 import os
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, SecurityScopes
 from dotenv import load_dotenv
-from dependencies import get_db
+from dependencies import get_db, get_current_user
 
 load_dotenv()
 
@@ -17,6 +17,7 @@ router = APIRouter()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+ENABLE_REGISTRATION = os.getenv("ENABLE_REGISTRATION", "true").lower() == "true"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -33,46 +34,42 @@ def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MIN
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(security_scopes: SecurityScopes,
-                     token: str = Depends(oauth2_scheme),
-                     db: Session = Depends(get_db)
-):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido")
-        user = db.query(User).filter(User.username == username).first()
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utente non trovato")
-        if user.role is None:
-            raise HTTPException(status_code=403, detail="Accesso negato: ruolo non assegnato")
-        if user.is_blocked:  # ✅ Blocca l'accesso agli utenti disabilitati
-            raise HTTPException(status_code=403, detail="Utente bloccato. Accesso negato.")
-        return user
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido")
-
+#############################################################################
+# Registrazione utente
 @router.post("/register/", response_model=dict)
 def register(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
+    if not ENABLE_REGISTRATION:
+        raise HTTPException(status_code=403, detail="Registrazione disabilitata")
+    
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username già in uso")
     hashed_password = hash_password(user.password)
-    new_user = User(username=user.username, hashed_password=hashed_password)
+
+    viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer).first()
+    if not viewer_role:
+        raise HTTPException(status_code=500, detail="Ruolo viewer non trovato nel database")
+
+    new_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password,
+        role_id=viewer_role.id
+    )
     db.add(new_user)
     db.commit()
     return {"message": "Utente registrato con successo"}
 
+# Login utente
 @router.post("/login/", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    print(f"🔍 DEBUG: db ricevuto in login -> {db}")  # ✅ Debug
+    #print(f"🔍 DEBUG: db ricevuto in login -> {db}")  # ✅ Debug
 
     if db is None:  # ✅ Debug: Controlla se db è None
         raise HTTPException(status_code=500, detail="Errore interno: database non disponibile")
@@ -85,7 +82,27 @@ def login(
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 
+# Info sull'utente loggato
+@router.get("/me", response_model=dict)
+def get_current_user_info(current_user: User = Depends(get_current_user)):
+    def mask_email(email: str) -> str:
+        if not email or "@" not in email:
+            return ""
+        name, domain = email.split("@", 1)
+        if len(name) <= 2:
+            masked = name[0] + "*" + "@" + domain
+        else:
+            masked = name[0] + "*" * (len(name) - 2) + name[-1] + "@" + domain
+        return masked
 
+    return {
+        "username": current_user.username,
+        "role": current_user.role.name if current_user.role else None,
+        "is_blocked": current_user.is_blocked,
+        "email": mask_email(current_user.email)
+    }
+
+# Debug DB
 @router.get("/debug/db")
 def debug_db(db: Session = Depends(get_db)):
     print(f"🔍 DEBUG: db ricevuto in endpoint -> {db}")  # ✅ Debug

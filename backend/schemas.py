@@ -35,17 +35,18 @@ RoleResponse.model_rebuild()
 # Modello per gli utenti
 class UserBase(BaseModel):
     username: str
+    email: Optional[str] = None  # ✅ Aggiunto campo email
 
 class UserCreate(UserBase):
-    hashed_password: str  # La password non viene restituita nelle risposte
+    password: str  # La password non viene restituita nelle risposte
 
 class UserUpdate(UserBase):
-    role_id: Optional[int] = None
     is_blocked: Optional[bool] = None  # ✅ Permette di aggiornare lo stato bloccato
+    role_id: int
 
 class UserResponse(UserBase, LoggingResponse):
     id: int
-    role: Optional['RoleResponse']
+    role: 'RoleResponse'
     is_blocked: bool
     
     class Config:
@@ -83,6 +84,9 @@ class InventoryBase(BaseModel):
 class InventoryCreate(InventoryBase):
     pass
 
+class InventoryUpdate(InventoryBase):
+    pass
+
 class InventoryResponse(InventoryBase, LoggingResponse):
     id: int
     owner: 'UserResponse'  # Riferimento all'utente proprietario
@@ -92,27 +96,40 @@ class InventoryResponse(InventoryBase, LoggingResponse):
 
 InventoryBase.model_rebuild()
 InventoryCreate.model_rebuild()
+InventoryUpdate.model_rebuild()
 InventoryResponse.model_rebuild()
 
 ################################################
 # Modello per gli elementi di un inventario
-class InventoryItemBase(BaseModel):
+class ItemBase(BaseModel):
     name: str
-    qty: int
+    description: Optional[str] = None
+    quantity: int
     inventory_id: int
 
-class InventoryItemCreate(InventoryItemBase):
+class ItemCreate(ItemBase):
     pass
 
-class InventoryItemResponse(InventoryItemBase, LoggingResponse):
+class ItemUpdate(BaseModel):
+    name: Optional[str]
+    description: Optional[str]
+    quantity: Optional[int]
+    inventory_id: Optional[int]
+
+class ItemDelete(BaseModel):
+    confirm: bool
+
+class ItemResponse(ItemBase, LoggingResponse):
     id: int
     
     class Config:
         from_attributes = True
 
-InventoryItemBase.model_rebuild()
-InventoryItemCreate.model_rebuild()
-InventoryItemResponse.model_rebuild()
+ItemBase.model_rebuild()
+ItemCreate.model_rebuild()
+ItemUpdate.model_rebuild()
+ItemDelete.model_rebuild()
+ItemResponse.model_rebuild()
 
 ##############################################################
 # Modello per la gestione del token di accesso
@@ -126,3 +143,9 @@ class TokenData(BaseModel):
 
 Token.model_rebuild()
 TokenData.model_rebuild()
+
+##############################################################
+class InventoryShareRequest(BaseModel):
+    group_ids: List[int]
+
+InventoryShareRequest.model_rebuild()

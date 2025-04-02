@@ -1,5 +1,4 @@
 import os
-#from sqlalchemy.orm import Session
 from fastapi import FastAPI
 import logging
 from database import SessionLocal, init_db
@@ -8,6 +7,7 @@ from routes.auth import router as auth_router
 from routes.user import router as user_router
 from routes.admin import router as admin_router
 from routes.inventory import router as inventory_router
+from routes.item import router as item_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -23,6 +23,7 @@ app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(user_router, prefix="/user", tags=["User"])
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 app.include_router(inventory_router, prefix="/inventory", tags=["Inventory"])
+app.include_router(item_router, prefix="/item", tags=["Item"])
 
 @app.get("/")
 def home():

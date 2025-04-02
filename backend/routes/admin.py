@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from models import User, RoleEnum
-from dependencies import get_db
+from dependencies import get_db, role_required
 
-router = APIRouter()
+#router = APIRouter()
+router = APIRouter(dependencies=[Depends(role_required(RoleEnum.admin))])
 
 @router.put("/users/{user_id}/role/")
 def update_user_role(

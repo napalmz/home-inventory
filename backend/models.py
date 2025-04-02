@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean, func, UniqueConstraint
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base, Session
 from enum import Enum
@@ -63,8 +63,9 @@ class User(Base, LoggingData):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    role_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     is_blocked = Column(Boolean, default=False)
+    email = Column(String, nullable=True)
 
     # Relazioni esplicite
     role = relationship("Role", foreign_keys=[role_id])
@@ -117,20 +118,36 @@ class Inventory(Base, LoggingData):
     name = Column(String, index=True)
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", foreign_keys=[owner_id])
+    items = relationship("Item", back_populates="inventory", cascade="all, delete-orphan")  
 
 ################################################
 class Item(Base, LoggingData):
     __tablename__ = "items"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    qty = Column(Integer, index=True)
-    inventory_id = Column(Integer, ForeignKey("inventories.id"))
+    name = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    quantity = Column(Integer, index=True)
+    inventory_id = Column(Integer, ForeignKey("inventories.id"), nullable=False)
+    inventory = relationship("Inventory", back_populates="items")
 
 ################################################
 class SharedInventory(Base, LoggingData):
     __tablename__ = "shared_inventories"
+    __table_args__ = (UniqueConstraint('user_id', 'inventory_id', name='_user_inventory_uc'),)
 
     id = Column(Integer, primary_key=True, index=True)
     inventory_id = Column(Integer, ForeignKey("inventories.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
+
+################################################
+class SharedInventoryGroup(Base, LoggingData):
+    __tablename__ = "shared_inventory_groups"
+    __table_args__ = (UniqueConstraint('group_id', 'inventory_id', name='_group_inventory_uc'),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    inventory_id = Column(Integer, ForeignKey("inventories.id"))
+    group_id = Column(Integer, ForeignKey("groups.id"))
+
+    inventory = relationship("Inventory", backref="shared_with_groups")
+    group = relationship("Group", backref="shared_inventories")
