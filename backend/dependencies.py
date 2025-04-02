@@ -13,18 +13,14 @@ ENABLE_REGISTRATION = os.getenv("ENABLE_REGISTRATION", "true").lower() == "true"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def get_db():
-    #print("🔍 DEBUG: get_db() chiamato")  # ✅ Debug
     db = SessionLocal()
     
     if db is None:
         print("❌ ERRORE: La sessione DB è None!")  # ✅ Debug in caso di errore 
-   # else:
-   #     print("✅ SUCCESSO: Sessione DB creata correttamente")  # ✅ Debug
 
     try:
         yield db
     finally:
-        #print("🔄 DEBUG: Chiusura sessione DB")  # ✅ Debug quando il DB viene chiuso
         db.close()
 
 def init_roles_and_admin(db: Session):
@@ -83,13 +79,10 @@ def get_current_user(security_scopes: SecurityScopes,
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido")
 
 def role_required(required_role: RoleEnum):  # ✅ Accetta RoleEnum invece di str
-    #from routes.auth import get_current_user
     def dependency(user: User = Depends(get_current_user)):
         if user.role is None:
             raise HTTPException(status_code=403, detail="Accesso negato: ruolo non assegnato")
-        
-        if user.role != required_role:  # ✅ Confronto con RoleEnum
+        if user.role.name != required_role.value:  # ✅ Confronto con RoleEnum
             raise HTTPException(status_code=403, detail="Accesso negato: permessi insufficienti")
-        
         return user
     return dependency
