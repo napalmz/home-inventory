@@ -63,6 +63,7 @@ def register(
     db.commit()
     return {"message": "Utente registrato con successo"}
 
+#############################################################################
 # Login utente
 @router.post("/login/", response_model=Token)
 def login(
@@ -82,6 +83,7 @@ def login(
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
 
+#############################################################################
 # Info sull'utente loggato
 @router.get("/me", response_model=dict)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
@@ -102,6 +104,7 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         "email": mask_email(current_user.email)
     }
 
+#############################################################################
 # Debug DB
 @router.get("/debug/db")
 def debug_db(db: Session = Depends(get_db)):

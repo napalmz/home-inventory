@@ -12,6 +12,7 @@ ENABLE_REGISTRATION = os.getenv("ENABLE_REGISTRATION", "true").lower() == "true"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+# Funzione per ottenere la sessione del database
 def get_db():
     db = SessionLocal()
     
@@ -23,6 +24,7 @@ def get_db():
     finally:
         db.close()
 
+# Funzione per inizializzare i ruoli e l'admin
 def init_roles_and_admin(db: Session):
     from routes.auth import hash_password
     role_objects = {}
@@ -58,6 +60,7 @@ def init_roles_and_admin(db: Session):
         role.user_ins = admin_user.id  # 👈 Ora assegniamo l'utente
     db.commit()
 
+# Funzione per ottenere l'utente corrente
 def get_current_user(security_scopes: SecurityScopes,
                      token: str = Depends(oauth2_scheme),
                      db: Session = Depends(get_db)
@@ -78,6 +81,7 @@ def get_current_user(security_scopes: SecurityScopes,
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido")
 
+# Funzione per verificare il ruolo dell'utente
 def role_required(required_role: RoleEnum):  # ✅ Accetta RoleEnum invece di str
     def dependency(user: User = Depends(get_current_user)):
         if user.role is None:

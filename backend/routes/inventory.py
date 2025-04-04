@@ -1,12 +1,42 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from dependencies import get_db
-from models import User, Inventory, SharedInventory, Group, SharedInventoryGroup
+from models import User, Inventory, SharedInventory, Group, SharedInventoryGroup, RoleEnum
 from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, InventoryShareRequest
 from routes.auth import get_current_user
 from typing import List
 
 router = APIRouter()
+
+# Funzione per verificare se l'utente ha accesso all'inventario
+def can_access_inventory(user: User, inventory: Inventory, action: str = "view") -> bool:
+    # Admin ha sempre accesso
+    if user.role.name == RoleEnum.admin.value:
+        return True
+
+    if action == "view":
+        # Chiunque può vedere se è condiviso o è il proprietario
+        if inventory.owner_id == user.id:
+            return True
+        if user.id in [s.user_id for s in inventory.shared_with_users]:
+            return True
+        user_group_ids = {assoc.group_id for assoc in user.group_associations}
+        inventory_group_ids = {g.group_id for g in inventory.shared_with_groups}
+        if user_group_ids & inventory_group_ids:
+            return True
+    elif action in ("edit", "delete"):
+        # Moderatori possono modificare/eliminare solo se è proprio o condiviso con loro
+        if user.role.name == RoleEnum.moderator.value:
+            if inventory.owner_id == user.id:
+                return True
+            if user.id in [s.user_id for s in inventory.shared_with_users]:
+                return True
+            user_group_ids = {assoc.group_id for assoc in user.group_associations}
+            inventory_group_ids = {g.group_id for g in inventory.shared_with_groups}
+            if user_group_ids & inventory_group_ids:
+                return True
+
+    return False
 
 #############################################################################
 # Lista degli inventari visibili all'utente
@@ -15,10 +45,12 @@ def list_inventories(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    owned  = db.query(Inventory).filter(Inventory.owner_id == user.id)
-    shared = db.query(Inventory).join(SharedInventory).filter(SharedInventory.user_id == user.id)
-    inventories = owned.union(shared).all()
-    return [InventoryResponse.model_validate(inv) for inv in inventories]  # ✅ Converti SQLAlchemy → Pydantic
+    inventories = db.query(Inventory).all()
+    visible_inventories = [
+        inv for inv in inventories if can_access_inventory(user, inv, action="view")
+    ]
+    return [InventoryResponse.model_validate(inv) for inv in visible_inventories]
+
 
 # Creazione inventario
 @router.post("/", response_model=InventoryResponse)
@@ -41,10 +73,10 @@ def update_inventory(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).options(joinedload(Inventory.shared_with)).get(inventory_id)
+    inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id and user.id not in [s.user_id for s in inventory.shared_with]:
+    if not can_access_inventory(user, inventory, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     inventory.name = update.name
@@ -59,10 +91,10 @@ def delete_inventory(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).options(joinedload(Inventory.shared_with)).get(inventory_id)
+    inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id and user.id not in [s.user_id for s in inventory.shared_with]:
+    if not can_access_inventory(user, inventory, action="delete"):
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     db.delete(inventory)
@@ -73,20 +105,20 @@ def delete_inventory(
 # Recupero item dell'inventario
 @router.get("/item/{inventory_id}/", response_model=List[ItemResponse])
 def list_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    inventory = db.query(Inventory).options(joinedload(Inventory.shared_with)).get(inventory_id)
+    inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id and user.id not in [s.user_id for s in inventory.shared_with]:
+    if not can_access_inventory(user, inventory, action="view"):
         raise HTTPException(status_code=403, detail="Accesso negato")
     return inventory.items
 
 # Contare gli item dell'inventario
 @router.get("/count/{inventory_id}", response_model=int)
 def count_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    inventory = db.query(Inventory).options(joinedload(Inventory.shared_with)).get(inventory_id)
+    inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id and user.id not in [s.user_id for s in inventory.shared_with]:
+    if not can_access_inventory(user, inventory, action="view"):
         raise HTTPException(status_code=403, detail="Accesso negato")
     return len(inventory.items)
 
@@ -102,16 +134,26 @@ def share_inventory(
     inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Solo il proprietario può condividere l'inventario")
+    if not can_access_inventory(user, inventory, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
 
     target_user = db.query(User).filter(User.username == request.username).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="Utente da condividere non trovato")
 
+    # Verifica condivisione diretta
     existing = db.query(SharedInventory).filter_by(user_id=target_user.id, inventory_id=inventory_id).first()
     if existing:
-        return {"detail": "Inventario già condiviso con questo utente"}
+        return {"detail": "Inventario già condiviso direttamente con questo utente"}
+
+    # Verifica condivisione tramite gruppo
+    user_group_ids = [assoc.group_id for assoc in target_user.group_associations]
+    group_shares = db.query(SharedInventoryGroup).filter(
+        SharedInventoryGroup.inventory_id == inventory_id,
+        SharedInventoryGroup.group_id.in_(user_group_ids)
+    ).first()
+    if group_shares:
+        return {"detail": "Inventario già accessibile tramite gruppo dell'utente"}
 
     shared = SharedInventory(user_id=target_user.id, inventory_id=inventory_id)
     db.add(shared)
@@ -129,8 +171,8 @@ def unshare_inventory(
     inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Solo il proprietario può revocare la condivisione")
+    if not can_access_inventory(user, inventory, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
 
     target_user = db.query(User).filter(User.username == username).first()
     if not target_user:
@@ -151,13 +193,13 @@ def list_inventory_shares(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).options(joinedload(Inventory.shared_with).joinedload(SharedInventory.user)).get(inventory_id)
+    inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Solo il proprietario può vedere le condivisioni")
+    if not can_access_inventory(user, inventory, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
 
-    return [share.user.username for share in inventory.shared_with]
+    return [share.user.username for share in inventory.shared_with_users]
 
 #############################################################################
 # Condivisione con gruppo
@@ -171,8 +213,8 @@ def share_inventory_with_group(
     inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Solo il proprietario può condividere l'inventario")
+    if not can_access_inventory(user, inventory, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
 
     group = db.query(Group).get(group_id)
     if not group:
@@ -198,8 +240,8 @@ def unshare_inventory_from_group(
     inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Solo il proprietario può revocare la condivisione")
+    if not can_access_inventory(user, inventory, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
 
     shared = db.query(SharedInventoryGroup).filter_by(group_id=group_id, inventory_id=inventory_id).first()
     if not shared:
@@ -216,10 +258,117 @@ def list_inventory_group_shares(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).options(joinedload(Inventory.shared_with_groups).joinedload(SharedInventoryGroup.group)).get(inventory_id)
+    inventory = db.query(Inventory).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
-    if inventory.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Solo il proprietario può vedere le condivisioni")
+    if not can_access_inventory(user, inventory, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
 
     return [share.group.name for share in inventory.shared_with_groups]
+
+#############################################################################
+# Elencare tutti gli utenti che hanno accesso a un inventario, con tipo di accesso e modalità
+@router.get("/access_details/{inventory_id}", response_model=List[dict])
+def list_inventory_access_details(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    inventory = db.query(Inventory).get(inventory_id)
+    if not inventory:
+        raise HTTPException(status_code=404, detail="Inventario non trovato")
+    if not can_access_inventory(user, inventory, action="view"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
+
+    access_details = []
+
+    # Utente proprietario
+    owner = db.query(User).get(inventory.owner_id)
+    access_details.append({
+        "username": owner.username,
+        "access": "edit",
+        "via": "owner",
+        "group": None
+    })
+
+    # Amministratori
+    admins = db.query(User).filter(User.role.has(name=RoleEnum.admin.value)).all()
+    for admin in admins:
+        if admin.id != inventory.owner_id:
+            access_details.append({
+                "username": admin.username,
+                "access": "edit",
+                "via": "admin",
+                "group": None
+            })
+
+    # Utenti condivisione diretta
+    for share in inventory.shared_with_users:
+        access = "edit" if share.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+        access_details.append({
+            "username": share.user.username,
+            "access": access,
+            "via": "share",
+            "group": None
+        })
+
+    # Utenti condivisione tramite gruppo
+    for shared_group in inventory.shared_with_groups:
+        group = db.query(Group).get(shared_group.group_id)
+        for assoc in group.user_associations:
+            access = "edit" if assoc.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+            access_details.append({
+                "username": assoc.user.username,
+                "access": access,
+                "via": "group",
+                "group": group.name
+            })
+
+    return access_details
+
+#############################################################################
+# Contare gli utenti che possono accedere all’inventario, raggruppati per accesso
+@router.get("/access_count/{inventory_id}", response_model=dict)
+def count_inventory_access_by_type(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    inventory = db.query(Inventory).get(inventory_id)
+    if not inventory:
+        raise HTTPException(status_code=404, detail="Inventario non trovato")
+    if not can_access_inventory(user, inventory, action="view"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
+
+    access_by_user = {}
+
+    # Owner
+    owner = db.query(User).get(inventory.owner_id)
+    access_by_user[owner.username] = "edit"
+
+    # Admin (aggiunti solo se non già presenti)
+    admins = db.query(User).filter(User.role.has(name=RoleEnum.admin.value)).all()
+    for admin in admins:
+        if admin.username not in access_by_user:
+            access_by_user[admin.username] = "admin"
+
+    # Dirette
+    for share in inventory.shared_with_users:
+        access = "edit" if share.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+        access_by_user[share.user.username] = access
+
+    # Gruppi
+    for shared_group in inventory.shared_with_groups:
+        group = db.query(Group).get(shared_group.group_id)
+        for assoc in group.user_associations:
+            access = "edit" if assoc.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+            # Se già presente come 'edit' non sovrascrivere
+            if assoc.user.username not in access_by_user or access_by_user[assoc.user.username] != "edit":
+                access_by_user[assoc.user.username] = access
+
+    # Conta
+    view_count = sum(1 for access in access_by_user.values() if access == "view")
+    edit_count = sum(1 for access in access_by_user.values() if access == "edit")
+    admin_count = sum(1 for access in access_by_user.values() if access == "admin")
+
+    return {"view": view_count, "edit": edit_count, "admin": admin_count}

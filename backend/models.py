@@ -118,7 +118,13 @@ class Inventory(Base, LoggingData):
     name = Column(String, index=True)
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", foreign_keys=[owner_id])
-    items = relationship("Item", back_populates="inventory", cascade="all, delete-orphan")  
+    items = relationship("Item", back_populates="inventory", cascade="all, delete-orphan")
+
+    # Relazione per gli utenti con cui è condiviso
+    shared_with_users = relationship("SharedInventory", back_populates="inventory", cascade="all, delete-orphan")
+
+    # Relazione per i gruppi con cui è condiviso
+    shared_with_groups = relationship("SharedInventoryGroup", back_populates="inventory", cascade="all, delete-orphan")
 
 ################################################
 class Item(Base, LoggingData):
@@ -140,6 +146,8 @@ class SharedInventory(Base, LoggingData):
     inventory_id = Column(Integer, ForeignKey("inventories.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
 
+    inventory = relationship("Inventory", back_populates="shared_with_users")
+
 ################################################
 class SharedInventoryGroup(Base, LoggingData):
     __tablename__ = "shared_inventory_groups"
@@ -149,5 +157,5 @@ class SharedInventoryGroup(Base, LoggingData):
     inventory_id = Column(Integer, ForeignKey("inventories.id"))
     group_id = Column(Integer, ForeignKey("groups.id"))
 
-    inventory = relationship("Inventory", backref="shared_with_groups")
+    inventory = relationship("Inventory", back_populates="shared_with_groups")
     group = relationship("Group", backref="shared_inventories")
