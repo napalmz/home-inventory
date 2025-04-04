@@ -36,7 +36,7 @@ def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MIN
 
 #############################################################################
 # Registrazione utente
-@router.post("/register/", response_model=dict)
+@router.post("/register", response_model=dict)
 def register(
     user: UserCreate,
     db: Session = Depends(get_db)
@@ -65,7 +65,7 @@ def register(
 
 #############################################################################
 # Login utente
-@router.post("/login/", response_model=Token)
+@router.post("/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
