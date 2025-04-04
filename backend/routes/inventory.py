@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from dependencies import get_db
 from models import User, Inventory, SharedInventory, Group, SharedInventoryGroup, RoleEnum
-from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, InventoryShareRequest
+from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, InventoryShareRequest, InventoryResponseWithItemCount
 from routes.auth import get_current_user
 from typing import List
 
@@ -40,17 +40,22 @@ def can_access_inventory(user: User, inventory: Inventory, action: str = "view")
 
 #############################################################################
 # Lista degli inventari visibili all'utente
-@router.get("/", response_model=list[InventoryResponse])
+@router.get("/", response_model=list[InventoryResponseWithItemCount])
 def list_inventories(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventories = db.query(Inventory).all()
+    inventories = db.query(Inventory).options(joinedload(Inventory.items)).all()
     visible_inventories = [
         inv for inv in inventories if can_access_inventory(user, inv, action="view")
     ]
-    return [InventoryResponse.model_validate(inv) for inv in visible_inventories]
-
+    return [
+        InventoryResponseWithItemCount(
+            **InventoryResponse.model_validate(inv).model_dump(),
+            item_count=len(inv.items)
+        )
+        for inv in visible_inventories
+    ]
 
 # Creazione inventario
 @router.post("/", response_model=InventoryResponse)

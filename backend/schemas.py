@@ -94,10 +94,14 @@ class InventoryResponse(InventoryBase, LoggingResponse):
     class Config:
         from_attributes = True
 
+class InventoryResponseWithItemCount(InventoryResponse):
+    item_count: int
+
 InventoryBase.model_rebuild()
 InventoryCreate.model_rebuild()
 InventoryUpdate.model_rebuild()
 InventoryResponse.model_rebuild()
+InventoryResponseWithItemCount.model_rebuild()
 
 ################################################
 # Modello per gli elementi di un inventario
