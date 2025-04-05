@@ -6,7 +6,7 @@ from schemas import ItemCreate, ItemUpdate, ItemDelete, ItemResponse
 from routes.auth import get_current_user
 from routes.inventory import can_access_inventory
 from fastapi import status
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -41,6 +41,8 @@ def create_item(item: ItemCreate, db: Session = Depends(get_db), user=Depends(ge
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
+    inventory.data_mod = datetime.now(timezone.utc)
+    db.commit()
     return db_item
 
 #############################################################################
@@ -58,6 +60,8 @@ def update_item(item_id: int, item_update: ItemUpdate, db: Session = Depends(get
     item.user_mod = user.id
     db.commit()
     db.refresh(item)
+    item.inventory.data_mod = datetime.now(timezone.utc)
+    db.commit()
     return item
 
 #############################################################################
@@ -71,6 +75,7 @@ def delete_item(item_id: int, delete: ItemDelete, db: Session = Depends(get_db),
         raise HTTPException(status_code=404, detail="Item non trovato")
     if not can_access_item(user, item, action="delete"):
         raise HTTPException(status_code=403, detail="Accesso negato")
+    item.inventory.data_mod = datetime.now(timezone.utc)
     db.delete(item)
     db.commit()
     return {"detail": "Item eliminato"}
