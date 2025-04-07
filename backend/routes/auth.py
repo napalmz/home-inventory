@@ -106,13 +106,16 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         return masked
 
     return {
+        "id": current_user.id,
         "username": current_user.username,
+        "email": mask_email(current_user.email),
         "role": {
             "id": current_user.role.id if current_user.role else None,
             "name": current_user.role.name if current_user.role else None
         },
         "is_blocked": current_user.is_blocked,
-        "email": mask_email(current_user.email)
+        "data_ins": current_user.data_ins,
+        "data_mod": current_user.data_mod
     }
 
 #############################################################################
