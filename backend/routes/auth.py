@@ -84,6 +84,14 @@ def login(
     return {"access_token": token, "token_type": "bearer"}
 
 #############################################################################
+# Logout utente
+@router.post("/logout")
+def logout(current_user=Depends(get_current_user)):
+    # In un'app solo token, il logout è gestito sul client
+    # Qui possiamo solo registrare l'evento, oppure implementare blacklist del token
+    return {"message": f"Utente {current_user.username} disconnesso"}
+
+#############################################################################
 # Info sull'utente loggato
 @router.get("/me", response_model=dict)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
