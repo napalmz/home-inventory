@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from models import User, RoleEnum, Role
-from schemas import UserCreate, Token
+from schemas import UserCreate, Token, UserResponse, UserSelfUpdate
 from passlib.context import CryptContext
 from jose import jwt
 import datetime
@@ -111,6 +111,29 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         "is_blocked": current_user.is_blocked,
         "email": mask_email(current_user.email)
     }
+
+
+
+#############################################################################
+# Aggiornamento dati utente autenticato (anche se non ADMIN)
+@router.put("/me", response_model=UserResponse, status_code=status.HTTP_200_OK, dependencies=[])
+def update_own_user(update: UserSelfUpdate, 
+                    db: Session = Depends(get_db), 
+                    current_user: User = Depends(get_current_user)):
+
+    user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+
+    if update.email:
+        user.email = update.email
+    if update.password:
+        user.hashed_password = hash_password(update.password)
+
+    db.commit()
+    db.refresh(user)
+    return user
 
 #############################################################################
 # Debug DB

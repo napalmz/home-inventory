@@ -44,6 +44,10 @@ class UserUpdate(UserBase):
     is_blocked: Optional[bool] = None  # ✅ Permette di aggiornare lo stato bloccato
     role_id: int
 
+class UserSelfUpdate(BaseModel): # Usato per aggiornare i dati dell'utente loggato, anche se non admin
+    email: Optional[str] = None
+    password: Optional[str] = None
+
 class UserResponse(UserBase, LoggingResponse):
     id: int
     role: 'RoleResponse'
@@ -52,9 +56,11 @@ class UserResponse(UserBase, LoggingResponse):
     class Config:
         from_attributes = True
 
+
 UserBase.model_rebuild()
 UserCreate.model_rebuild()
 UserUpdate.model_rebuild()
+UserSelfUpdate.model_rebuild()
 UserResponse.model_rebuild()
 
 ################################################
