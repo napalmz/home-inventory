@@ -26,12 +26,19 @@ def update_user(user_id: int, update: schemas.UserUpdate, db: Session = Depends(
     if not user:
         raise HTTPException(status_code=404, detail="Utente non trovato")
 
-    if update.username:
-        user.username = update.username
-    if update.password:
+    #if update.username is not None:
+    #    user.username = update.username
+    if update.password is not None:
         user.hashed_password = hash_password(update.password)
-    if update.email:
+    if update.email is not None:
         user.email = update.email
+    if update.is_blocked is not None:
+        user.is_blocked = update.is_blocked
+    if update.role_id is not None:
+        role = db.query(Role).filter(Role.id == update.role_id).first()
+        if not role:
+            raise HTTPException(status_code=404, detail="Ruolo non trovato")
+        user.role_id = update.role_id
 
     db.commit()
     db.refresh(user)

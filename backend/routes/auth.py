@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from models import User, RoleEnum, Role
-from schemas import UserCreate, Token, UserResponse, UserSelfUpdate
+from schemas import UserCreateSelf, Token, UserResponse, UserSelfUpdate
 from passlib.context import CryptContext
-from jose import jwt
+from jose import jwt, JWTError
 import datetime
 import os
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, SecurityScopes
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security.utils import get_authorization_scheme_param
 from dotenv import load_dotenv
 from dependencies import get_db, get_current_user
+from crud import get_setting, set_setting
 
 load_dotenv()
 
@@ -17,7 +19,6 @@ router = APIRouter()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
-ENABLE_REGISTRATION = os.getenv("ENABLE_REGISTRATION", "true").lower() == "true"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -38,10 +39,10 @@ def create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_MIN
 # Registrazione utente
 @router.post("/register", response_model=dict)
 def register(
-    user: UserCreate,
+    user: UserCreateSelf,
     db: Session = Depends(get_db)
 ):
-    if not ENABLE_REGISTRATION:
+    if (get_setting(db, "ENABLE_REGISTRATION") or "true").lower() != "true":
         raise HTTPException(status_code=403, detail="Registrazione disabilitata")
     
     db_user = db.query(User).filter(User.username == user.username).first()
@@ -94,7 +95,54 @@ def logout(current_user=Depends(get_current_user)):
 #############################################################################
 # Info sull'utente loggato
 @router.get("/me", response_model=dict)
-def get_current_user_info(current_user: User = Depends(get_current_user)):
+def get_current_user_info(request: Request, db: Session = Depends(get_db)):
+    auth: str = request.headers.get("Authorization")
+    scheme, token = get_authorization_scheme_param(auth)
+
+    if not token or scheme.lower() != "bearer":
+        token = None
+
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username: str = payload.get("sub")
+            if not username:
+                raise JWTError()
+        except JWTError:
+            username = None
+    else:
+        username = None
+
+    if not username:
+        return {
+            "id": None,
+            "username": None,
+            "email": "",
+            "role": {
+                "id": None,
+                "name": None
+            },
+            "is_blocked": None,
+            "data_ins": None,
+            "data_mod": None
+        }
+
+    user = db.query(User).filter(User.username == username).first()
+
+    if not user:
+        return {
+            "id": None,
+            "username": None,
+            "email": "",
+            "role": {
+                "id": None,
+                "name": None
+            },
+            "is_blocked": None,
+            "data_ins": None,
+            "data_mod": None
+        }
+
     def mask_email(email: str) -> str:
         if not email or "@" not in email:
             return ""
@@ -106,16 +154,16 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         return masked
 
     return {
-        "id": current_user.id,
-        "username": current_user.username,
-        "email": mask_email(current_user.email),
+        "id": user.id,
+        "username": user.username,
+        "email": mask_email(user.email),
         "role": {
-            "id": current_user.role.id if current_user.role else None,
-            "name": current_user.role.name if current_user.role else None
+            "id": user.role.id if user.role else None,
+            "name": user.role.name if user.role else None
         },
-        "is_blocked": current_user.is_blocked,
-        "data_ins": current_user.data_ins,
-        "data_mod": current_user.data_mod
+        "is_blocked": user.is_blocked,
+        "data_ins": user.data_ins,
+        "data_mod": user.data_mod
     }
 
 #############################################################################

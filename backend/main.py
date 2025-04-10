@@ -1,14 +1,17 @@
 import os
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 import logging
 from database import SessionLocal, init_db
-from dependencies import init_roles_and_admin
+from dependencies import init_roles_and_admin, get_db, initialize_settings
+from sqlalchemy.orm import Session
 from routes.auth import router as auth_router
 from routes.user import router as user_router
 from routes.admin import router as admin_router
 from routes.inventory import router as inventory_router
 from routes.item import router as item_router
 from routes.system import router as system_router
+from routes.settings import router as settings_router
 from fastapi.middleware.cors import CORSMiddleware
 from models import Inventory, Item, User
 
@@ -19,7 +22,14 @@ init_db()
 init_roles_and_admin(db)
 db.close()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = next(get_db())
+    initialize_settings(db)
+    yield
+    db.close()
+
+app = FastAPI(lifespan=lifespan)
 app.openapi_schema = None  # Rigenera lo schema alla prima richiesta
 
 app.add_middleware(
@@ -36,6 +46,7 @@ app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 app.include_router(inventory_router, prefix="/inventory", tags=["Inventory"])
 app.include_router(item_router, prefix="/item", tags=["Item"])
 app.include_router(system_router, prefix="/system", tags=["System"])
+app.include_router(settings_router, prefix="/settings", tags=["Settings"])
 
 @app.get("/")
 def home():

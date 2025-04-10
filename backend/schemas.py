@@ -39,8 +39,13 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str  # La password non viene restituita nelle risposte
+    role_id: int
+
+class UserCreateSelf(UserBase):
+    password: str  # La password non viene restituita nelle risposte
 
 class UserUpdate(UserBase):
+    password: Optional[str] = None
     is_blocked: Optional[bool] = None  # ✅ Permette di aggiornare lo stato bloccato
     role_id: int
 
@@ -56,9 +61,9 @@ class UserResponse(UserBase, LoggingResponse):
     class Config:
         from_attributes = True
 
-
 UserBase.model_rebuild()
 UserCreate.model_rebuild()
+UserCreateSelf.model_rebuild()
 UserUpdate.model_rebuild()
 UserSelfUpdate.model_rebuild()
 UserResponse.model_rebuild()
@@ -159,3 +164,18 @@ class InventoryShareRequest(BaseModel):
     group_ids: List[int]
 
 InventoryShareRequest.model_rebuild()
+
+##############################################################
+# Impostazioni generali dell'applicazione
+class AppSettingUpdate(BaseModel):
+    key: str
+    value: str
+    protected: bool = False
+
+class AppSettingResponse(BaseModel):
+    key: str
+    value: str
+    protected: bool
+
+AppSettingUpdate.model_rebuild()
+AppSettingResponse.model_rebuild()

@@ -2,13 +2,13 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, SecurityScopes
 from database import SessionLocal, Session
 from models import User, RoleEnum, Role
+from crud import get_setting, set_setting
 from jose import jwt
 import os
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
-ENABLE_REGISTRATION = os.getenv("ENABLE_REGISTRATION", "true").lower() == "true"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -90,3 +90,11 @@ def role_required(required_role: RoleEnum):  # ✅ Accetta RoleEnum invece di st
             raise HTTPException(status_code=403, detail="Accesso negato: permessi insufficienti")
         return user
     return dependency
+
+def initialize_settings(db: Session):
+    defaults = {
+        "ENABLE_REGISTRATION": "true"
+    }
+    for key, value in defaults.items():
+        if get_setting(db, key) is None:
+            set_setting(db, key, value, True)  # ✅ Proteggiamo le impostazioni di default

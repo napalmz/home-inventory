@@ -159,3 +159,11 @@ class SharedInventoryGroup(Base, LoggingData):
 
     inventory = relationship("Inventory", back_populates="shared_with_groups")
     group = relationship("Group", backref="shared_inventories")
+
+################################################
+class Setting(Base, LoggingData):
+    __tablename__ = "settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String)
+    protected = Column(Boolean, default=False)  # ← nuovo campo

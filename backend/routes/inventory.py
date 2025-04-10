@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from dependencies import get_db
-from models import User, Inventory, SharedInventory, Group, SharedInventoryGroup, RoleEnum
+from models import User, Inventory, Item, SharedInventory, Group, SharedInventoryGroup, RoleEnum
 from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, InventoryShareRequest, InventoryResponseWithItemCount
 from routes.auth import get_current_user
 from typing import List
@@ -110,7 +110,10 @@ def delete_inventory(
 # Recupero item dell'inventario
 @router.get("/item/{inventory_id}/", response_model=List[ItemResponse])
 def list_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).options(
+        joinedload(Inventory.items).joinedload(Item.user_ins_rel),
+        joinedload(Inventory.items).joinedload(Item.user_mod_rel)
+    ).get(inventory_id)
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
@@ -377,3 +380,20 @@ def count_inventory_access_by_type(
     admin_count = sum(1 for access in access_by_user.values() if access == "admin")
 
     return {"view": view_count, "edit": edit_count, "admin": admin_count}
+
+@router.get("/{inventory_id}", response_model=InventoryResponseWithItemCount)
+def get_inventory_by_id(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    inventory = db.query(Inventory).options(joinedload(Inventory.items)).get(inventory_id)
+    if not inventory:
+        raise HTTPException(status_code=404, detail="Inventario non trovato")
+    if not can_access_inventory(user, inventory, action="view"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
+
+    return InventoryResponseWithItemCount(
+        **InventoryResponse.model_validate(inventory).model_dump(),
+        item_count=len(inventory.items)
+    )
