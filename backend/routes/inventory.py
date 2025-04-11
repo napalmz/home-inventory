@@ -118,7 +118,15 @@ def list_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(ge
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
         raise HTTPException(status_code=403, detail="Accesso negato")
-    return inventory.items
+    #return inventory.items
+    return [
+        ItemResponse(
+            **item.__dict__,
+            username_ins=item.user_ins_rel.username if item.user_ins_rel else None,
+            username_mod=item.user_mod_rel.username if item.user_mod_rel else None,
+        )
+        for item in inventory.items
+    ]
 
 # Contare gli item dell'inventario
 @router.get("/count/{inventory_id}", response_model=int)

@@ -136,6 +136,8 @@ class ItemDelete(BaseModel):
 
 class ItemResponse(ItemBase, LoggingResponse):
     id: int
+    username_ins: Optional[str] = None
+    username_mod: Optional[str] = None
     
     class Config:
         from_attributes = True
