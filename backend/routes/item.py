@@ -59,6 +59,7 @@ def update_item(item_id: int, item_update: ItemUpdate, db: Session = Depends(get
     for field, value in item_update.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
     item.user_mod = user.id
+    item.username_mod = user.username
     db.commit()
     db.refresh(item)
     item.inventory.data_mod = datetime.now(timezone.utc)
