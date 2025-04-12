@@ -42,6 +42,7 @@ def create_item(item: ItemCreate, db: Session = Depends(get_db), user=Depends(ge
     db.commit()
     db.refresh(db_item)
     inventory.data_mod = datetime.now(timezone.utc)
+    inventory.user_mod = user.id
     db.commit()
     return db_item
 
