@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from routes.auth import hash_password
+from sqlalchemy import not_
+from routes.auth import hash_password, get_current_user
 from dependencies import get_db, role_required
-from models import User, RoleEnum, Role, Group
+from models import User, RoleEnum, Role, Group, Inventory
 import crud, schemas
+from typing import List
 
 router = APIRouter(dependencies=[Depends(role_required(RoleEnum.admin))])
 
@@ -156,3 +158,14 @@ def block_user(user_id: int,
     
     status_text = "bloccato" if user.is_blocked else "sbloccato"
     return {"message": f"Utente {user.username} {status_text}", "user": user}
+
+@router.get("/users/shareable/{inventory_id}", response_model=List[str])
+def get_shareable_users(inventory_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role.name not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403)
+
+    # escludi utenti già con accesso e admin
+    inventory = db.query(Inventory).get(inventory_id)
+    shared_usernames = [db.query(User).get(s.user_id).username for s in inventory.shared_with_users]
+    all_users = db.query(User).filter(User.role.has(Role.name != "admin")).all()
+    return [u.username for u in all_users if u.username not in shared_usernames]

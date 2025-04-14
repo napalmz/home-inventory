@@ -140,10 +140,10 @@ def count_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(g
 
 #############################################################################
 # Condivisione inventario
-@router.post("/share/{inventory_id}")
+@router.post("/share/{inventory_id}/{username}")
 def share_inventory(
     inventory_id: int,
-    request: InventoryShareRequest,
+    username: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
@@ -153,7 +153,7 @@ def share_inventory(
     if not can_access_inventory(user, inventory, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
 
-    target_user = db.query(User).filter(User.username == request.username).first()
+    target_user = db.query(User).filter(User.username == username).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="Utente da condividere non trovato")
 
@@ -215,7 +215,11 @@ def list_inventory_shares(
     if not can_access_inventory(user, inventory, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
 
-    return [share.user.username for share in inventory.shared_with_users]
+    #return [share.user.username for share in inventory.shared_with_users]
+    return [
+        db.query(User).get(share.user_id).username
+        for share in inventory.shared_with_users
+    ]
 
 #############################################################################
 # Condivisione con gruppo
@@ -320,9 +324,10 @@ def list_inventory_access_details(
 
     # Utenti condivisione diretta
     for share in inventory.shared_with_users:
-        access = "edit" if share.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+        user = db.query(User).get(share.user_id)
+        access = "edit" if user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
         access_details.append({
-            "username": share.user.username,
+            "username": user.username,
             "access": access,
             "via": "share",
             "group": None
@@ -370,8 +375,9 @@ def count_inventory_access_by_type(
 
     # Dirette
     for share in inventory.shared_with_users:
-        access = "edit" if share.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
-        access_by_user[share.user.username] = access
+        user = db.query(User).get(share.user_id)
+        access = "edit" if user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+        access_by_user[user.username] = access
 
     # Gruppi
     for shared_group in inventory.shared_with_groups:
