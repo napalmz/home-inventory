@@ -74,12 +74,13 @@ class GroupBase(BaseModel):
     name: str
 
 class GroupCreate(GroupBase):
-    pass
+    role_id: int
 
 class GroupResponse(GroupBase, LoggingResponse):
     id: int
     users: List['UserResponse'] = []
-    
+    role: 'RoleResponse'
+
     class Config:
         from_attributes = True
 

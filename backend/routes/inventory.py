@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from dependencies import get_db
 from models import User, Inventory, Item, SharedInventory, Group, SharedInventoryGroup, RoleEnum
-from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, InventoryShareRequest, InventoryResponseWithItemCount
+from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, UserResponse, InventoryResponseWithItemCount
 from routes.auth import get_current_user
 from typing import List
 
@@ -203,7 +203,7 @@ def unshare_inventory(
     return {"detail": f"Condivisione revocata per {username}"}
 
 # Lista utenti con cui è condiviso un inventario
-@router.get("/share/{inventory_id}", response_model=List[str])
+@router.get("/share/{inventory_id}", response_model=List[UserResponse])
 def list_inventory_shares(
     inventory_id: int,
     db: Session = Depends(get_db),
@@ -215,9 +215,8 @@ def list_inventory_shares(
     if not can_access_inventory(user, inventory, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
 
-    #return [share.user.username for share in inventory.shared_with_users]
     return [
-        db.query(User).get(share.user_id).username
+        db.query(User).get(share.user_id)
         for share in inventory.shared_with_users
     ]
 

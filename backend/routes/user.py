@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import not_
 from routes.auth import hash_password, get_current_user
 from dependencies import get_db, role_required
@@ -129,6 +129,39 @@ def delete_group(group_id: int, db: Session = Depends(get_db)):
     return {"detail": "Gruppo eliminato"}
 
 #############################################################################
+# Assegnazione utente a gruppo
+@router.post("/groups/{group_id}/add_user/{user_id}", response_model=schemas.GroupResponse)
+def add_user_to_group(group_id: int, user_id: int, db: Session = Depends(get_db)):
+    group = db.query(Group).filter(Group.id == group_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not group or not user:
+        raise HTTPException(status_code=404, detail="Gruppo o utente non trovato")
+
+    if user not in group.users:
+        group.users.append(user)
+        db.commit()
+        db.refresh(group)
+
+    return group
+
+# Rimozione utente da gruppo
+@router.delete("/groups/{group_id}/remove_user/{user_id}", response_model=schemas.GroupResponse)
+def remove_user_from_group(group_id: int, user_id: int, db: Session = Depends(get_db)):
+    group = db.query(Group).filter(Group.id == group_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not group or not user:
+        raise HTTPException(status_code=404, detail="Gruppo o utente non trovato")
+
+    if user in group.users:
+        group.users.remove(user)
+        db.commit()
+        db.refresh(group)
+
+    return group
+
+#############################################################################
 # Assegnazione ruolo a utente
 @router.post("/users/{user_id}/role/{role_id}")
 def assign_role(user_id: int, role_id: int, db: Session = Depends(get_db)):
@@ -159,13 +192,31 @@ def block_user(user_id: int,
     status_text = "bloccato" if user.is_blocked else "sbloccato"
     return {"message": f"Utente {user.username} {status_text}", "user": user}
 
-@router.get("/users/shareable/{inventory_id}", response_model=List[str])
+@router.get("/users/shareable/{inventory_id}", response_model=List[schemas.UserResponse])
 def get_shareable_users(inventory_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role.name not in ["admin", "moderator"]:
         raise HTTPException(status_code=403)
 
-    # escludi utenti già con accesso e admin
-    inventory = db.query(Inventory).get(inventory_id)
-    shared_usernames = [db.query(User).get(s.user_id).username for s in inventory.shared_with_users]
+    inventory = db.query(Inventory).options(
+        joinedload(Inventory.shared_with_users),
+        joinedload(Inventory.shared_with_groups)
+    ).get(inventory_id)
+    if not inventory:
+        raise HTTPException(status_code=404, detail="Inventario non trovato")
+
+    # utenti con accesso diretto
+    shared_user_ids = {s.user_id for s in inventory.shared_with_users}
+
+    # utenti che hanno già accesso (direttamente o tramite gruppo)
+    for shared_group in inventory.shared_with_groups:
+        group = db.query(Group).filter(Group.id == shared_group.group_id).first()
+        if group:
+            for user in group.users:
+                shared_user_ids.add(user.id)
+
+    # tutti gli utenti non admin
     all_users = db.query(User).filter(User.role.has(Role.name != "admin")).all()
-    return [u.username for u in all_users if u.username not in shared_usernames]
+
+    # ritorna solo quelli non ancora condivisi in nessun modo
+    return [u for u in all_users if u.id not in shared_user_ids]
+    # print("Utenti disponibili alla condivisione:", [u.username for u in all_users if u.id not in shared_user_ids])
