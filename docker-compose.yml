@@ -31,6 +31,11 @@ services:
       - backend/.env
     volumes:
       - ./backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/system/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     entrypoint: ["/app/entrypoint.sh"]
 
   frontend:
@@ -41,6 +46,11 @@ services:
       VITE_BACKEND_BASE_URL: http://localhost:8001
     ports:
       - "3000:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       - backend
 
