@@ -33,5 +33,16 @@ services:
       - ./backend:/app
     entrypoint: ["/app/entrypoint.sh"]
 
+  frontend:
+    build: ./frontend
+    container_name: inventory-frontend
+    environment:
+      TZ: Europe/Rome
+      VITE_BACKEND_BASE_URL: http://localhost:8001
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
