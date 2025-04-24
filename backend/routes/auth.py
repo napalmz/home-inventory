@@ -117,6 +117,7 @@ def get_current_user_info(request: Request, db: Session = Depends(get_db)):
         return {
             "id": None,
             "username": None,
+            "email_masked": "",
             "email": "",
             "role": {
                 "id": None,
@@ -133,6 +134,7 @@ def get_current_user_info(request: Request, db: Session = Depends(get_db)):
         return {
             "id": None,
             "username": None,
+            "email_masked": "",
             "email": "",
             "role": {
                 "id": None,
@@ -156,7 +158,8 @@ def get_current_user_info(request: Request, db: Session = Depends(get_db)):
     return {
         "id": user.id,
         "username": user.username,
-        "email": mask_email(user.email),
+        "email_masked": mask_email(user.email),
+        "email": user.email,
         "role": {
             "id": user.role.id if user.role else None,
             "name": user.role.name if user.role else None
