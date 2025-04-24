@@ -1,0 +1,308 @@
+import axios from 'axios'
+import { User, Role, Inventory, InventoryItem } from "./types";
+
+//const API_BASE_URL = window.APP_CONFIG.VITE_BACKEND_BASE_URL;
+
+function getApiBaseUrl() {
+  return window.APP_CONFIG?.VITE_BACKEND_BASE_URL ?? 'http://localhost:8001';
+}
+
+export const api = axios.create({
+  //baseURL: 'http://localhost:8001',
+  baseURL: getApiBaseUrl(), //API_BASE_URL,
+  withCredentials: false, // lasciamo false se non usiamo cookie
+})
+
+// Interceptor per aggiungere token
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('access_token')
+  if (token) {
+    config.headers = config.headers || {} // garantisce che headers esista
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+/* LOGIN UTENTI */
+export async function loginUser(username: string, password: string): Promise<{ access_token: string }> {
+  const response = await api.post(
+    '/auth/login',
+    new URLSearchParams({ username, password }),
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    }
+  )
+  return response.data as { access_token: string }
+}
+
+/* REGISTRAZIONE UTENTI */
+export async function registerUser(username: string, password: string, email: string): Promise<void> {
+  await api.post("/auth/register", {
+    username,
+    password,
+    email
+  });
+}
+
+/* RECUPERO DATI UTENTE */
+export async function getUserInfo() {
+  const response = await api.get('/auth/me');
+  return response.data;
+}
+
+/* RECUPERO LISTA UTENTI */
+export async function getUsers(): Promise<User[]> {
+  const response = await api.get<User[]>("/user/users/");
+  return response.data;
+}
+
+/* RECUPERO VERSIONE API */
+export async function getApiVersion(): Promise<{ version: string }> {
+  const response = await api.get<{ version: string }>('/system/version');
+  return response.data;
+}
+
+/* EFFETTUA LOGOUT */
+export async function logoutApi() {
+  await api.post("/auth/logout")
+}
+
+/* AGGIORNAMENTO DATI UTENTE */
+export async function updateMe(email: string, password: string): Promise<void> {
+  await api.put("/auth/me", {
+    email,
+    password
+  });
+}
+
+/* LISTING RUOLI */
+export async function getRoles(): Promise<Role[]> {
+  const response = await api.get("/user/roles");
+  if (Array.isArray(response.data)) {
+    return response.data;
+  } else {
+    console.error("Formato ruoli non valido:", response.data);
+    return [];
+  }
+}
+
+/* CREAZIONE, AGGIORNAMENTO E CANCELLAZIONE UTENTI */
+export const createUser = async (data: {
+  username: string;
+  email: string;
+  password: string;
+  roleId: number;
+}) => {
+  const payload = {
+    username: data.username,
+    email: data.email,
+    password: data.password,
+    role_id: data.roleId,
+  };
+  const response = await api.post("/user/users/", payload);
+  return response.data;
+};
+
+export const updateUser = async (
+  id: number,
+  data: {
+    username: string;
+    email: string;
+    password?: string;
+    is_blocked: boolean;
+    role_id: number;
+}) => {
+  const response = await api.put(`/user/users/${id}`, data);
+  return response.data;
+};
+
+export const deleteUser = async (id: number) => {
+  const response = await api.delete(`/user/users/${id}`);
+  return response.data;
+};
+
+/* PAGINA DI WELCOME */
+export async function getApiWelcomeInfo(): Promise<{
+  title: string;
+  message: string;
+  stats: {
+    total_inventories: number;
+    total_items: number;
+    total_users: number;
+  };
+}> {
+  const response = await api.get('/');
+  return response.data as {
+    title: string;
+    message: string;
+    stats: {
+      total_inventories: number;
+      total_items: number;
+      total_users: number;
+    };
+  };
+}
+
+/* REPERIMENTO LISTA IMPOSTAZIONI */
+export async function getAllSettings(): Promise<{ key: string; value: string; protected: boolean }[]> {
+  const response = await api.get('/settings/settings');
+  return response.data as { key: string; value: string; protected: boolean }[];
+}
+
+/* CREAZIONE, AGGIORNAMENTO E CANCELLAZIONE IMPOSTAZIONI */
+export async function getSetting(key: string): Promise<{ key: string; value: string; protected: boolean }> {
+  const response = await api.get(`/settings/settings/${key}`);
+  return response.data as { key: string; value: string; protected: boolean };
+}
+
+export async function setSetting(key: string, value: string): Promise<{ key: string; value: string; protected: boolean }> {
+  const response = await api.post(`/settings/settings`, {
+    key,
+    value,
+  });
+  return response.data as { key: string; value: string; protected: boolean };
+}
+
+export async function deleteSetting(key: string): Promise<void> {
+  await api.delete(`/settings/settings/${key}`);
+}
+
+/* CREAZIONE INVENTARIO */
+export async function createInventory(name: string): Promise<Inventory> {
+  const response = await api.post('/inventory/', { name });
+  return response.data as Inventory;
+}
+
+export async function deleteInventory(id: number) {
+  await api.delete(`/inventory/${id}`);
+}
+
+/* LISTA INVENTARI */
+export async function getInventories(): Promise<Inventory[]> {
+  const response = await api.get<Inventory[]>('/inventory/');
+  return response.data;
+}
+
+/* RECUPERO INVENTARIO PER ID */
+export async function getInventoryById(id: number): Promise<Inventory> {
+  const response = await api.get(`/inventory/${id}`);
+  return response.data as Inventory;
+}
+
+/* RECUPERO ELENCO ITEM PER ID INVENTARIO */
+export async function getInventoryItems(id: number): Promise<InventoryItem[]> {
+  const response = await api.get(`/inventory/item/${id}`);
+  return response.data as InventoryItem[];
+}
+
+/* CREAZIONE ITEM */
+export async function createItem(data: {
+  name: string;
+  description?: string;
+  quantity: number;
+  inventory_id: number;
+}): Promise<InventoryItem> {
+  const response = await api.post('/item/', data);
+  return response.data as InventoryItem;
+}
+
+/* MODIFICA ITEM */
+export async function updateItem(itemId: number, data: {
+  name: string;
+  description?: string;
+  quantity: number;
+  inventory_id: number;
+}): Promise<InventoryItem> {
+  const response = await api.patch(`/item/${itemId}`, data);
+  return response.data as InventoryItem;
+}
+
+/* CANCELLAZIONE ITEM */
+export async function deleteItem(itemId: number): Promise<void> {
+  await api.request({
+    url: `/item/${itemId}`,
+    method: 'DELETE',
+    data: { confirm: true }
+  });
+}
+
+// === UTENTI ===
+export async function getSharableUsers(inventoryId: number) {
+  const res = await api.get(`/user/users/shareable/${inventoryId}`);
+  return res.data;
+}
+
+export async function shareInventoryWithUser(inventoryId: number, username: string) {
+  return api.post(`/inventory/share/${inventoryId}/${username}`);
+}
+
+export async function unshareInventoryWithUser(inventoryId: number, username: string) {
+  return api.delete(`/inventory/share/${inventoryId}/${username}`);
+}
+
+// === GRUPPI ===
+export async function getAllGroups() {
+  const res = await api.get('/user/groups/');
+  return res.data;
+}
+
+export async function shareInventoryWithGroup(inventoryId: number, groupId: number) {
+  return api.post(`/inventory/share_group/${inventoryId}/${groupId}`);
+}
+
+export async function unshareInventoryFromGroup(inventoryId: number, groupId: number) {
+  return api.delete(`/inventory/share_group/${inventoryId}/${groupId}`);
+}
+
+export async function createGroup(data: { name: string; role_id: number }) {
+  const res = await api.post('/user/groups/', data);
+  return res.data;
+}
+
+export async function updateGroup(groupId: number, data: { name: string; role_id: number; users?: number[] }) {
+  const res = await api.put(`/user/groups/${groupId}`, data);
+  return res.data;
+}
+
+export async function deleteGroup(groupId: number) {
+  const res = await api.delete(`/user/groups/${groupId}`);
+  return res.data;
+}
+
+// === DETTAGLI ACCESSO ===
+export async function getInventoryAccessDetails(inventoryId: number) {
+  const res = await api.get(`/inventory/access_details/${inventoryId}`);
+  return res.data;
+}
+
+export async function getInventoryUserShares(inventoryId: number) {
+  const response = await api.get(`/inventory/share/${inventoryId}`);
+  return response.data;
+}
+
+export async function getInventoryGroupShares(inventoryId: number) {
+  const response = await api.get(`/inventory/share_group/${inventoryId}`);
+  return response.data;
+}
+
+export async function updateInventoryName(inventoryId: number, name: string): Promise<void> {
+  await api.patch(`/inventory/${inventoryId}`, { name });
+}
+
+export async function getAllRoles() {
+  const res = await api.get('/user/roles/');
+  return res.data;
+}
+
+// === GESTIONE UTENTI NEI GRUPPI ===
+export async function addUserToGroup(groupId: number, userId: number) {
+  const res = await api.post(`/user/groups/${groupId}/add_user/${userId}`);
+  return res.data;
+}
+
+export async function removeUserFromGroup(groupId: number, userId: number) {
+  const res = await api.delete(`/user/groups/${groupId}/remove_user/${userId}`);
+  return res.data;
+}

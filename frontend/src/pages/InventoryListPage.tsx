@@ -1,0 +1,586 @@
+import { useEffect, useState, useRef, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  createInventory,
+  deleteInventory,
+  //getInventoryAccessDetails,
+  getInventories,
+  getSharableUsers,
+  getAllGroups,
+  shareInventoryWithUser,
+  unshareInventoryWithUser,
+  shareInventoryWithGroup,
+  unshareInventoryFromGroup,
+  getInventoryUserShares,
+  getInventoryGroupShares,
+  updateInventoryName
+} from '../api';
+import { AuthContext } from '../auth-context'
+import { Dialog } from '@headlessui/react'
+
+interface Inventory {
+    id: number
+    name: string
+    data_ins: string
+    data_mod: string
+    owner: {
+      username: string
+    }
+    item_count: number
+  }
+
+function NewInventoryModal({ isOpen, onClose, onCreate }: {
+    isOpen: boolean
+    onClose: () => void
+    onCreate: (name: string) => void
+  }) {
+    const [name, setName] = useState('')
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+      if (isOpen) {
+        setTimeout(() => inputRef.current?.focus(), 0)
+      }
+    }, [isOpen])
+
+    const handleSubmit = (e?: React.FormEvent) => {
+      if (e) e.preventDefault()
+      if (name.trim()) {
+        onCreate(name.trim())
+        setName('')
+        onClose()
+      }
+    }
+
+    return (
+      <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+        <div className="fixed inset-0 bg-black/30 " aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
+            <Dialog.Title className="text-lg font-bold mb-4">Nuovo Inventario</Dialog.Title>
+            <form onSubmit={handleSubmit}>
+              <input
+                type="text"
+                placeholder="Nome inventario"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSubmit()
+                  }
+                }}
+                ref={inputRef}
+                className="w-full border px-3 py-2 mb-4"
+              />
+              <div className="flex justify-end space-x-2">
+                <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Annulla</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Crea</button>
+              </div>
+            </form>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+    )
+  }
+
+function InventoryListPage() {
+  const [inventories, setInventories] = useState<Inventory[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [inventoryBeingEdited, setInventoryBeingEdited] = useState<Inventory | null>(null);
+  const [inventoryPermissionsTarget, setInventoryPermissionsTarget] = useState<Inventory | null>(null);
+  const [allUsers, setAllUsers] = useState<string[]>([]);
+  const [allGroups, setAllGroups] = useState<{ id: number; name: string }[]>([]);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [accessUsers, setAccessUsers] = useState<{ username: string; role?: { name: string } }[]>([]);
+  const [accessGroups, setAccessGroups] = useState<{ name: string; role?: { name: string } }[]>([]);
+  const [editedName, setEditedName] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const navigate = useNavigate()
+  const authContext = useContext(AuthContext)
+  const user = authContext?.user
+  const [message, setMessage] = useState<string>("");
+  const [messageType, setMessageType] = useState<"success" | "error" | "">("");
+  const [editMode, setEditMode] = useState(false);
+  const [selectedInventories, setSelectedInventories] = useState<number[]>([]);
+  const [sortBy, setSortBy] = useState<'name' | 'date' | 'item_count' | 'created'>(
+    () => localStorage.getItem('inventory_sortBy') as 'name' | 'date' | 'item_count' | 'created' || 'created'
+  );
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => localStorage.getItem('inventory_sortOrder') as 'asc' | 'desc' || 'asc');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await getInventories();
+        setInventories(res)
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message)
+        } else {
+          setError('Errore sconosciuto')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  useEffect(() => {
+    if (inventoryBeingEdited) {
+      setEditedName(inventoryBeingEdited.name);
+    }
+  }, [inventoryBeingEdited]);
+
+  const handleClick = (id: number) => {
+    navigate(`/inventories/${id}`)
+  }
+
+  const getSortedInventories = () => {
+    const sorted = [...inventories];
+    sorted.sort((a, b) => {
+      if (sortBy === 'name') {
+        return sortOrder === 'asc'
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      } else if (sortBy === 'item_count') {
+        return sortOrder === 'asc'
+          ? a.item_count - b.item_count
+          : b.item_count - a.item_count;
+      } else if (sortBy === 'created') {
+        return sortOrder === 'asc'
+          ? new Date(a.data_ins).getTime() - new Date(b.data_ins).getTime()
+          : new Date(b.data_ins).getTime() - new Date(a.data_ins).getTime();
+      } else {
+        return sortOrder === 'asc'
+          ? new Date(a.data_mod).getTime() - new Date(b.data_mod).getTime()
+          : new Date(b.data_mod).getTime() - new Date(a.data_mod).getTime();
+      }
+    });
+    return sorted;
+  };
+
+  const showMessage = (text: string, type: "success" | "error") => {
+    setMessage(text);
+    setMessageType(type);
+    const timeout = setTimeout(() => {
+      setMessage("");
+      setMessageType("");
+    }, type === "success" ? 5000 : 10000);
+    return () => clearTimeout(timeout);
+  };
+
+  const openAccessModal = async (inv: Inventory) => {
+    const allUsersList = await getSharableUsers(inv.id);
+    const allGroupsList = await getAllGroups();
+    setAllUsers(
+      (allUsersList as { username: string; role?: { name: string } }[])
+        .filter(u => u.role && u.role.name !== 'admin')
+        .map(u => u.username)
+    );
+    setAllGroups((allGroupsList as { id: number, name: string }[]).map(g => ({ id: g.id, name: g.name })));
+    setInventoryPermissionsTarget(inv);
+    try {
+      const [userList, groupList] = await Promise.all([
+        getInventoryUserShares(inv.id),
+        getInventoryGroupShares(inv.id)
+      ]);
+      setAccessUsers(userList as { username: string; role?: { name: string } }[]);
+      setAccessGroups(
+        (groupList as string[]).map(name => ({ name }))
+      );
+    } catch (err) {
+      console.error("Errore caricamento accessi inventario:", err);
+    }
+  };
+
+  if (loading) return <p>Caricamento...</p>
+  if (error) return <p>Errore: {error}</p>
+
+  return (
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Inventari</h1>
+      </div>
+      <div className="flex flex-wrap justify-between items-center mb-4">
+        <div className="flex gap-2 items-center">
+          <label className="text-sm font-medium">Ordina per:</label>
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              const value = e.target.value as 'name' | 'date' | 'item_count';
+              localStorage.setItem('inventory_sortBy', value);
+              setSortBy(value);
+            }}
+            className="border px-2 py-1 rounded"
+          >
+            <option value="date">Data modifica</option>
+            <option value="created">Data creazione</option>
+            <option value="name">Nome</option>
+            <option value="item_count">Numero di oggetti</option>
+          </select>
+          <select
+            value={sortOrder}
+            onChange={(e) => {
+              const value = e.target.value as 'asc' | 'desc';
+              localStorage.setItem('inventory_sortOrder', value);
+              setSortOrder(value);
+            }}
+            className="border px-2 py-1 rounded"
+          >
+            <option value="desc">Decrescente</option>
+            <option value="asc">Crescente</option>
+          </select>
+        </div>
+        {editMode && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedInventories(inventories.map(item => item.id))}
+              className="px-2 py-1 text-sm bg-blue-500 text-white rounded"
+            >
+              Seleziona tutti
+            </button>
+            <button
+              onClick={() => setSelectedInventories([])}
+              className="px-2 py-1 text-sm bg-gray-500 text-white rounded"
+            >
+              Deseleziona tutti
+            </button>
+          </div>
+        )}
+      </div>
+      {user && user.role.name !== 'viewer' && (
+        <>
+          <NewInventoryModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onCreate={async (name) => {
+              try {
+                const newInv = await createInventory(name) as unknown as Inventory;
+
+                if (!newInv?.id) {
+                  showMessage('Errore nella risposta del server.', 'error');
+                  return;
+                }
+
+                setInventories((prev) => [...prev, newInv]);
+                showMessage('Inventario creato con successo!', 'success');
+              } catch (error) {
+                showMessage("Errore durante la creazione dell'inventario", 'error');
+                console.error('Errore durante la creazione dell\'inventario:', error);
+              }
+            }}
+          />
+        </>
+      )}
+      {inventories.length === 0 ? (
+        <p>Nessun inventario disponibile.</p>
+      ) : (
+        <ul className="space-y-2">
+          {getSortedInventories().map(inv => (
+            <li
+              key={inv.id}
+              className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center ${
+                editMode
+                  ? selectedInventories.includes(inv.id)
+                    ? "bg-yellow-100"
+                    : "hover:bg-yellow-50"
+                  : "hover:bg-gray-50"
+              }`}
+              onClick={() => {
+                if (editMode) {
+                  setSelectedInventories((prev) =>
+                    prev.includes(inv.id)
+                      ? prev.filter((id) => id !== inv.id)
+                      : [...prev, inv.id]
+                  );
+                } else {
+                  handleClick(inv.id);
+                }
+              }}
+            >
+              {editMode ? (
+                <div className="flex justify-between items-center w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow">
+                    <h2 className="text-lg font-semibold">{inv.name}</h2>
+                    <p className="text-sm text-gray-500 sm:ml-4">
+                      Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
+                    </p>
+                    {(user?.role.name === 'admin' || user?.role.name === 'moderator') && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAccessModal(inv);
+                      }}
+                    className="ml-4 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-700 text-sm"
+                    >
+                      <span className="inline md:hidden">🔐</span>
+                      <span className="hidden md:inline">Accessi</span>
+                    </button>
+                  )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInventoryBeingEdited(inv);
+                      setIsEditModalOpen(true);
+                    }}
+                    className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                  >
+                    <span className="inline md:hidden">✏️</span>
+                    <span className="hidden md:inline">Modifica</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow">
+                  <h2 className="text-lg font-semibold">{inv.name}</h2>
+                  <p className="text-sm text-gray-500 sm:ml-4">
+                    Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div
+        className={`z-40 gap-2 flex ${
+          window.innerWidth >= 768
+            ? 'fixed top-4 right-4 flex-row'
+            : 'fixed bottom-2 right-2 flex-col'
+        }`}
+      >
+        {editMode && selectedInventories.length > 0 && (
+          <button
+            onClick={async () => {
+              const deletableIds = inventories
+                .filter(inv => selectedInventories.includes(inv.id) && inv.item_count === 0)
+                .map(inv => inv.id);
+
+              const nonDeletable = inventories
+                .filter(inv => selectedInventories.includes(inv.id) && inv.item_count > 0);
+
+              if (deletableIds.length === 0 && nonDeletable.length > 0) {
+                showMessage("Gli inventari selezionati contengono oggetti e non possono essere cancellati.", "error");
+                return;
+              }
+
+              if (window.confirm("Sei sicuro di voler cancellare gli inventari selezionati senza oggetti?")) {
+                try {
+                  await Promise.all(deletableIds.map(id => deleteInventory(id)))
+                  setInventories(prev => prev.filter(inv => !deletableIds.includes(inv.id)));
+                  setSelectedInventories([]);
+                  setEditMode(false); // Disabilita la modalità di modifica dopo la cancellazione
+                  showMessage("Inventari senza oggetti cancellati con successo.", "success");
+                } catch {
+                  showMessage("Errore durante la cancellazione degli inventari.", "error");
+                }
+
+                if (nonDeletable.length > 0) {
+                  showMessage("Alcuni inventari non sono stati cancellati perché contengono oggetti.", "error");
+                }
+              }
+            }}
+            className="py-2 px-4 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700"
+          >
+            <span className="inline md:hidden">🗑️ {( selectedInventories.length )}</span>
+            <span className="hidden md:inline">Elimina {( selectedInventories.length )}</span>
+          </button>
+        )}
+        <button
+          onClick={() => {
+            setEditMode(!editMode);
+            setSelectedInventories([]);
+          }}
+          className={`py-2 px-4 rounded-full shadow-lg text-white ${
+            editMode ? 'bg-yellow-700' : 'bg-yellow-500 hover:bg-yellow-600'
+          }`}
+        >
+          <span className="inline md:hidden">{editMode ? "✖️" : "✏️"}</span>
+          <span className="hidden md:inline">{editMode ? "Chiudi" : "Modifica"}</span>
+        </button>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
+        >
+        <span className="inline md:hidden">➕</span>
+        <span className="hidden md:inline">Nuovo</span>
+        </button>
+      </div>
+
+      <Dialog open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} className="relative z-50">
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
+            <Dialog.Title className="text-lg font-semibold mb-4">Modifica Inventario</Dialog.Title>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!inventoryBeingEdited) return;
+                await updateInventoryName(inventoryBeingEdited.id, editedName);
+                setInventories((prev) =>
+                  prev.map((inv) => (inv.id === inventoryBeingEdited.id ? { ...inv, name: editedName } : inv))
+                );
+                setIsEditModalOpen(false);
+                setInventoryBeingEdited(null);
+                setEditedName('');
+                showMessage("Inventario modificato con successo.", "success");
+              }}
+            >
+              <input
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                className="w-full border px-3 py-2 mb-4"
+              />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border rounded">
+                  Annulla
+                </button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
+                  Salva
+                </button>
+              </div>
+            </form>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      <Dialog open={!!inventoryPermissionsTarget} onClose={() => setInventoryPermissionsTarget(null)} className="relative z-50">
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <Dialog.Title className="text-lg font-bold mb-4">Gestione Accessi – {inventoryPermissionsTarget?.name}</Dialog.Title>
+
+            <div className="mb-4">
+              <h3 className="font-semibold text-md mb-2">Utenti con accesso</h3>
+              <ul className="mb-2 text-sm text-gray-700 space-y-1">
+              <div className="flex items-center gap-2 mt-2">
+                <select
+                  className="border px-2 py-1 rounded text-sm"
+                  value={selectedUser}
+                  onChange={(e) => setSelectedUser(e.target.value)}
+                >
+                  <option value="">-- Seleziona utente --</option>
+                  {allUsers
+                    .filter(u => !accessUsers.some(au => au.username === u))
+                    .map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                </select>
+                <button
+                  disabled={!selectedUser}
+                  onClick={async () => {
+                    if (!inventoryPermissionsTarget || !selectedUser) return;
+                    await shareInventoryWithUser(inventoryPermissionsTarget.id, selectedUser);
+                    setAccessUsers(prev => [...prev, { username: selectedUser }]);
+                    setSelectedUser('');
+                  }}
+                  className="px-2 py-1 bg-blue-500 text-white rounded text-sm disabled:opacity-50"
+                >
+                  Aggiungi
+                </button>
+              </div>
+                {accessUsers
+                  .filter(user => user && user.username)
+                  .map((user) => (
+                  <li key={user.username} className="flex justify-between items-center border-b py-1">
+                    <span>{user.username} {user.role?.name ? `(${user.role.name})` : ""}</span>
+                    <button
+                      onClick={async () => {
+                        if (!inventoryPermissionsTarget) return;
+                        await unshareInventoryWithUser(inventoryPermissionsTarget.id, user.username);
+                        setAccessUsers(prev => prev.filter(u => u.username !== user.username));
+                      }}
+                      className="text-red-500 hover:underline text-xs"
+                    >
+                      Rimuovi
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mb-4">
+              <h3 className="font-semibold text-md mb-2">Gruppi con accesso</h3>
+              <ul className="mb-2 text-sm text-gray-700 space-y-1">
+              <div className="flex items-center gap-2 mt-2">
+                <select
+                  className="border px-2 py-1 rounded text-sm"
+                  value={selectedGroupId ?? ''}
+                  onChange={(e) => setSelectedGroupId(Number(e.target.value))}
+                >
+                  <option value="">-- Seleziona gruppo --</option>
+                  {allGroups
+                    .filter(g => !(accessGroups || []).some(ag => ag.name === g.name))
+                    .map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                </select>
+                <button
+                  disabled={!selectedGroupId}
+                  onClick={async () => {
+                    if (!inventoryPermissionsTarget || selectedGroupId === null) return;
+                    await shareInventoryWithGroup(inventoryPermissionsTarget.id, selectedGroupId);
+                    const groupName = allGroups.find(g => g.id === selectedGroupId)?.name;
+                    if (groupName) {
+                      setAccessGroups(prev => [...prev, { name: groupName }]);
+                    }
+                    setSelectedGroupId(null);
+                  }}
+                  className="px-2 py-1 bg-blue-500 text-white rounded text-sm disabled:opacity-50"
+                >
+                  Aggiungi
+                </button>
+              </div>
+                {(accessGroups || [])
+                  .filter(group => !!group)
+                  .map((group) => (
+                  <li key={group.name} className="flex justify-between items-center border-b py-1">
+                    <span>{group.name} {group.role?.name ? `(${group.role.name})` : ""}</span>
+                    <button
+                      onClick={async () => {
+                        if (!inventoryPermissionsTarget) return;
+                      const groupObj = allGroups.find(g => g.name === group.name);
+                      if (groupObj) {
+                        await unshareInventoryFromGroup(inventoryPermissionsTarget.id, groupObj.id);
+                        setAccessGroups((prev) => prev.filter(g => g !== group));
+                      }
+                      }}
+                      className="text-red-500 hover:underline text-xs"
+                    >
+                      Rimuovi
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={() => setInventoryPermissionsTarget(null)} className="px-4 py-2 border rounded">Chiudi</button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      {message && (
+        <div
+          className={`fixed z-50 p-3 rounded shadow-lg text-white transition-opacity duration-1000 ${
+            messageType === "success" ? "bg-green-500" : "bg-red-500"
+          } ${
+            window.innerWidth < 768
+              ? "bottom-4 left-1/2 transform -translate-x-1/2"
+              : "top-4 left-1/2 transform -translate-x-1/2"
+          }`}
+        >
+          {message}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default InventoryListPage
