@@ -1,6 +1,9 @@
 # Usa un'immagine di base con Python
 FROM python:3.11-slim
 
+# Install curl
+RUN apt-get update && apt-get install -y curl && apt-get clean
+
 # Imposta la directory di lavoro nel container
 WORKDIR /app
 
