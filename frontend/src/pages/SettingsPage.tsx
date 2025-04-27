@@ -1,16 +1,18 @@
 import { useState } from "react";
 import GeneralSettings from "./settings/GeneralSettings";
 import UserManagementPage from "./settings/UserManagementPage";
-import RoleManagementPage from "./settings/RoleManagementPage";
+//import RoleManagementPage from "./settings/RoleManagementPage";
 import GroupManagementPage from "./settings/GroupManagementPage";
-import InfoPage from "./settings/InfoPage";
+//import InfoPage from "./settings/InfoPage";
+import BackupManagementPage from "./settings/BackupManagementPage";
 
 const tabs = [
   { name: "Generale", component: <GeneralSettings /> },
   { name: "Utenti", component: <UserManagementPage /> },
-  { name: "Ruoli", component: <RoleManagementPage /> },
+  //{ name: "Ruoli", component: <RoleManagementPage /> },
   { name: "Gruppi", component: <GroupManagementPage /> },
-  { name: "Info", component: <InfoPage /> },
+  { name: "Backup", component: <BackupManagementPage /> },
+  //{ name: "Info", component: <InfoPage /> },
 ];
 
 export default function SettingsPage() {

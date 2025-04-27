@@ -1,27 +1,30 @@
-import axios from 'axios'
+import axios from 'axios';
 import { User, Role, Inventory, InventoryItem } from "./types";
 
-//const API_BASE_URL = window.APP_CONFIG.VITE_BACKEND_BASE_URL;
+let api: ReturnType<typeof axios.create>;
 
 function getApiBaseUrl() {
+  //console.error("VITE_BACKEND_BASE_URL:", window.APP_CONFIG?.VITE_BACKEND_BASE_URL);
   return window.APP_CONFIG?.VITE_BACKEND_BASE_URL ?? 'http://localhost:8001';
 }
 
-export const api = axios.create({
-  //baseURL: 'http://localhost:8001',
-  baseURL: getApiBaseUrl(), //API_BASE_URL,
-  withCredentials: false, // lasciamo false se non usiamo cookie
-})
+export function createApiInstance() {
+  api = axios.create({
+    baseURL: getApiBaseUrl(),
+    withCredentials: false,
+  });
 
-// Interceptor per aggiungere token
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers = config.headers || {} // garantisce che headers esista
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
+  api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+}
+
+export { api };
 
 /* LOGIN UTENTI */
 export async function loginUser(username: string, password: string): Promise<{ access_token: string }> {
@@ -305,4 +308,65 @@ export async function addUserToGroup(groupId: number, userId: number) {
 export async function removeUserFromGroup(groupId: number, userId: number) {
   const res = await api.delete(`/user/groups/${groupId}/remove_user/${userId}`);
   return res.data;
+}
+
+// Elenco dei backup disponibili
+export async function listBackups() {
+  const res = await api.get('/backup/');
+  return res.data;
+}
+
+// Creazione di un nuovo backup
+export async function createBackup() {
+  const res = await api.post(`/backup/create`);
+  return res.data;
+}
+
+// Download di un backup esistente
+export async function downloadBackup(filename: string): Promise<void> {
+  const response = await api.get(`/backup/download/${encodeURIComponent(filename)}`, {
+    responseType: 'blob'
+  });
+  
+  const blob = new Blob([response.data as Blob]);
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  
+  window.URL.revokeObjectURL(url);
+}
+
+// Ripristino di un backup esistente
+export async function restoreBackup(filename: string): Promise<void> {
+  await api.request({
+    url: `/backup/restore/${encodeURIComponent(filename)}`,
+    method: 'POST',
+    data: true
+  });
+}
+
+// Cancellazione di un backup esistente
+export async function deleteBackup(filename: string): Promise<void> {
+  await api.request({
+    url: `/backup/delete/${encodeURIComponent(filename)}`,
+    method: 'DELETE',
+    data: true
+  });
+}
+
+// Upload di un backup esistente
+export async function uploadBackup(file: File): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  await api.post('/backup/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
 }

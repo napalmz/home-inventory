@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import './index.css'
 import App from './App'
 import { AuthProvider } from "./auth-context"
+import { createApiInstance } from './api';
 
 fetch("/config.json")
   .then((res) => {
@@ -11,6 +12,7 @@ fetch("/config.json")
   })
   .then((config) => {
     window.APP_CONFIG = config;
+    createApiInstance(); // 👉 crea l'istanza solo ora!
     ReactDOM.createRoot(document.getElementById("root")!).render(
       <React.StrictMode>
         <AuthProvider>
@@ -21,5 +23,9 @@ fetch("/config.json")
   })
   .catch((err) => {
     console.error("Errore caricamento config.json:", err);
-    // eventualmente mostra un fallback UI o errore
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        Errore: impossibile caricare la configurazione. Contattare l'amministratore.
+      </div>
+    );
   });

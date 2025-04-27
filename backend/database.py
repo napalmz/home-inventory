@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
-from models import User, Role, RoleEnum, Base
+from models import Base
 import os
 
 load_dotenv()  # Carica le variabili dal file .env

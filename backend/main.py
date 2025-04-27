@@ -12,6 +12,7 @@ from routes.inventory import router as inventory_router
 from routes.item import router as item_router
 from routes.system import router as system_router
 from routes.settings import router as settings_router
+from routes.backup import router as backup_router
 from fastapi.middleware.cors import CORSMiddleware
 from models import Inventory, Item, User
 
@@ -47,6 +48,7 @@ app.include_router(inventory_router, prefix="/inventory", tags=["Inventory"])
 app.include_router(item_router, prefix="/item", tags=["Item"])
 app.include_router(system_router, prefix="/system", tags=["System"])
 app.include_router(settings_router, prefix="/settings", tags=["Settings"])
+app.include_router(backup_router, prefix="/backup", tags=["Backups"])
 
 @app.get("/")
 def home():

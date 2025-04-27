@@ -2,7 +2,11 @@
 FROM python:3.11-slim
 
 # Install curl
-RUN apt-get update && apt-get install -y curl && apt-get clean
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    postgresql-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Imposta la directory di lavoro nel container
 WORKDIR /app
