@@ -5,6 +5,5 @@ __pycache__/
 *$py.class
 
 venv/
-docker-volume/
-db_backups/
 .DS_Store
+backend/backups/
