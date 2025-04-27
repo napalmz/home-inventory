@@ -349,7 +349,8 @@ export default function InventoryDetailPage() {
                   inventory_id: inventory.id
                 });
                 if (newItem) {
-                  setItems((prev) => [...prev, newItem]);
+                  const refreshed = inventory && await getInventoryItems(inventory.id);
+                  if (refreshed) setItems(refreshed);
                   setNewItemName("");
                   setNewItemDescription("");
                   setNewItemQuantity(1);
@@ -367,7 +368,29 @@ export default function InventoryDetailPage() {
               </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium">Quantità</label>
-                <input type="number" className="w-full border rounded p-1" value={newItemQuantity} onChange={(e) => setNewItemQuantity(Number(e.target.value))} />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewItemQuantity((prev) => Math.max(0, prev - 1))}
+                    className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-16 border rounded p-2 text-center"
+                    value={newItemQuantity}
+                    onChange={(e) => setNewItemQuantity(Math.max(0, Number(e.target.value)))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNewItemQuantity((prev) => prev + 1)}
+                    className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <button
