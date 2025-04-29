@@ -27,6 +27,7 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: inventory
+      FASTAPI_ROOT_PATH: /api
     ports:
       - "8001:8000"
     depends_on:
@@ -41,14 +42,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    entrypoint: ["/app/entrypoint.sh"]
 
   frontend:
     build: ./frontend
     container_name: inventory-frontend
     environment:
       TZ: Europe/Rome
-      VITE_BACKEND_BASE_URL: http://localhost:8001
+      BACKEND_BASE_URL: http://backend:8000
     ports:
       - "3000:80"
     healthcheck:

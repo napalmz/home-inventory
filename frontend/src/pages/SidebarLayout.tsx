@@ -97,10 +97,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         {/* Footer */}
         <div className="absolute bottom-4 left-4 right-4 text-xs text-gray-400">
           <hr className="mb-2 border-gray-600" />
-          <p>API {apiVersion ?? '...'}</p>
+          <p>API v{apiVersion ?? '...'}</p>
           <p>Frontend v{frontendVersion}</p>
           <p className="mt-1">
-            © 2025 <a href="https://github.com/napalmz" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">napalmz</a>
+            © {new Date().getFullYear()} <a href="https://github.com/napalmz" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">napalmz</a>
           </p>
         </div>
 

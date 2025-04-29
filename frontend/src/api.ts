@@ -5,7 +5,8 @@ let api: ReturnType<typeof axios.create>;
 
 function getApiBaseUrl() {
   //console.error("VITE_BACKEND_BASE_URL:", window.APP_CONFIG?.VITE_BACKEND_BASE_URL);
-  return window.APP_CONFIG?.VITE_BACKEND_BASE_URL ?? 'http://localhost:8001';
+  //return window.APP_CONFIG?.VITE_BACKEND_BASE_URL ?? 'http://localhost:8001';
+  return '/api';
 }
 
 export function createApiInstance() {
@@ -29,7 +30,7 @@ export { api };
 /* LOGIN UTENTI */
 export async function loginUser(username: string, password: string): Promise<{ access_token: string }> {
   const response = await api.post(
-    '/auth/login',
+    "/auth/login",
     new URLSearchParams({ username, password }),
     {
       headers: {
@@ -51,7 +52,7 @@ export async function registerUser(username: string, password: string, email: st
 
 /* RECUPERO DATI UTENTE */
 export async function getUserInfo() {
-  const response = await api.get('/auth/me');
+  const response = await api.get("/auth/me");
   return response.data;
 }
 
@@ -63,7 +64,7 @@ export async function getUsers(): Promise<User[]> {
 
 /* RECUPERO VERSIONE API */
 export async function getApiVersion(): Promise<{ version: string }> {
-  const response = await api.get<{ version: string }>('/system/version');
+  const response = await api.get<{ version: string }>("/system/version");
   return response.data;
 }
 
@@ -160,6 +161,7 @@ export async function getSetting(key: string): Promise<{ key: string; value: str
   return response.data as { key: string; value: string; protected: boolean };
 }
 
+/* AGGIORNAMENTO IMPOSTAZIONI */
 export async function setSetting(key: string, value: string): Promise<{ key: string; value: string; protected: boolean }> {
   const response = await api.post(`/settings/settings`, {
     key,
@@ -168,6 +170,7 @@ export async function setSetting(key: string, value: string): Promise<{ key: str
   return response.data as { key: string; value: string; protected: boolean };
 }
 
+/* CANCELLAZIONE IMPOSTAZIONI */
 export async function deleteSetting(key: string): Promise<void> {
   await api.delete(`/settings/settings/${key}`);
 }
@@ -178,6 +181,7 @@ export async function createInventory(name: string): Promise<Inventory> {
   return response.data as Inventory;
 }
 
+/* CANCELLAZIONE INVENTARIO */
 export async function deleteInventory(id: number) {
   await api.delete(`/inventory/${id}`);
 }
@@ -196,7 +200,7 @@ export async function getInventoryById(id: number): Promise<Inventory> {
 
 /* RECUPERO ELENCO ITEM PER ID INVENTARIO */
 export async function getInventoryItems(id: number): Promise<InventoryItem[]> {
-  const response = await api.get(`/inventory/item/${id}`);
+  const response = await api.get(`/inventory/item/${id}/`);
   return response.data as InventoryItem[];
 }
 

@@ -30,7 +30,18 @@ async def lifespan(app: FastAPI):
     yield
     db.close()
 
-app = FastAPI(lifespan=lifespan)
+root_path = os.getenv("FASTAPI_ROOT_PATH", "")
+api_version = os.getenv("API_VERSION", "unknown")
+
+app = FastAPI(
+    lifespan=lifespan
+   ,title="Home Inventory"
+   ,version=api_version
+   ,root_path=root_path  # 👈
+   #,openapi_url="/api/openapi.json" # Per usare il reverse proxy
+   #,docs_url="/api/docs"            # Per usare il reverse proxy
+   #,redoc_url="/api/redoc"          # Per usare il reverse proxy
+)
 app.openapi_schema = None  # Rigenera lo schema alla prima richiesta
 
 app.add_middleware(
