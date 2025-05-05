@@ -93,7 +93,13 @@ def role_required(required_role: RoleEnum):  # ✅ Accetta RoleEnum invece di st
 
 def initialize_settings(db: Session):
     defaults = {
-        "ENABLE_REGISTRATION": "true"
+        "ENABLE_REGISTRATION": "true",
+        "BACKUP_FREQUENCY": "none",
+        "BACKUP_INTERVAL_DAYS": None,
+        "BACKUP_INTERVAL_HOURS": None,
+        "BACKUP_INTERVAL_MINUTES": None,
+        "BACKUP_RETENTION": None,  # numero di backup da mantenere
+        "BACKUP_LAST_RUN": None,
     }
     for key, value in defaults.items():
         if get_setting(db, key) is None:

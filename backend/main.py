@@ -15,6 +15,7 @@ from routes.settings import router as settings_router
 from routes.backup import router as backup_router
 from fastapi.middleware.cors import CORSMiddleware
 from models import Inventory, Item, User
+from scheduler import start_scheduler
 
 logging.basicConfig(level=logging.INFO)
 
@@ -43,6 +44,9 @@ app = FastAPI(
    #,redoc_url="/api/redoc"          # Per usare il reverse proxy
 )
 app.openapi_schema = None  # Rigenera lo schema alla prima richiesta
+
+# Avvio dello scheduler per i backup
+start_scheduler()
 
 app.add_middleware(
     CORSMiddleware,

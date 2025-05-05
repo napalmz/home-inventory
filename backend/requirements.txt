@@ -8,3 +8,4 @@ jwt
 python-multipart
 python-jose
 alembic
+apscheduler

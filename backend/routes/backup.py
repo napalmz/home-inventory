@@ -1,4 +1,3 @@
-# backend/routes/backup.py
 from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import FileResponse
 from fastapi import UploadFile, File
@@ -13,6 +12,7 @@ from dependencies import get_db, role_required
 from models import RoleEnum
 from dotenv import load_dotenv
 from database import SessionLocal
+from crud import get_setting, set_setting
 
 load_dotenv()
 
@@ -24,9 +24,9 @@ BACKUP_DIR = Path("./backups")
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/create")
-def create_backup(db: Session = Depends(get_db)):
+def create_backup(db: Session = Depends(get_db), prefix: str = "manual"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    full_backup_path = BACKUP_DIR / f"backup_{timestamp}.sql"
+    full_backup_path = BACKUP_DIR / f"{prefix}_backup_{timestamp}.sql"
     users_backup_path = BACKUP_DIR / f"users_temp_{timestamp}.sql"
 
     try:
@@ -121,8 +121,6 @@ def delete_backup(filename: str, confirm: bool = Body(...)):
 
     return {"message": "Backup cancellato"}
 
-# To be added: endpoint for config get/set and automatic backup scheduler
-
 @router.post("/restore/{filename}")
 def restore_backup(filename: str, confirm: bool = Body(...)):
     if not confirm:
@@ -147,11 +145,15 @@ def restore_backup(filename: str, confirm: bool = Body(...)):
 
                 logger.info(f"Pulizia tabelle prima del restore...")
                 db = SessionLocal()
+                db.execute(text("DELETE FROM shared_inventories"))
+                db.execute(text("DELETE FROM shared_inventory_groups"))
                 db.execute(text("DELETE FROM items"))
                 db.execute(text("DELETE FROM inventories"))
+                db.execute(text("DELETE FROM user_group_association"))
                 db.execute(text("DELETE FROM groups"))
                 #db.execute(text("DELETE FROM roles"))
                 db.execute(text("DELETE FROM users WHERE username != 'admin'"))
+                #db.execute(text("DELETE FROM settings"))
                 db.commit()
                 db.close()
                 logger.info(f"Pulizia completata. Avvio restore da {filename}")
@@ -189,3 +191,55 @@ def upload_backup(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Errore durante il caricamento del file: {str(e)}")
 
     return {"message": "Backup caricato correttamente", "filename": file.filename}
+
+@router.get("/schedule")
+def get_backup_schedule(db: Session = Depends(get_db)):
+    """Restituisce la configurazione della schedulazione backup."""
+    frequency   = get_setting(db, "BACKUP_FREQUENCY")
+    int_days    = get_setting(db, "BACKUP_INTERVAL_DAYS")
+    int_hours   = get_setting(db, "BACKUP_INTERVAL_HOURS")
+    int_minutes = get_setting(db, "BACKUP_INTERVAL_MINUTES")
+    retention   = get_setting(db, "BACKUP_RETENTION")
+    return {
+        "BACKUP_FREQUENCY": frequency,
+        "BACKUP_INTERVAL_DAYS": int_days,
+        "BACKUP_INTERVAL_HOURS": int_hours,
+        "BACKUP_INTERVAL_MINUTES": int_minutes,
+        "BACKUP_RETENTION": retention
+    }
+
+@router.post("/schedule")
+def set_backup_schedule(
+    backup_frequency:   str = Body(..., embed=True),
+    backup_int_days:    int = Body(..., embed=True),
+    backup_int_hours:   int = Body(..., embed=True),
+    backup_int_minutes: int = Body(..., embed=True),
+    backup_retention:   int = Body(..., embed=True),
+    db: Session = Depends(get_db)
+):
+    """Aggiorna o crea la configurazione della schedulazione backup."""
+    set_setting(db, "BACKUP_FREQUENCY", str(backup_frequency))
+    set_setting(db, "BACKUP_INTERVAL_DAYS", str(backup_int_days))
+    set_setting(db, "BACKUP_INTERVAL_HOURS", str(backup_int_hours))
+    set_setting(db, "BACKUP_INTERVAL_MINUTES", str(backup_int_minutes))
+    set_setting(db, "BACKUP_RETENTION", str(backup_retention))
+
+    try:
+        from scheduler import start_scheduler as perform_start_scheduler
+        perform_start_scheduler()
+    except Exception as e:
+        logger.error(f"Errore durante l'avvio dello scheduler: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore durante l'avvio dello scheduler: {str(e)}")
+    
+    return {"message": "Schedulazione aggiornata correttamente."}
+
+@router.post("/schedule/trigger")
+def trigger_backup_now(db: Session = Depends(get_db)):
+    """Esegue immediatamente un backup manuale come se fosse schedulato."""
+    try:
+        from scheduler import scheduled_backup as perform_scheduled_backup
+        perform_scheduled_backup()
+        return {"message": "Backup schedulato avviato manualmente."}
+    except Exception as e:
+        logger.error(f"Errore durante il trigger manuale del backup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore durante il trigger manuale del backup: {str(e)}")
