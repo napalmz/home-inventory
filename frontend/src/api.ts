@@ -83,7 +83,7 @@ export async function updateMe(email: string, password: string): Promise<void> {
 
 /* LISTING RUOLI */
 export async function getRoles(): Promise<Role[]> {
-  const response = await api.get("/user/roles");
+  const response = await api.get("/user/roles/");
   if (Array.isArray(response.data)) {
     return response.data;
   } else {
@@ -373,4 +373,42 @@ export async function uploadBackup(file: File): Promise<void> {
       'Content-Type': 'multipart/form-data',
     },
   });
+}
+
+// === BACKUP SCHEDULAZIONI ===
+export async function getBackupSchedule(): Promise<{
+  frequency: string;
+  interval_days?: number;
+  interval_hours?: number;
+  interval_minutes?: number;
+  retention: number;
+}> {
+  const res = await api.get<Record<string, { value: string }>>('/backup/schedule');
+  return {
+    frequency: res.data.BACKUP_FREQUENCY.value,
+    interval_days: parseInt(res.data.BACKUP_INTERVAL_DAYS.value),
+    interval_hours: parseInt(res.data.BACKUP_INTERVAL_HOURS.value),
+    interval_minutes: parseInt(res.data.BACKUP_INTERVAL_MINUTES.value),
+    retention: parseInt(res.data.BACKUP_RETENTION.value),
+  };
+}
+
+export async function updateBackupSchedule(data: {
+  frequency: string;
+  interval_days?: number;
+  interval_hours?: number;
+  interval_minutes?: number;
+  retention: number;
+}): Promise<void> {
+  await api.post('/backup/schedule', {
+    backup_frequency: data.frequency,
+    backup_int_days: data.interval_days ?? 0,
+    backup_int_hours: data.interval_hours ?? 0,
+    backup_int_minutes: data.interval_minutes ?? 0,
+    backup_retention: data.retention
+  });
+}
+
+export async function triggerScheduledBackup(): Promise<void> {
+  await api.post('/backup/schedule/trigger');
 }

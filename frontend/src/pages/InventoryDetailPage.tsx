@@ -156,18 +156,17 @@ export default function InventoryDetailPage() {
               <option value="name">Nome</option>
               <option value="quantity">Quantità</option>
             </select>
-            <select
-              value={sortOrder}
-              onChange={(e) => {
-                const value = e.target.value as 'asc' | 'desc';
-                localStorage.setItem('item_sortOrder', value);
-                setSortOrder(value);
+            <button
+              onClick={() => {
+                const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+                localStorage.setItem('item_sortOrder', newOrder);
+                setSortOrder(newOrder);
               }}
-              className="border rounded p-1"
+              className="border rounded p-1 px-2"
+              title={`Ordina in ordine ${sortOrder === 'asc' ? 'decrescente' : 'crescente'}`}
             >
-              <option value="asc">Crescente</option>
-              <option value="desc">Decrescente</option>
-            </select>
+              {sortOrder === 'asc' ? '⬆️ Crescente' : '⬇️ Decrescente'}
+            </button>
             <input
               type="text"
               placeholder="Filtra la lista..."
