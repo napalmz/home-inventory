@@ -5,6 +5,7 @@ from models import User, Inventory, Item, SharedInventory, Group, SharedInventor
 from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, UserResponse, InventoryResponseWithItemCount
 from routes.auth import get_current_user
 from typing import List
+import re
 
 router = APIRouter()
 
@@ -40,8 +41,9 @@ def can_access_inventory(user: User, inventory: Inventory, action: str = "view")
 
 #############################################################################
 # Lista degli inventari visibili all'utente
-@router.get("/", response_model=list[InventoryResponseWithItemCount])
+@router.get("/", response_model=List[dict])
 def list_inventories(
+    filtro: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
@@ -49,13 +51,51 @@ def list_inventories(
     visible_inventories = [
         inv for inv in inventories if can_access_inventory(user, inv, action="view")
     ]
-    return [
-        InventoryResponseWithItemCount(
-            **InventoryResponse.model_validate(inv).model_dump(),
-            item_count=len(inv.items)
-        )
-        for inv in visible_inventories
-    ]
+
+    def highlight_match(text: str, filtro: str) -> str:
+        pattern = re.compile(re.escape(filtro), re.IGNORECASE)
+        return pattern.sub(lambda m: f"**{m.group(0)}**", text)
+
+    result = []
+    filtro_lower = filtro.lower()
+    for inv in visible_inventories:
+        matching_items = []
+        if filtro:
+            matching_items = []
+            for item in inv.items:
+                name_match = filtro_lower in (item.name or "").lower()
+                desc_match = filtro_lower in (item.description or "").lower() if item.description else False
+                if name_match or desc_match:
+                    # Evidenzia la parte corrispondente nel nome e nella descrizione (case-insensitive)
+                    name_highlight = (item.name or "")
+                    desc_highlight = (item.description or "") if item.description else None
+                    if name_match:
+                        name_highlight = highlight_match(name_highlight, filtro)
+                    if desc_match and desc_highlight is not None:
+                        desc_highlight = highlight_match(desc_highlight, filtro)
+                    matching_items.append({
+                        **ItemResponse(
+                            **item.__dict__,
+                            username_ins=item.user_ins_rel.username if item.user_ins_rel else None,
+                            username_mod=item.user_mod_rel.username if item.user_mod_rel else None,
+                        ).model_dump(),
+                        "highlighted": {
+                            "name": name_highlight,
+                            "description": desc_highlight
+                        }
+                    })
+            if not matching_items:
+                continue  # Skip inventories that do not match the filter
+
+        result.append({
+            **InventoryResponseWithItemCount(
+                **InventoryResponse.model_validate(inv).model_dump(),
+                item_count=len(inv.items)
+            ).model_dump(),
+            "matching_items": matching_items if filtro else None
+        })
+
+    return result
 
 # Creazione inventario
 @router.post("/", response_model=InventoryResponse)
