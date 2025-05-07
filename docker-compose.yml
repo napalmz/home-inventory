@@ -2,25 +2,29 @@ services:
   db:
     image: postgres:latest
     container_name: inventory-db
-    restart: always
-    ports:
-      - "5432:5432"
+    #ports:
+    #  - "5432:5432"
     environment:
+      PUID: 1000
+      PGID: 1000
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: inventory
       TZ: Europe/Rome
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - /home/napalmz/docker-conf/home-inventory/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d inventory"]
       interval: 5s
       retries: 5
+    restart: always
 
   backend:
-    build: ./backend
+    image: napalmzrpi/home-inventory-backend:latest
     container_name: inventory-backend
     environment:
+      PUID: 1000
+      PGID: 1000
       TZ: Europe/Rome
       DATABASE_URL: postgresql://admin:admin@db:5432/inventory
       POSTGRES_HOST: db
@@ -28,25 +32,26 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: inventory
       FASTAPI_ROOT_PATH: /api
+    volumes:
+      - /home/napalmz/docker-conf/home-inventory/backups:/app/backups
     ports:
       - "8001:8000"
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - backend/.env
-    volumes:
-      - ./backend:/app
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/system/version"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: always
 
   frontend:
-    build: ./frontend
+    image: napalmzrpi/home-inventory-frontend:latest
     container_name: inventory-frontend
     environment:
+      PUID: 1000
+      PGID: 1000
       TZ: Europe/Rome
       BACKEND_BASE_URL: http://backend:8000
     ports:
@@ -58,6 +63,4 @@ services:
       retries: 5
     depends_on:
       - backend
-
-volumes:
-  pgdata:
+    restart: always
