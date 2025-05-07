@@ -181,7 +181,7 @@ export default function BackupManagementPage() {
           <div>
             <p className="font-medium">Backup automatico:</p>
             <p className="text-sm text-gray-700">
-              {scheduleConfig
+              {scheduleConfig && scheduleConfig.frequency !== "none"
                 ? `Attivo - Frequenza: ${scheduleConfig.frequency} ${
                     scheduleConfig.frequency === "hourly"
                       ? `ogni ${scheduleConfig.interval_minutes ?? 60} minuti`
@@ -190,9 +190,9 @@ export default function BackupManagementPage() {
                         : scheduleConfig.frequency === "weekly"
                           ? ` giorno: ${giorniSettimana[scheduleConfig.interval_days ?? 0]} alle ${scheduleConfig.interval_hours ?? 0}:${scheduleConfig.interval_minutes ?? 0}`
                           : ""
-                  } - Retention: ${scheduleConfig.retention} backup${
-                    lastRun ? ` - Ultimo backup: ${lastRun}` : ""
-                  }`
+                } - Retention: ${scheduleConfig.retention} backup${
+                  lastRun ? ` - Ultimo backup: ${lastRun}` : ""
+                }`
                 : "Nessuna schedulazione configurata."}
             </p>
           </div>
