@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   createInventory,
   deleteInventory,
-  //getInventoryAccessDetails,
   getInventories,
   getSharableUsers,
   getAllGroups,
@@ -17,17 +16,8 @@ import {
 } from '../api';
 import { AuthContext } from '../auth-context'
 import { Dialog } from '@headlessui/react'
+import { Inventory, InventoryWithMatches } from "../types";
 
-interface Inventory {
-    id: number
-    name: string
-    data_ins: string
-    data_mod: string
-    owner: {
-      username: string
-    }
-    item_count: number
-  }
 
 function NewInventoryModal({ isOpen, onClose, onCreate }: {
     isOpen: boolean
@@ -85,12 +75,12 @@ function NewInventoryModal({ isOpen, onClose, onCreate }: {
   }
 
 function InventoryListPage() {
-  const [inventories, setInventories] = useState<Inventory[]>([])
+  const [inventories, setInventories] = useState<InventoryWithMatches[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [inventoryBeingEdited, setInventoryBeingEdited] = useState<Inventory | null>(null);
-  const [inventoryPermissionsTarget, setInventoryPermissionsTarget] = useState<Inventory | null>(null);
+  const [inventoryBeingEdited, setInventoryBeingEdited] = useState<InventoryWithMatches | null>(null);
+  const [inventoryPermissionsTarget, setInventoryPermissionsTarget] = useState<InventoryWithMatches | null>(null);
   const [allUsers, setAllUsers] = useState<string[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: number; name: string }[]>([]);
   const [selectedUser, setSelectedUser] = useState('');
@@ -110,24 +100,22 @@ function InventoryListPage() {
     () => localStorage.getItem('inventory_sortBy') as 'name' | 'date' | 'item_count' | 'created' || 'created'
   );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => localStorage.getItem('inventory_sortOrder') as 'asc' | 'desc' || 'asc');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await getInventories();
-        setInventories(res)
+        const query = searchQuery.trim();
+        const res = await getInventories(query.length > 0 ? query : undefined);
+        setInventories(res);
       } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message)
-        } else {
-          setError('Errore sconosciuto')
-        }
+        setError(err instanceof Error ? err.message : 'Errore sconosciuto');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    fetchData()
-  }, [])
+    };
+    fetchData();
+  }, [searchQuery]);
 
   useEffect(() => {
     if (inventoryBeingEdited) {
@@ -136,7 +124,12 @@ function InventoryListPage() {
   }, [inventoryBeingEdited]);
 
   const handleClick = (id: number) => {
-    navigate(`/inventories/${id}`)
+    const query = searchQuery.trim();
+    if (query) {
+      navigate(`/inventories/${id}?filtro=${encodeURIComponent(query)}`);
+    } else {
+      navigate(`/inventories/${id}`);
+    }
   }
 
   const getSortedInventories = () => {
@@ -205,6 +198,16 @@ function InventoryListPage() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Inventari</h1>
       </div>
+      <input
+        type="text"
+        placeholder="Filtra per oggetto..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setSearchQuery('');
+        }}
+        className="border px-3 py-2 rounded w-full sm:w-96 mt-2"
+      />
       <div className="flex flex-wrap justify-between items-center mb-4">
         <div className="flex gap-2 items-center">
           <label className="text-sm font-medium">Ordina per:</label>
@@ -280,7 +283,7 @@ function InventoryListPage() {
         <p>Nessun inventario disponibile.</p>
       ) : (
         <ul className="space-y-2">
-          {getSortedInventories().map(inv => (
+          {getSortedInventories().map((inv: InventoryWithMatches) => (
             <li
               key={inv.id}
               className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center ${
@@ -340,6 +343,50 @@ function InventoryListPage() {
                   <p className="text-sm text-gray-500 sm:ml-4">
                     Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
                   </p>
+                  {inv.matching_items && inv.matching_items.length > 0 && (
+                    <div className="mt-2 p-2 border rounded bg-yellow-50">
+                      <p className="text-xs font-medium text-gray-700">Corrispondenze trovate:</p>
+                      <ul className="text-sm list-disc list-inside">
+                        {inv.matching_items.map((item: {
+                          id: number;
+                          name: string;
+                          description: string;
+                          quantity: number;
+                          username_ins?: string;
+                          username_mod?: string | null;
+                          highlighted?: {
+                            name: string;
+                            description?: string | null;
+                          };
+                        }) => (
+                          <li key={item.id}>
+                            <span
+                              dangerouslySetInnerHTML={{
+                                __html: `${item.quantity}x ${(item.highlighted?.name || item.name)}`.replace(
+                                  /\*\*(.*?)\*\*/g,
+                                  "<span style='background-color: #cce5ff; padding: 0 2px; border-radius: 2px;'>$1</span>"
+                                )
+                              }}
+                            />
+                            {item.highlighted?.description && item.highlighted.description.trim() && (
+                              <>
+                                {' – '}
+                                <span
+                                  className="text-gray-500"
+                                  dangerouslySetInnerHTML={{
+                                    __html: item.highlighted.description.replace(
+                                      /\*\*(.*?)\*\*/g,
+                                      "<span style='background-color: #cce5ff; padding: 0 2px; border-radius: 2px;'>$1</span>"
+                                    )
+                                  }}
+                                />
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </li>

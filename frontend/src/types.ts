@@ -51,3 +51,12 @@ export interface Item {
     data_ins: string;
     data_mod: string;
 }
+
+export interface InventoryWithMatches extends Inventory {
+    matching_items?: (Item & {
+      highlighted?: {
+        name: string;
+        description?: string | null;
+      };
+    })[];
+  }

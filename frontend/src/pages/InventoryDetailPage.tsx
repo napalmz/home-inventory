@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getInventoryById, getInventoryItems, createItem, updateItem, deleteItem } from "../api";
 import { Inventory, Item } from "../types";
@@ -13,6 +13,8 @@ export default function InventoryDetailPage() {
   const [csvTextarea, setCsvTextarea] = useState('');
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const { id } = useParams();
+  const location = useLocation();
+  const filtroParam = new URLSearchParams(location.search).get('filtro') || "";
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
@@ -32,7 +34,7 @@ export default function InventoryDetailPage() {
     return 'desc';
   });
   const [itemBeingEdited, setItemBeingEdited] = useState<Item | null>(null);
-  const [filterText, setFilterText] = useState("");
+  const [filterText, setFilterText] = useState(filtroParam);
 
   useEffect(() => {
     const fetchData = async () => {

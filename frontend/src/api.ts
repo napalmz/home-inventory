@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { User, Role, Inventory, InventoryItem } from "./types";
+import { User, Role, Inventory, InventoryItem, InventoryWithMatches } from "./types";
 
 let api: ReturnType<typeof axios.create>;
 
@@ -186,10 +186,12 @@ export async function deleteInventory(id: number) {
   await api.delete(`/inventory/${id}`);
 }
 
-/* LISTA INVENTARI */
-export async function getInventories(): Promise<Inventory[]> {
-  const response = await api.get<Inventory[]>('/inventory/');
-  return response.data;
+/* LISTA INVENTARI con filtro opzionale */
+export async function getInventories(filtro?: string): Promise<(InventoryWithMatches)[]> {
+  const response = await api.get('/inventory/', {
+    params: filtro ? { filtro } : {},
+  });
+  return response.data as (InventoryWithMatches)[];
 }
 
 /* RECUPERO INVENTARIO PER ID */
