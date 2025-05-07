@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useContext } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   createInventory,
   deleteInventory,
@@ -90,6 +90,8 @@ function InventoryListPage() {
   const [editedName, setEditedName] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams();
+  const initialFilter = searchParams.get('filtro') || '';
   const authContext = useContext(AuthContext)
   const user = authContext?.user
   const [message, setMessage] = useState<string>("");
@@ -100,7 +102,7 @@ function InventoryListPage() {
     () => localStorage.getItem('inventory_sortBy') as 'name' | 'date' | 'item_count' | 'created' || 'created'
   );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => localStorage.getItem('inventory_sortOrder') as 'asc' | 'desc' || 'asc');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialFilter);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -198,16 +200,30 @@ function InventoryListPage() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Inventari</h1>
       </div>
-      <input
-        type="text"
-        placeholder="Filtra per oggetto..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') setSearchQuery('');
-        }}
-        className="border px-3 py-2 rounded w-full sm:w-96 mt-2"
-      />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Filtra per oggetto..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setSearchQuery('');
+            }}
+            className="border px-3 py-2 rounded w-full sm:w-96"
+          />
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setInventories([]);
+            }}
+            className="px-4 py-2 bg-gray-300 text-gray-700 rounded"
+          >
+            <span className="inline sm:hidden">❌</span>
+            <span className="hidden sm:inline">Cancella filtro</span>
+          </button>
+        </div>
+      </div>
       <div className="flex flex-wrap justify-between items-center mb-4">
         <div className="flex gap-2 items-center">
           <label className="text-sm font-medium">Ordina per:</label>
@@ -225,18 +241,17 @@ function InventoryListPage() {
             <option value="name">Nome</option>
             <option value="item_count">Numero di oggetti</option>
           </select>
-          <select
-            value={sortOrder}
-            onChange={(e) => {
-              const value = e.target.value as 'asc' | 'desc';
-              localStorage.setItem('inventory_sortOrder', value);
-              setSortOrder(value);
+          <button
+            onClick={() => {
+              const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+              localStorage.setItem('inventory_sortOrder', newOrder);
+              setSortOrder(newOrder);
             }}
-            className="border px-2 py-1 rounded"
+            className="border rounded p-1 px-2"
+            title={`Ordina in ordine ${sortOrder === 'asc' ? 'decrescente' : 'crescente'}`}
           >
-            <option value="desc">Decrescente</option>
-            <option value="asc">Crescente</option>
-          </select>
+            {sortOrder === 'asc' ? '⬆️' : '⬇️'}
+          </button>
         </div>
         {editMode && (
           <div className="flex gap-2">

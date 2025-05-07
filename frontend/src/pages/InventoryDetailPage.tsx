@@ -1,4 +1,4 @@
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getInventoryById, getInventoryItems, createItem, updateItem, deleteItem } from "../api";
 import { Inventory, Item } from "../types";
@@ -125,14 +125,17 @@ export default function InventoryDetailPage() {
   return (
     <div className="relative p-4">
       <div className="sticky top-0 bg-white z-10 pb-2">
-        <a href="/inventories" className="text-blue-500 hover:underline mb-2 inline-block">
+        <Link
+          to={`/inventories${filtroParam ? `?filtro=${encodeURIComponent(filtroParam)}` : ""}`}
+          className="text-blue-500 hover:underline mb-2 inline-block"
+        >
           ← Torna alla lista degli inventari
-        </a>
+        </Link>
         {inventory && (
           <>
             <h2 className="text-xl font-bold">{inventory.name}</h2>
             <p className="text-sm text-gray-600 mb-2">
-              Creato da: {inventory.owner.username ? `${inventory.owner.username}` : "Sconosciuto"} | Ultima modifica:{" "}
+              Creato da: {inventory.owner.username ? `${inventory.owner.username}` : "Sconosciuto"} | Data modifica:{" "}
               {new Date(inventory.data_mod).toLocaleString()}
             </p>
             <hr className="mb-2" />
@@ -154,7 +157,7 @@ export default function InventoryDetailPage() {
               }}
               className="border rounded p-1"
             >
-              <option value="date">Ultima modifica</option>
+              <option value="date">Data modifica</option>
               <option value="name">Nome</option>
               <option value="quantity">Quantità</option>
             </select>
@@ -167,20 +170,33 @@ export default function InventoryDetailPage() {
               className="border rounded p-1 px-2"
               title={`Ordina in ordine ${sortOrder === 'asc' ? 'decrescente' : 'crescente'}`}
             >
-              {sortOrder === 'asc' ? '⬆️ Crescente' : '⬇️ Decrescente'}
+              {sortOrder === 'asc' ? '⬆️' : '⬇️'}
             </button>
-            <input
-              type="text"
-              placeholder="Filtra la lista..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setFilterText('');
-                }
-              }}
-              className="border rounded p-1 w-full sm:w-auto"
-            />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Filtra la lista..."
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setFilterText('');
+                    }
+                  }}
+                  className="border rounded p-1 w-full sm:w-auto"
+                />
+                <button
+                  onClick={() => {
+                    setFilterText('');
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded"
+                >
+                  <span className="inline sm:hidden">❌</span>
+                  <span className="hidden sm:inline">Cancella filtro</span>
+                </button>
+              </div>
+            </div>
             {isEditMode && (
                 <div className="mb-2 ml-auto flex gap-2">
                 <button
