@@ -48,12 +48,19 @@ export default function BackupManagementPage() {
             interval_minutes: settings.interval_minutes || 0,
             retention: settings.retention || 7
           });
+        } else {
+          setScheduleConfig(null);
+        }
+        // Caricamento di lastRunSetting separato dal controllo su settings
+        try {
           const lastRunSetting = await getSetting("BACKUP_LAST_RUN");
           if (typeof lastRunSetting === "string") {
             setLastRun(new Date(lastRunSetting).toLocaleString());
+          } else if (lastRunSetting && typeof lastRunSetting === "object" && "value" in lastRunSetting) {
+            setLastRun(new Date(lastRunSetting.value).toLocaleString());
           }
-        } else {
-          setScheduleConfig(null);
+        } catch (err) {
+          console.error("Errore nel caricamento di BACKUP_LAST_RUN:", err);
         }
       } catch (error) {
         console.error("Errore nel caricamento della schedulazione:", error);
