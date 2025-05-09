@@ -26,12 +26,12 @@ export default function InventoryDetailPage() {
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'quantity'>(() => {
     const stored = localStorage.getItem('item_sortBy');
     if (stored === 'name' || stored === 'date' || stored === 'quantity') return stored;
-    return 'date';
+    return 'name';
   });
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
     const stored = localStorage.getItem('item_sortOrder');
     if (stored === 'asc' || stored === 'desc') return stored;
-    return 'desc';
+    return 'asc';
   });
   const [itemBeingEdited, setItemBeingEdited] = useState<Item | null>(null);
   const [filterText, setFilterText] = useState(filtroParam);
@@ -320,6 +320,26 @@ export default function InventoryDetailPage() {
             <span className="hidden md:inline">Elimina {( selectedItems.length )}</span>
           </button>
         )}
+        {/* {typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent) && ( */}
+        <button
+          onClick={() => {
+            const now = new Date();
+            const header = `${inventory?.name} (${now.toLocaleString()})`;
+            const withQty = items.filter(i => i.quantity > 0).sort((a, b) => a.name.localeCompare(b.name));
+            const zeroQty = items.filter(i => i.quantity === 0).sort((a, b) => a.name.localeCompare(b.name));
+            const lines = [...withQty, ...zeroQty].map(i =>
+              `- ${i.quantity}x ${i.name}${i.description ? ` (${i.description})` : ''}`
+            );
+            const text = encodeURIComponent([header, ...lines].join('\n'));
+            //window.location.href = `https://wa.me/?text=${text}`;
+            window.open(`https://wa.me/?text=${text}`, '_blank');
+          }}
+          className="py-2 px-4 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800"
+        >
+          <span className="inline md:hidden">📲</span>
+          <span className="hidden md:inline">📲 Invia via WhatsApp</span>
+        </button>
+        {/* )} */}
         {user?.role.name === 'admin' && (
             <button
             onClick={() => setIsShareModalOpen(true)}
