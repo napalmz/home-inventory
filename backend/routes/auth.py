@@ -42,7 +42,8 @@ def register(
     user: UserCreateSelf,
     db: Session = Depends(get_db)
 ):
-    if (get_setting(db, "ENABLE_REGISTRATION") or "true").lower() != "true":
+    setting = get_setting(db, "ENABLE_REGISTRATION")
+    if (setting.value if setting else "true").lower() != "true":
         raise HTTPException(status_code=403, detail="Registrazione disabilitata")
     
     db_user = db.query(User).filter(User.username == user.username).first()
