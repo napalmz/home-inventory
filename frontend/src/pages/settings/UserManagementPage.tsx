@@ -238,8 +238,39 @@ export default function UserManagementPage() {
                     </select>
                   </td></tr>
                   <tr><td className="p-2 font-medium">Bloccato</td><td className="p-2"><input type="checkbox" checked={newIsBlocked} onChange={(e) => setNewIsBlocked(e.target.checked)} /></td></tr>
-                  <tr><td className="p-2 font-medium">Nuova password</td><td className="p-2"><input type="password" className="w-full border rounded p-1 text-sm" value={password} onChange={(e) => setPassword(e.target.value)} /></td></tr>
-                  <tr><td className="p-2 font-medium">Ripeti password</td><td className="p-2"><input type="password" className="w-full border rounded p-1 text-sm" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></td></tr>
+                  <tr>
+                    <td className="p-2 font-medium">Nuova password</td>
+                    <td className="p-2 flex items-center gap-2">
+                      <input
+                        type="password"
+                        className="w-full border rounded p-1 text-sm"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="p-2 font-medium">Ripeti password</td>
+                    <td className="p-2 flex items-center gap-2">
+                      <input
+                        type="password"
+                        className="w-full border rounded p-1 text-sm"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                      />
+                    </td>
+                  </tr>
+                  {(password || confirmPassword) && (
+                    <tr>
+                      <td colSpan={2} className="p-2 text-sm">
+                        {password === confirmPassword ? (
+                          <span className="text-green-600">✔️ Le password coincidono</span>
+                        ) : (
+                          <span className="text-red-600">❌ Le password non coincidono</span>
+                        )}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             )}
@@ -252,7 +283,12 @@ export default function UserManagementPage() {
               </button>
               <button
                 onClick={saveChanges}
-                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 w-full"
+                disabled={!!((password || confirmPassword) && password !== confirmPassword)}
+                className={`px-3 py-1 text-sm text-white rounded w-full ${
+                  (password || confirmPassword) && password !== confirmPassword
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
               >
                 Salva
               </button>

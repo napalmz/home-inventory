@@ -6,6 +6,8 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMatch, setPasswordMatch] = useState<null | boolean>(null);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
@@ -68,16 +70,52 @@ export default function RegisterPage() {
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setPasswordMatch(
+                e.target.value && confirmPassword
+                  ? e.target.value === confirmPassword
+                  : null
+              );
+            }}
             className="w-full border p-2 rounded"
             required
             disabled={!registrationEnabled}
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium">Conferma Password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setPasswordMatch(
+                password && e.target.value
+                  ? password === e.target.value
+                  : null
+              );
+            }}
+            className="w-full border p-2 rounded"
+            required
+            disabled={!registrationEnabled}
+          />
+        </div>
+        {passwordMatch === false && (
+          <p className="text-red-500 text-sm">Le password non coincidono.</p>
+        )}
+        {passwordMatch === true && (
+          <p className="text-green-600 text-sm">Le password coincidono.</p>
+        )}
         <button
           type="submit"
           className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-          disabled={!registrationEnabled}
+          disabled={
+            !registrationEnabled ||
+            !password ||
+            !confirmPassword ||
+            password !== confirmPassword
+          }
         >
           Registrati
         </button>
