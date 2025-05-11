@@ -13,10 +13,12 @@ To deploy this project using Docker, pull this repository and then run:
   docker-compose up --build -d
 ```
 
-Backend API: http://localhost:8001
+Backend API: <http://localhost:3000/api>
 
-Frontend: http://localhost:3000
+Frontend: <http://localhost:3000>
+
+Default Login: admin/12345
+
 ## Authors
 
 - [@napalmz](https://www.github.com/napalmz)
-

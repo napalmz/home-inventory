@@ -1,6 +1,9 @@
 # Usa un'immagine di base con Python
 FROM python:3.11-slim
 
+# Imposta le variabili d'ambiente
+ENV PYTHONDONTWRITEBYTECODE=1
+
 # Aggiungi repository PostgreSQL 17 in modo moderno e sicuro
 RUN apt-get update && apt-get install -y wget gnupg lsb-release && \
     echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
@@ -20,14 +23,20 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Installa le dipendenze
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && rm -rf /root/.cache
 
 # Copia il codice dell'app
 COPY . .
 
+# Pulisci i file non necessari
+RUN rm -f Dockerfile requirements.txt
+
 # Esponi la porta 8000 per FastAPI
 EXPOSE 8000
 
+# Crea cartelle per i backup e imposta i permessi
+RUN mkdir -p /app/backups && chmod 777 /app/backups
+
 # Comando per avviare l'API
-#CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 ENTRYPOINT ["/app/entrypoint.sh"]

@@ -25,5 +25,6 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 80
 
-ENV BACKEND_BASE_URL=http://localhost:8001
+ENV BACKEND_BASE_URL=http://localhost:8000
+
 ENTRYPOINT ["/entrypoint.sh"]

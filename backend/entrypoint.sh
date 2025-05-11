@@ -1,5 +1,9 @@
 #!/bin/sh
 
+echo "📁 Creating /app/backups with 777 permissions..."
+mkdir -p /app/backups
+chmod 777 /app/backups
+
 echo "🔄 Applying database migrations..."
 alembic upgrade head
 
