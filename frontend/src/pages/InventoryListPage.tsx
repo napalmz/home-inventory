@@ -452,25 +452,29 @@ function InventoryListPage() {
             <span className="hidden md:inline">Elimina {( selectedInventories.length )}</span>
           </button>
         )}
-        <button
-          onClick={() => {
-            setEditMode(!editMode);
-            setSelectedInventories([]);
-          }}
-          className={`py-2 px-4 rounded-full shadow-lg text-white ${
-            editMode ? 'bg-yellow-700' : 'bg-yellow-500 hover:bg-yellow-600'
-          }`}
-        >
-          <span className="inline md:hidden">{editMode ? "✖️" : "✏️"}</span>
-          <span className="hidden md:inline">{editMode ? "Chiudi" : "Modifica"}</span>
-        </button>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
-        >
-        <span className="inline md:hidden">➕</span>
-        <span className="hidden md:inline">Nuovo</span>
-        </button>
+        {user?.role.name !== 'viewer' && (
+          <>
+            <button
+              onClick={() => {
+                setEditMode(!editMode);
+                setSelectedInventories([]);
+              }}
+              className={`py-2 px-4 rounded-full shadow-lg text-white ${
+                editMode ? 'bg-yellow-700' : 'bg-yellow-500 hover:bg-yellow-600'
+              }`}
+            >
+              <span className="inline md:hidden">{editMode ? "✖️" : "✏️"}</span>
+              <span className="hidden md:inline">{editMode ? "Chiudi" : "Modifica"}</span>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
+            >
+              <span className="inline md:hidden">➕</span>
+              <span className="hidden md:inline">Nuovo</span>
+            </button>
+          </>
+        )}
       </div>
 
       <Dialog open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} className="relative z-50">
