@@ -13,6 +13,8 @@ export default function GeneralSettings() {
   const [message, setMessage] = useState("");
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
+  const [showProtected, setShowProtected] = useState(false);
+  const [showEditable, setShowEditable] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -72,66 +74,78 @@ export default function GeneralSettings() {
     <div className="p-4 sm:px-6 space-y-4 overflow-x-auto">
       <h2 className="text-lg font-semibold">Impostazioni generali</h2>
 
-      <h3 className="text-md font-semibold mt-4">Parametri protetti</h3>
-      {settings
-        .filter((s) => s.protected)
-        .sort((a, b) => a.key.localeCompare(b.key))
-        .map((setting, idx) => (
-          <div key={`protected-${idx}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 w-full">
-            <span className="w-1/4">
-              {setting.key}
-              <span className="ml-1 text-xs text-gray-500">(protetto)</span>
-            </span>
-            <input
-              className="border rounded px-2 py-1 w-full sm:w-auto flex-grow"
-              value={setting.value}
-              onChange={(e) => {
-                const newVal = e.target.value;
-                setSettings((prev) =>
-                  prev.map((s) => (s.key === setting.key ? { ...s, value: newVal } : s))
-                );
-              }}
-            />
-            <button onClick={() => handleUpdate(setting.key, setting.value)} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-              Salva
-            </button>
-            <button
-              disabled
-              className="bg-gray-300 text-black px-3 py-1 rounded hover:bg-gray-400"
-            >
-              Elimina
-            </button>
-          </div>
-      ))}
+      <button onClick={() => setShowProtected(!showProtected)} className="text-md font-semibold mt-4 flex items-center">
+        {showProtected ? "▼" : "►"} Parametri protetti ({settings.filter((s) => s.protected).length})
+      </button>
+      {showProtected && (
+        <div className="space-y-2">
+          {settings
+            .filter((s) => s.protected)
+            .sort((a, b) => a.key.localeCompare(b.key))
+            .map((setting, idx) => (
+              <div key={`protected-${idx}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 w-full">
+                <span className="w-1/4">
+                  {setting.key}
+                  <span className="ml-1 text-xs text-gray-500">(protetto)</span>
+                </span>
+                <input
+                  className="border rounded px-2 py-1 w-full sm:w-auto flex-grow"
+                  value={setting.value}
+                  onChange={(e) => {
+                    const newVal = e.target.value;
+                    setSettings((prev) =>
+                      prev.map((s) => (s.key === setting.key ? { ...s, value: newVal } : s))
+                    );
+                  }}
+                />
+                <button onClick={() => handleUpdate(setting.key, setting.value)} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                  Salva
+                </button>
+                <button
+                  disabled
+                  className="bg-gray-300 text-black px-3 py-1 rounded hover:bg-gray-400"
+                >
+                  Elimina
+                </button>
+              </div>
+          ))}
+        </div>
+      )}
 
-      <h3 className="text-md font-semibold mt-4">Parametri modificabili</h3>
-      {settings
-        .filter((s) => !s.protected)
-        .sort((a, b) => a.key.localeCompare(b.key))
-        .map((setting, idx) => (
-          <div key={`editable-${idx}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 w-full">
-            <span className="w-1/4">{setting.key}</span>
-            <input
-              className="border rounded px-2 py-1 w-full sm:w-auto flex-grow"
-              value={setting.value}
-              onChange={(e) => {
-                const newVal = e.target.value;
-                setSettings((prev) =>
-                  prev.map((s) => (s.key === setting.key ? { ...s, value: newVal } : s))
-                );
-              }}
-            />
-            <button onClick={() => handleUpdate(setting.key, setting.value)} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-              Salva
-            </button>
-            <button
-              onClick={() => handleDelete(setting.key)}
-              className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-            >
-              Elimina
-            </button>
-          </div>
-      ))}
+      <button onClick={() => setShowEditable(!showEditable)} className="text-md font-semibold mt-4 flex items-center">
+        {showEditable ? "▼" : "►"} Parametri modificabili ({settings.filter((s) => !s.protected).length})
+      </button>
+      {showEditable && (
+        <div className="space-y-2">
+          {settings
+            .filter((s) => !s.protected)
+            .sort((a, b) => a.key.localeCompare(b.key))
+            .map((setting, idx) => (
+              <div key={`editable-${idx}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2 w-full">
+                <span className="w-1/4">{setting.key}</span>
+                <input
+                  className="border rounded px-2 py-1 w-full sm:w-auto flex-grow"
+                  value={setting.value}
+                  onChange={(e) => {
+                    const newVal = e.target.value;
+                    setSettings((prev) =>
+                      prev.map((s) => (s.key === setting.key ? { ...s, value: newVal } : s))
+                    );
+                  }}
+                />
+                <button onClick={() => handleUpdate(setting.key, setting.value)} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                  Salva
+                </button>
+                <button
+                  onClick={() => handleDelete(setting.key)}
+                  className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                >
+                  Elimina
+                </button>
+              </div>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4 border-t pt-4">
         <h3 className="text-md font-semibold">Aggiungi nuovo setting</h3>
