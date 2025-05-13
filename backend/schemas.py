@@ -94,7 +94,7 @@ class InventoryBase(BaseModel):
     name: str
 
 class InventoryCreate(InventoryBase):
-    pass
+    pass 
 
 class InventoryUpdate(InventoryBase):
     pass

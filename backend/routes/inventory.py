@@ -7,7 +7,9 @@ from routes.auth import get_current_user
 from typing import List
 import re
 
-router = APIRouter()
+#router = APIRouter()
+inventory_router = APIRouter() # INVENTORY_TYPE = "INVENTORY"
+checklist_router = APIRouter() # INVENTORY_TYPE = "CHECKLIST"
 
 # Funzione per verificare se l'utente ha accesso all'inventario
 def can_access_inventory(user: User, inventory: Inventory, action: str = "view") -> bool:
@@ -41,13 +43,13 @@ def can_access_inventory(user: User, inventory: Inventory, action: str = "view")
 
 #############################################################################
 # Lista degli inventari visibili all'utente
-@router.get("/", response_model=List[dict])
-def list_inventories(
+def list_inventories_base(
+    inventory_type: str, 
     filtro: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventories = db.query(Inventory).options(joinedload(Inventory.items)).all()
+    inventories = db.query(Inventory).filter(Inventory.type == inventory_type).options(joinedload(Inventory.items)).all()
     visible_inventories = [
         inv for inv in inventories if can_access_inventory(user, inv, action="view")
     ]
@@ -98,27 +100,27 @@ def list_inventories(
     return result
 
 # Creazione inventario
-@router.post("/", response_model=InventoryResponse)
-def create_inventory(
+def create_inventory_base(
+    inventory_type: str, 
     inventory: InventoryCreate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    new_inventory = Inventory(name=inventory.name, owner_id=user.id)
+    new_inventory = Inventory(name=inventory.name, owner_id=user.id, type=inventory_type)
     db.add(new_inventory)
     db.commit()
     db.refresh(new_inventory)
     return InventoryResponse.model_validate(new_inventory)  # Converti il modello SQLAlchemy in Pydantic
 
 # Aggiornamento inventario
-@router.patch("/{inventory_id}", response_model=InventoryResponse)
-def update_inventory(
+def update_inventory_base(
+    inventory_type: str, 
     inventory_id: int,
     update: InventoryUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="edit"):
@@ -130,13 +132,13 @@ def update_inventory(
     return InventoryResponse.model_validate(inventory)
 
 # Eliminazione inventario
-@router.delete("/{inventory_id}")
-def delete_inventory(
+def delete_inventory_base(
+    inventory_type: str, 
     inventory_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="delete"):
@@ -148,12 +150,16 @@ def delete_inventory(
 
 #############################################################################
 # Recupero item dell'inventario
-@router.get("/item/{inventory_id}/", response_model=List[ItemResponse])
-def list_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def list_items_base(
+    inventory_type: str,
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
     inventory = db.query(Inventory).options(
         joinedload(Inventory.items).joinedload(Item.user_ins_rel),
         joinedload(Inventory.items).joinedload(Item.user_mod_rel)
-    ).get(inventory_id)
+    ).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
@@ -169,9 +175,13 @@ def list_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(ge
     ]
 
 # Contare gli item dell'inventario
-@router.get("/count/{inventory_id}", response_model=int)
-def count_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    inventory = db.query(Inventory).get(inventory_id)
+def count_items_base(
+    inventory_type: str,
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
@@ -180,14 +190,14 @@ def count_items(inventory_id: int, db: Session = Depends(get_db), user=Depends(g
 
 #############################################################################
 # Condivisione inventario
-@router.post("/share/{inventory_id}/{username}")
-def share_inventory(
+def share_base(
+    inventory_type: str,
     inventory_id: int,
     username: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="edit"):
@@ -217,14 +227,14 @@ def share_inventory(
     return {"detail": f"Inventario condiviso con {target_user.username}"}
 
 # Revoca condivisione inventario
-@router.delete("/share/{inventory_id}/{username}")
-def unshare_inventory(
+def unshare_base(
+    inventory_type: str,
     inventory_id: int,
     username: str,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="edit"):
@@ -243,13 +253,13 @@ def unshare_inventory(
     return {"detail": f"Condivisione revocata per {username}"}
 
 # Lista utenti con cui è condiviso un inventario
-@router.get("/share/{inventory_id}", response_model=List[UserResponse])
-def list_inventory_shares(
+def list_shares_base(
+    inventory_type: str,
     inventory_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="edit"):
@@ -262,14 +272,14 @@ def list_inventory_shares(
 
 #############################################################################
 # Condivisione con gruppo
-@router.post("/share_group/{inventory_id}/{group_id}")
-def share_inventory_with_group(
+def share_with_group_base(
+    inventory_type: str,
     inventory_id: int,
     group_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="edit"):
@@ -289,14 +299,14 @@ def share_inventory_with_group(
     return {"detail": f"Inventario condiviso con il gruppo '{group.name}'"}
 
 # Revoca condivisione da gruppo
-@router.delete("/share_group/{inventory_id}/{group_id}")
-def unshare_inventory_from_group(
+def unshare_from_group_base(
+    inventory_type: str,
     inventory_id: int,
     group_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="edit"):
@@ -311,13 +321,13 @@ def unshare_inventory_from_group(
     return {"detail": "Condivisione con gruppo revocata"}
 
 # Lista gruppi con cui è condiviso un inventario
-@router.get("/share_group/{inventory_id}", response_model=List[str])
-def list_inventory_group_shares(
+def list_group_shares_base(
+    inventory_type: str,
     inventory_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="edit"):
@@ -327,13 +337,13 @@ def list_inventory_group_shares(
 
 #############################################################################
 # Elencare tutti gli utenti che hanno accesso a un inventario, con tipo di accesso e modalità
-@router.get("/access_details/{inventory_id}", response_model=List[dict])
-def list_inventory_access_details(
+def list_access_details_base(
+    inventory_type: str,
     inventory_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
@@ -388,13 +398,13 @@ def list_inventory_access_details(
 
 #############################################################################
 # Contare gli utenti che possono accedere all’inventario, raggruppati per accesso
-@router.get("/access_count/{inventory_id}", response_model=dict)
-def count_inventory_access_by_type(
+def count_access_by_type_base(
+    inventory_type: str,
     inventory_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).get(inventory_id)
+    inventory = db.query(Inventory).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
@@ -434,13 +444,13 @@ def count_inventory_access_by_type(
 
     return {"view": view_count, "edit": edit_count, "admin": admin_count}
 
-@router.get("/{inventory_id}", response_model=InventoryResponseWithItemCount)
-def get_inventory_by_id(
+def get_by_id_base(
+    inventory_type: str,
     inventory_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventory = db.query(Inventory).options(joinedload(Inventory.items)).get(inventory_id)
+    inventory = db.query(Inventory).options(joinedload(Inventory.items)).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
@@ -450,3 +460,448 @@ def get_inventory_by_id(
         **InventoryResponse.model_validate(inventory).model_dump(),
         item_count=len(inventory.items)
     )
+
+#############################################################################
+#############################################################################
+#############################################################################
+#############################################################################
+
+#############################################################################
+# Lista degli inventari visibili all'utente
+@inventory_router.get("/", response_model=List[dict])
+def list_inventories(
+    filtro: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_inventories_base(
+        inventory_type="INVENTORY",
+        filtro=filtro,
+        db=db,
+        user=user
+    )
+
+# Lista delle checklist visibili all'utente
+@checklist_router.get("/", response_model=List[dict])
+def list_checklists(
+    filtro: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_inventories_base(
+        inventory_type="CHECKLIST",
+        filtro=filtro,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Creazione inventario
+@inventory_router.post("/", response_model=InventoryResponse)
+def create_inventory(
+    inventory: InventoryCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return create_inventory_base(
+        inventory_type="INVENTORY",
+        inventory=inventory,
+        db=db,
+        user=user
+    )
+# Creazione checklist
+@checklist_router.post("/", response_model=InventoryResponse)
+def create_checklist(
+    inventory: InventoryCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return create_inventory_base(
+        inventory_type="CHECKLIST",
+        inventory=inventory,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Aggiornamento inventario
+@inventory_router.patch("/{inventory_id}", response_model=InventoryResponse)
+def update_inventory(
+    inventory_id: int,
+    update: InventoryUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return update_inventory_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        update=update,
+        db=db,
+        user=user
+    )
+# Aggiornamento checklist
+@checklist_router.patch("/{inventory_id}", response_model=InventoryResponse)
+def update_checklist(
+    inventory_id: int,
+    update: InventoryUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return update_inventory_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        update=update,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Eliminazione inventario
+@inventory_router.delete("/{inventory_id}")
+def delete_inventory(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return delete_inventory_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Eliminazione checklist
+@checklist_router.delete("/{inventory_id}")
+def delete_checklist(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return delete_inventory_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Recupero item dell'inventario
+@inventory_router.get("/item/{inventory_id}/", response_model=List[ItemResponse])
+def list_items(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return list_items_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Recupero item della checklist
+@checklist_router.get("/item/{inventory_id}/", response_model=List[ItemResponse])
+def list_checklist_items(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return list_items_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Contare gli item dell'inventario
+@inventory_router.get("/count/{inventory_id}", response_model=int)
+def count_inventory_items(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return count_items_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Contare gli item della checklist
+@checklist_router.get("/count/{inventory_id}", response_model=int)
+def count_checklist_items(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return count_items_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Condivisione inventario
+@inventory_router.post("/share/{inventory_id}/{username}")
+def share_inventory(
+    inventory_id: int,
+    username: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return share_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        username=username,
+        db=db,
+        user=user
+    )
+# Condivisione checklist
+@checklist_router.post("/share/{inventory_id}/{username}")
+def share_checklist(
+    inventory_id: int,
+    username: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return share_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        username=username,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Revoca condivisione inventario
+@inventory_router.delete("/share/{inventory_id}/{username}")
+def unshare_inventory(
+    inventory_id: int,
+    username: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return unshare_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        username=username,
+        db=db,
+        user=user
+    )
+# Revoca condivisione checklist
+@checklist_router.delete("/share/{inventory_id}/{username}")
+def unshare_checklist(
+    inventory_id: int,
+    username: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return unshare_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        username=username,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Lista utenti con cui è condiviso un inventario
+@inventory_router.get("/share/{inventory_id}", response_model=List[UserResponse])
+def list_inventory_shares(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_shares_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Lista utenti con cui è condivisa una checklist
+@checklist_router.get("/share/{inventory_id}", response_model=List[UserResponse])
+def list_checklist_shares(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_shares_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Condivisione con gruppo
+@inventory_router.post("/share_group/{inventory_id}/{group_id}")
+def share_inventory_with_group(
+    inventory_id: int,
+    group_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return share_with_group_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        group_id=group_id,
+        db=db,
+        user=user
+    )
+# Condivisione checklist con gruppo
+@checklist_router.post("/share_group/{inventory_id}/{group_id}")
+def share_checklist_with_group(
+    inventory_id: int,
+    group_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return share_with_group_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        group_id=group_id,
+        db=db,
+        user=user
+    )
+#############################################################################
+# Revoca condivisione inventario da gruppo
+@inventory_router.delete("/share_group/{inventory_id}/{group_id}")
+def unshare_inventory_from_group(
+    inventory_id: int,
+    group_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return unshare_from_group_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        group_id=group_id,
+        db=db,
+        user=user
+    )
+# Revoca condivisione checklist da gruppo
+@checklist_router.delete("/share_group/{inventory_id}/{group_id}")
+def unshare_checklist_from_group(
+    inventory_id: int,
+    group_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return unshare_from_group_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        group_id=group_id,
+        db=db,
+        user=user
+    )
+#############################################################################
+# Lista gruppi con cui è condiviso un inventario
+@inventory_router.get("/share_group/{inventory_id}", response_model=List[str])
+def list_inventory_group_shares(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_group_shares_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Lista gruppi con cui è condivisa una checklist
+@checklist_router.get("/share_group/{inventory_id}", response_model=List[str])
+def list_checklist_group_shares(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_group_shares_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Elencare tutti gli utenti che hanno accesso a un inventario, con tipo di accesso e modalità
+@inventory_router.get("/access_details/{inventory_id}", response_model=List[dict])
+def list_inventory_access_details(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_access_details_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Elencare tutti gli utenti che hanno accesso a una checklist, con tipo di accesso e modalità
+@checklist_router.get("/access_details/{inventory_id}", response_model=List[dict])
+def list_checklist_access_details(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return list_access_details_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Contare gli utenti che possono accedere all’inventario, raggruppati per accesso
+@inventory_router.get("/access_count/{inventory_id}", response_model=dict)
+def count_inventory_access_by_type(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return count_access_by_type_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Contare gli utenti che possono accedere alla checklist, raggruppati per accesso
+@checklist_router.get("/access_count/{inventory_id}", response_model=dict)
+def count_checklist_access_by_type(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return count_access_by_type_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+
+#############################################################################
+# Recupero inventario per ID
+@inventory_router.get("/{inventory_id}", response_model=InventoryResponseWithItemCount)
+def get_inventory_by_id(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return get_by_id_base(
+        inventory_type="INVENTORY",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+# Recupero checklist per ID
+@checklist_router.get("/{inventory_id}", response_model=InventoryResponseWithItemCount)
+def get_checklist_by_id(
+    inventory_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return get_by_id_base(
+        inventory_type="CHECKLIST",
+        inventory_id=inventory_id,
+        db=db,
+        user=user
+    )
+#############################################################################

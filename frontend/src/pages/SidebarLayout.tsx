@@ -87,6 +87,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               Inventari
             </Link>
           )}
+          {user && user.username && (
+            <Link to="/checklists" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
+              Liste
+            </Link>
+          )}
           {user && user.username && user.role?.name === 'admin' && (
             <Link to="/settings" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
               Impostazioni

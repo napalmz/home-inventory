@@ -1,24 +1,24 @@
 import { useEffect, useState, useRef, useContext } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  createInventory,
-  deleteInventory, 
-  getInventories, 
+  createChecklist,
+  deleteChecklist,
+  getChecklists,
   getSharableUsers,
   getAllGroups,
-  shareInventoryWithUser, 
-  unshareInventoryWithUser, 
-  shareInventoryWithGroup, 
-  unshareInventoryFromGroup, 
-  getInventoryUserShares, 
-  getInventoryGroupShares, 
-  updateInventoryName
+  shareChecklistWithUser,
+  unshareChecklistWithUser,
+  shareChecklistWithGroup,
+  unshareChecklistFromGroup,
+  getChecklistUserShares,
+  getChecklistGroupShares,
+  updateChecklistName
 } from '../api';
 import { AuthContext } from '../auth-context'
 import { Dialog } from '@headlessui/react'
-import { Inventory, InventoryWithMatches } from "../types";
+import { Checklist, ChecklistWithMatches } from "../types";
 
-function NewInventoryModal({ isOpen, onClose, onCreate }: {
+function NewChecklistModal({ isOpen, onClose, onCreate }: {
     isOpen: boolean
     onClose: () => void
     onCreate: (name: string) => void
@@ -46,11 +46,11 @@ function NewInventoryModal({ isOpen, onClose, onCreate }: {
         <div className="fixed inset-0 bg-black/30 " aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
-            <Dialog.Title className="text-lg font-bold mb-4">Nuovo Inventario</Dialog.Title>
+            <Dialog.Title className="text-lg font-bold mb-4">Nuova lista</Dialog.Title>
             <form onSubmit={handleSubmit}>
               <input
                 type="text"
-                placeholder="Nome inventario"
+                placeholder="Nome lista"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 onKeyDown={(e) => {
@@ -73,13 +73,13 @@ function NewInventoryModal({ isOpen, onClose, onCreate }: {
     )
   }
 
-function InventoryListPage() {
-  const [inventories, setInventories] = useState<InventoryWithMatches[]>([])
+function ChecklistListPage() {
+  const [checklists, setChecklists] = useState<ChecklistWithMatches[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [inventoryBeingEdited, setInventoryBeingEdited] = useState<InventoryWithMatches | null>(null);
-  const [inventoryPermissionsTarget, setInventoryPermissionsTarget] = useState<InventoryWithMatches | null>(null);
+  const [ChecklistBeingEdited, setChecklistBeingEdited] = useState<ChecklistWithMatches | null>(null);
+  const [ChecklistPermissionsTarget, setChecklistPermissionsTarget] = useState<ChecklistWithMatches | null>(null);
   const [allUsers, setAllUsers] = useState<string[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: number; name: string }[]>([]);
   const [selectedUser, setSelectedUser] = useState('');
@@ -96,19 +96,19 @@ function InventoryListPage() {
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const [editMode, setEditMode] = useState(false);
-  const [selectedInventories, setSelectedInventories] = useState<number[]>([]);
+  const [selectedChecklists, setSelectedChecklists] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'item_count' | 'created'>(
-    () => localStorage.getItem('inventory_sortBy') as 'name' | 'date' | 'item_count' | 'created' || 'created'
+    () => localStorage.getItem('checklist_sortBy') as 'name' | 'date' | 'item_count' | 'created' || 'created'
   );
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => localStorage.getItem('inventory_sortOrder') as 'asc' | 'desc' || 'asc');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => localStorage.getItem('checklist_sortOrder') as 'asc' | 'desc' || 'asc');
   const [searchQuery, setSearchQuery] = useState(initialFilter);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const query = searchQuery.trim();
-        const res = await getInventories(query.length > 0 ? query : undefined);
-        setInventories(res);
+        const res = await getChecklists(query.length > 0 ? query : undefined);
+        setChecklists(res);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Errore sconosciuto');
       } finally {
@@ -119,22 +119,22 @@ function InventoryListPage() {
   }, [searchQuery]);
 
   useEffect(() => {
-    if (inventoryBeingEdited) {
-      setEditedName(inventoryBeingEdited.name);
+    if (ChecklistBeingEdited) {
+      setEditedName(ChecklistBeingEdited.name);
     }
-  }, [inventoryBeingEdited]);
+  }, [ChecklistBeingEdited]);
 
   const handleClick = (id: number) => {
     const query = searchQuery.trim();
     if (query) {
-      navigate(`/inventories/${id}?filtro=${encodeURIComponent(query)}`);
+      navigate(`/checklists/${id}?filtro=${encodeURIComponent(query)}`);
     } else {
-      navigate(`/inventories/${id}`);
+      navigate(`/checklists/${id}`);
     }
   }
 
-  const getSortedInventories = () => {
-    const sorted = [...inventories];
+  const getSortedChecklists = () => {
+    const sorted = [...checklists];
     sorted.sort((a, b) => {
       if (sortBy === 'name') {
         return sortOrder === 'asc'
@@ -167,7 +167,7 @@ function InventoryListPage() {
     return () => clearTimeout(timeout);
   };
 
-  const openAccessModal = async (inv: Inventory) => {
+  const openAccessModal = async (inv: Checklist) => {
     const allUsersList = await getSharableUsers(inv.id);
     const allGroupsList = await getAllGroups();
     setAllUsers(
@@ -176,18 +176,18 @@ function InventoryListPage() {
         .map(u => u.username)
     );
     setAllGroups((allGroupsList as { id: number, name: string }[]).map(g => ({ id: g.id, name: g.name })));
-    setInventoryPermissionsTarget(inv);
+    setChecklistPermissionsTarget(inv);
     try {
       const [userList, groupList] = await Promise.all([
-        getInventoryUserShares(inv.id),
-        getInventoryGroupShares(inv.id)
+        getChecklistUserShares(inv.id),
+        getChecklistGroupShares(inv.id)
       ]);
       setAccessUsers(userList as { username: string; role?: { name: string } }[]);
       setAccessGroups(
         (groupList as string[]).map(name => ({ name }))
       );
     } catch (err) {
-      console.error("Errore caricamento accessi inventario:", err);
+      console.error("Errore caricamento accessi lista:", err);
     }
   };
 
@@ -197,7 +197,7 @@ function InventoryListPage() {
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Inventari</h1>
+        <h1 className="text-2xl font-bold">Liste</h1>
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 mb-4">
         <div className="flex items-center gap-2">
@@ -214,7 +214,7 @@ function InventoryListPage() {
           <button
             onClick={() => {
               setSearchQuery('');
-              setInventories([]);
+              setChecklists([]);
             }}
             className="px-4 py-2 bg-gray-300 text-gray-700 rounded"
           >
@@ -230,7 +230,7 @@ function InventoryListPage() {
             value={sortBy}
             onChange={(e) => {
               const value = e.target.value as 'name' | 'date' | 'item_count';
-              localStorage.setItem('inventory_sortBy', value);
+              localStorage.setItem('checklist_sortBy', value);
               setSortBy(value);
             }}
             className="border px-2 py-1 rounded"
@@ -243,7 +243,7 @@ function InventoryListPage() {
           <button
             onClick={() => {
               const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-              localStorage.setItem('inventory_sortOrder', newOrder);
+              localStorage.setItem('checklist_sortOrder', newOrder);
               setSortOrder(newOrder);
             }}
             className="border rounded p-1 px-2"
@@ -255,13 +255,13 @@ function InventoryListPage() {
         {editMode && (
           <div className="flex gap-2">
             <button
-              onClick={() => setSelectedInventories(inventories.map(item => item.id))}
+              onClick={() => setSelectedChecklists(checklists.map(item => item.id))}
               className="px-2 py-1 text-sm bg-blue-500 text-white rounded"
             >
               Seleziona tutti
             </button>
             <button
-              onClick={() => setSelectedInventories([])}
+              onClick={() => setSelectedChecklists([])}
               className="px-2 py-1 text-sm bg-gray-500 text-white rounded"
             >
               Deseleziona tutti
@@ -271,45 +271,45 @@ function InventoryListPage() {
       </div>
       {user && user.role.name !== 'viewer' && (
         <>
-          <NewInventoryModal
+          <NewChecklistModal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             onCreate={async (name) => {
               try {
-                const newInv = await createInventory(name) as unknown as Inventory;
+                const newInv = await createChecklist(name) as unknown as Checklist;
 
                 if (!newInv?.id) {
                   showMessage('Errore nella risposta del server.', 'error');
                   return;
                 }
 
-                setInventories((prev) => [...prev, newInv]);
-                showMessage('Inventario creato con successo!', 'success');
+                setChecklists((prev) => [...prev, newInv]);
+                showMessage('Lista creata con successo!', 'success');
               } catch (error) {
-                showMessage("Errore durante la creazione dell'inventario", 'error');
-                console.error('Errore durante la creazione dell\'inventario:', error);
+                showMessage("Errore durante la creazione della lista", 'error');
+                console.error('Errore durante la creazione della lista:', error);
               }
             }}
           />
         </>
       )}
-      {inventories.length === 0 ? (
-        <p>Nessun inventario disponibile.</p>
+      {checklists.length === 0 ? (
+        <p>Nessuna lista disponibile.</p>
       ) : (
         <ul className="space-y-2">
-          {getSortedInventories().map((inv: InventoryWithMatches) => (
+          {getSortedChecklists().map((inv: ChecklistWithMatches) => (
             <li
               key={inv.id}
               className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center ${
                 editMode
-                  ? selectedInventories.includes(inv.id)
+                  ? selectedChecklists.includes(inv.id)
                     ? "bg-yellow-100"
                     : "hover:bg-yellow-50"
                   : "hover:bg-gray-50"
               }`}
               onClick={() => {
                 if (editMode) {
-                  setSelectedInventories((prev) =>
+                  setSelectedChecklists((prev) =>
                     prev.includes(inv.id)
                       ? prev.filter((id) => id !== inv.id)
                       : [...prev, inv.id]
@@ -342,7 +342,7 @@ function InventoryListPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setInventoryBeingEdited(inv);
+                      setChecklistBeingEdited(inv);
                       setIsEditModalOpen(true);
                     }}
                     className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
@@ -414,41 +414,41 @@ function InventoryListPage() {
             : 'fixed bottom-2 right-2 flex-col'
         }`}
       >
-        {editMode && selectedInventories.length > 0 && (
+        {editMode && selectedChecklists.length > 0 && (
           <button
             onClick={async () => {
-              const deletableIds = inventories
-                .filter(inv => selectedInventories.includes(inv.id) && inv.item_count === 0)
+              const deletableIds = checklists
+                .filter(inv => selectedChecklists.includes(inv.id) && inv.item_count === 0)
                 .map(inv => inv.id);
 
-              const nonDeletable = inventories
-                .filter(inv => selectedInventories.includes(inv.id) && inv.item_count > 0);
+              const nonDeletable = checklists
+                .filter(inv => selectedChecklists.includes(inv.id) && inv.item_count > 0);
 
               if (deletableIds.length === 0 && nonDeletable.length > 0) {
-                showMessage("Gli inventari selezionati contengono oggetti e non possono essere cancellati.", "error");
+                showMessage("Le liste selezionate contengono oggetti e non possono essere cancellate.", "error");
                 return;
               }
 
-              if (window.confirm("Sei sicuro di voler cancellare gli inventari selezionati senza oggetti?")) {
+              if (window.confirm("Sei sicuro di voler cancellare le liste selezionate senza oggetti?")) {
                 try {
-                  await Promise.all(deletableIds.map(id => deleteInventory(id)))
-                  setInventories(prev => prev.filter(inv => !deletableIds.includes(inv.id)));
-                  setSelectedInventories([]);
+                  await Promise.all(deletableIds.map(id => deleteChecklist(id)))
+                  setChecklists(prev => prev.filter(inv => !deletableIds.includes(inv.id)));
+                  setSelectedChecklists([]);
                   setEditMode(false); // Disabilita la modalità di modifica dopo la cancellazione
-                  showMessage("Inventari senza oggetti cancellati con successo.", "success");
+                  showMessage("Liste senza oggetti cancellate con successo.", "success");
                 } catch {
-                  showMessage("Errore durante la cancellazione degli inventari.", "error");
+                  showMessage("Errore durante la cancellazione delle liste.", "error");
                 }
 
                 if (nonDeletable.length > 0) {
-                  showMessage("Alcuni inventari non sono stati cancellati perché contengono oggetti.", "error");
+                  showMessage("Alcune liste non sono state cancellate perché contengono oggetti.", "error");
                 }
               }
             }}
             className="py-2 px-4 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700"
           >
-            <span className="inline md:hidden">🗑️ {( selectedInventories.length )}</span>
-            <span className="hidden md:inline">Elimina {( selectedInventories.length )}</span>
+            <span className="inline md:hidden">🗑️ {( selectedChecklists.length )}</span>
+            <span className="hidden md:inline">Elimina {( selectedChecklists.length )}</span>
           </button>
         )}
         {user?.role.name !== 'viewer' && (
@@ -456,7 +456,7 @@ function InventoryListPage() {
             <button
               onClick={() => {
                 setEditMode(!editMode);
-                setSelectedInventories([]);
+                setSelectedChecklists([]);
               }}
               className={`py-2 px-4 rounded-full shadow-lg text-white ${
                 editMode ? 'bg-yellow-700' : 'bg-yellow-500 hover:bg-yellow-600'
@@ -470,7 +470,7 @@ function InventoryListPage() {
               className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
             >
               <span className="inline md:hidden">➕</span>
-              <span className="hidden md:inline">Nuovo</span>
+              <span className="hidden md:inline">Nuova</span>
             </button>
           </>
         )}
@@ -480,19 +480,19 @@ function InventoryListPage() {
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
-            <Dialog.Title className="text-lg font-semibold mb-4">Modifica Inventario</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold mb-4">Modifica lista</Dialog.Title>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (!inventoryBeingEdited) return;
-                await updateInventoryName(inventoryBeingEdited.id, editedName);
-                setInventories((prev) =>
-                  prev.map((inv) => (inv.id === inventoryBeingEdited.id ? { ...inv, name: editedName } : inv))
+                if (!ChecklistBeingEdited) return;
+                await updateChecklistName(ChecklistBeingEdited.id, editedName);
+                setChecklists((prev) =>
+                  prev.map((inv) => (inv.id === ChecklistBeingEdited.id ? { ...inv, name: editedName } : inv))
                 );
                 setIsEditModalOpen(false);
-                setInventoryBeingEdited(null);
+                setChecklistBeingEdited(null);
                 setEditedName('');
-                showMessage("Inventario modificato con successo.", "success");
+                showMessage("Lista modificata con successo.", "success");
               }}
             >
               <input
@@ -514,11 +514,11 @@ function InventoryListPage() {
         </div>
       </Dialog>
 
-      <Dialog open={!!inventoryPermissionsTarget} onClose={() => setInventoryPermissionsTarget(null)} className="relative z-50">
+      <Dialog open={!!ChecklistPermissionsTarget} onClose={() => setChecklistPermissionsTarget(null)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Panel className="bg-white rounded p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
-            <Dialog.Title className="text-lg font-bold mb-4">Gestione Accessi – {inventoryPermissionsTarget?.name}</Dialog.Title>
+            <Dialog.Title className="text-lg font-bold mb-4">Gestione Accessi – {ChecklistPermissionsTarget?.name}</Dialog.Title>
 
             <div className="mb-4">
               <h3 className="font-semibold text-md mb-2">Utenti con accesso</h3>
@@ -539,8 +539,8 @@ function InventoryListPage() {
                 <button
                   disabled={!selectedUser}
                   onClick={async () => {
-                    if (!inventoryPermissionsTarget || !selectedUser) return;
-                    await shareInventoryWithUser(inventoryPermissionsTarget.id, selectedUser);
+                    if (!ChecklistPermissionsTarget || !selectedUser) return;
+                    await shareChecklistWithUser(ChecklistPermissionsTarget.id, selectedUser);
                     setAccessUsers(prev => [...prev, { username: selectedUser }]);
                     setSelectedUser('');
                   }}
@@ -556,8 +556,8 @@ function InventoryListPage() {
                     <span>{user.username} {user.role?.name ? `(${user.role.name})` : ""}</span>
                     <button
                       onClick={async () => {
-                        if (!inventoryPermissionsTarget) return;
-                        await unshareInventoryWithUser(inventoryPermissionsTarget.id, user.username);
+                        if (!ChecklistPermissionsTarget) return;
+                        await unshareChecklistWithUser(ChecklistPermissionsTarget.id, user.username);
                         setAccessUsers(prev => prev.filter(u => u.username !== user.username));
                       }}
                       className="text-red-500 hover:underline text-xs"
@@ -588,8 +588,8 @@ function InventoryListPage() {
                 <button
                   disabled={!selectedGroupId}
                   onClick={async () => {
-                    if (!inventoryPermissionsTarget || selectedGroupId === null) return;
-                    await shareInventoryWithGroup(inventoryPermissionsTarget.id, selectedGroupId);
+                    if (!ChecklistPermissionsTarget || selectedGroupId === null) return;
+                    await shareChecklistWithGroup(ChecklistPermissionsTarget.id, selectedGroupId);
                     const groupName = allGroups.find(g => g.id === selectedGroupId)?.name;
                     if (groupName) {
                       setAccessGroups(prev => [...prev, { name: groupName }]);
@@ -608,10 +608,10 @@ function InventoryListPage() {
                     <span>{group.name} {group.role?.name ? `(${group.role.name})` : ""}</span>
                     <button
                       onClick={async () => {
-                        if (!inventoryPermissionsTarget) return;
+                        if (!ChecklistPermissionsTarget) return;
                       const groupObj = allGroups.find(g => g.name === group.name);
                       if (groupObj) {
-                        await unshareInventoryFromGroup(inventoryPermissionsTarget.id, groupObj.id);
+                        await unshareChecklistFromGroup(ChecklistPermissionsTarget.id, groupObj.id);
                         setAccessGroups((prev) => prev.filter(g => g !== group));
                       }
                       }}
@@ -625,7 +625,7 @@ function InventoryListPage() {
             </div>
 
             <div className="flex justify-end">
-              <button onClick={() => setInventoryPermissionsTarget(null)} className="px-4 py-2 border rounded">Chiudi</button>
+              <button onClick={() => setChecklistPermissionsTarget(null)} className="px-4 py-2 border rounded">Chiudi</button>
             </div>
           </Dialog.Panel>
         </div>
@@ -648,4 +648,4 @@ function InventoryListPage() {
   )
 }
 
-export default InventoryListPage
+export default ChecklistListPage

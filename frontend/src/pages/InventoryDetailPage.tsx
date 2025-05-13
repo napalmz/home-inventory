@@ -1,6 +1,9 @@
 import { useParams, useLocation, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { getInventoryById, getInventoryItems, createItem, updateItem, deleteItem } from "../api";
+import {
+  getInventoryById, getInventoryItems,
+  getChecklistById, getChecklistItems,
+  createItem, updateItem, deleteItem } from "../api";
 import { Inventory, Item } from "../types";
 import { Dialog } from "@headlessui/react";
 import { useContext } from "react";
@@ -15,12 +18,15 @@ export default function InventoryDetailPage() {
   const { id } = useParams();
   const location = useLocation();
   const filtroParam = new URLSearchParams(location.search).get('filtro') || "";
+  const basePath = location.pathname.split("/")[1] as "inventories" | "checklists";
+  const isInventory = basePath === "inventories";
+  const isChecklist = basePath === "checklists";
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [newItemName, setNewItemName] = useState("");
   const [newItemDescription, setNewItemDescription] = useState("");
-  const [newItemQuantity, setNewItemQuantity] = useState(1);
+  const [newItemQuantity, setNewItemQuantity] = useState(isChecklist ? 0 : 1);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'quantity'>(() => {
@@ -36,17 +42,21 @@ export default function InventoryDetailPage() {
   const [itemBeingEdited, setItemBeingEdited] = useState<Item | null>(null);
   const [filterText, setFilterText] = useState(filtroParam);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (id) {
-        const inventoryData = await getInventoryById(Number(id));
-        if (inventoryData) setInventory(inventoryData as Inventory);
-        const itemsData = await getInventoryItems(Number(id));
-        if (Array.isArray(itemsData)) setItems(itemsData as Item[]);
-      }
-    };
-    fetchData();
-  }, [id]);
+useEffect(() => {
+  const fetchData = async () => {
+    if (!id) return;
+
+    const getById  = isInventory ? getInventoryById  : getChecklistById;
+    const getItems = isInventory ? getInventoryItems : getChecklistItems;
+
+    const inventoryData = await getById(Number(id));
+    if (inventoryData) setInventory(inventoryData as Inventory);
+
+    const itemsData = await getItems(Number(id));
+    if (Array.isArray(itemsData)) setItems(itemsData as Item[]);
+  };
+  fetchData();
+}, [id, isInventory]);
 
   useEffect(() => {
     localStorage.setItem("item_sortBy", sortBy);
@@ -66,8 +76,13 @@ export default function InventoryDetailPage() {
       return sortOrder === "asc" ? result : -result;
     })
     .sort((a, b) => {
-      if (a.quantity === 0 && b.quantity > 0) return 1;
-      if (a.quantity > 0 && b.quantity === 0) return -1;
+      if (isChecklist) {
+        if (a.quantity === 1 && b.quantity === 0) return 1;
+        if (a.quantity === 0 && b.quantity === 1) return -1;
+      } else {
+        if (a.quantity === 0 && b.quantity > 0) return 1;
+        if (a.quantity > 0 && b.quantity === 0) return -1;
+      }
       return 0;
     });
 
@@ -126,14 +141,17 @@ export default function InventoryDetailPage() {
     <div className="relative p-4">
       <div className="sticky top-0 bg-white z-10 pb-2">
         <Link
-          to={`/inventories${filtroParam ? `?filtro=${encodeURIComponent(filtroParam)}` : ""}`}
+          to={`/${basePath}${filtroParam ? `?filtro=${encodeURIComponent(filtroParam)}` : ""}`}
           className="text-blue-500 hover:underline mb-2 inline-block"
         >
-          ← Torna alla lista degli inventari
+          ← Torna all'elenco {isChecklist ? "delle liste" : "degli inventari"}
         </Link>
         {inventory && (
           <>
-            <h2 className="text-xl font-bold">{inventory.name}</h2>
+            <h2 className="text-xl font-bold">
+              {isChecklist ? "Lista: " : "Inventario: "}
+              {inventory.name}
+            </h2>
             <p className="text-sm text-gray-600 mb-2">
               Creato da: {inventory.owner.username ? `${inventory.owner.username}` : "Sconosciuto"} | Data modifica:{" "}
               {new Date(inventory.data_mod).toLocaleString()}
@@ -141,7 +159,6 @@ export default function InventoryDetailPage() {
             <hr className="mb-2" />
           </>
         )}
-        
       </div>
 
       {inventory ? (
@@ -227,7 +244,7 @@ export default function InventoryDetailPage() {
                 }}
                 className={`border p-2 rounded mb-2 shadow-sm cursor-pointer flex justify-between items-center ${
                   isEditMode && selectedItems.includes(item.id) ? "bg-blue-100" : ""
-                } ${item.quantity === 0 ? "text-gray-400" : ""}`}
+                } ${(isChecklist && item.quantity > 0) || (!isChecklist && item.quantity === 0) ? "text-gray-400" : ""}`}
               >
                 <div>
                   <div className="font-semibold">{item.name}</div>
@@ -251,7 +268,7 @@ export default function InventoryDetailPage() {
                       <span className="hidden md:inline">Modifica</span>
                     </button>
                   )}
-                  {user?.role.name !== 'viewer' ? (
+                  {isInventory && user?.role.name !== 'viewer' ? (
                     <>
                       <button
                         onClick={(e) => {
@@ -289,6 +306,22 @@ export default function InventoryDetailPage() {
                         +
                       </button>
                     </>
+                  ) : isChecklist && user?.role.name !== 'viewer' ? (
+                    <input
+                      type="checkbox"
+                      checked={item.quantity > 0}
+                      onChange={(e) => {
+                        const updatedItem = { ...item, quantity: e.target.checked ? 1 : 0 };
+                        updateItem(item.id, updatedItem).then((updated) => {
+                          if (updated) {
+                            setItems((prev) =>
+                              prev.map((itm) => (itm.id === updated.id ? updated : itm))
+                            );
+                          }
+                        });
+                      }}
+                      className="w-5 h-5"
+                    />
                   ) : (
                     <span className="min-w-[24px] text-center">{item.quantity}</span>
                   )}
@@ -298,7 +331,7 @@ export default function InventoryDetailPage() {
           </ul>
         </div>
       ) : (
-        <p>Caricamento inventario...</p>
+        <p>Caricamento {isChecklist ? "checklist" : "inventaro"}...</p>
       )}
 
       <div
@@ -317,7 +350,8 @@ export default function InventoryDetailPage() {
               }
               setSelectedItems([]);
               setIsEditMode(false);
-              const refreshed = inventory && await getInventoryItems(inventory.id);
+              const getItems = isInventory ? getInventoryItems : getChecklistItems;
+              const refreshed = inventory && await getItems(inventory.id);
               if (refreshed) setItems(refreshed);
             }}
             className="py-2 px-4 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700"
@@ -326,56 +360,56 @@ export default function InventoryDetailPage() {
             <span className="hidden md:inline">Elimina {( selectedItems.length )}</span>
           </button>
         )}
-        {/* {typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent) && ( */}
-        <button
-          onClick={() => {
-            const now = new Date();
-            const header = `${inventory?.name} (${now.toLocaleString()})`;
-            const withQty = items.filter(i => i.quantity > 0).sort((a, b) => a.name.localeCompare(b.name));
-            const zeroQty = items.filter(i => i.quantity === 0).sort((a, b) => a.name.localeCompare(b.name));
-            const lines = [...withQty, ...zeroQty].map(i =>
-              `- ${i.quantity}x ${i.name}${i.description ? ` (${i.description})` : ''}`
-            );
-            const text = encodeURIComponent([header, ...lines].join('\n'));
-            //window.location.href = `https://wa.me/?text=${text}`;
-            window.open(`https://wa.me/?text=${text}`, '_blank');
-          }}
-          className="py-2 px-4 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800"
-        >
-          <span className="inline md:hidden">📲</span>
-          <span className="hidden md:inline">📲 Invia via WhatsApp</span>
-        </button>
-        {/* )} */}
-        {user?.role.name === 'admin' && (
-            <button
-            onClick={() => setIsShareModalOpen(true)}
-            className="py-2 px-4 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700"
-            >
-              <span className="inline md:hidden">📤</span>
-              <span className="hidden md:inline">Import/Export</span>
-            </button>
-        )}
-        {user?.role.name !== 'viewer' && (
-          <>
+        {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
           <button
             onClick={() => {
-              setIsEditMode((prev) => !prev);
-              setSelectedItems([]);
+              const now = new Date();
+              const header = `${inventory?.name} (${now.toLocaleString()})`;
+              const withQty = items.filter(i => i.quantity > 0).sort((a, b) => a.name.localeCompare(b.name));
+              const zeroQty = items.filter(i => i.quantity === 0).sort((a, b) => a.name.localeCompare(b.name));
+              const lines = [...withQty, ...zeroQty].map(i =>
+                `- ${i.quantity}x ${i.name}${i.description ? ` (${i.description})` : ''}`
+              );
+              const text = encodeURIComponent([header, ...lines].join('\n'));
+              //window.location.href = `https://wa.me/?text=${text}`;
+              window.open(`https://wa.me/?text=${text}`, '_blank');
             }}
-            className={`py-2 px-4 rounded-full shadow-lg text-white ${
-              isEditMode ? "bg-yellow-700" : "bg-yellow-500 hover:bg-yellow-600"
-            }`}
+            className="py-2 px-4 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800"
           >
-            <span className="inline md:hidden">{isEditMode ? "✖️" : "✏️"}</span>
-            <span className="hidden md:inline">{isEditMode ? "Chiudi" : "Modifica"}</span>
+            <span className="inline md:hidden">📲</span>
+            <span className="hidden md:inline">📲 Invia via WhatsApp</span>
           </button>
+        )}
+        {(isInventory || isChecklist) && user?.role.name === 'admin' && (
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
+            onClick={() => setIsShareModalOpen(true)}
+            className="py-2 px-4 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700"
           >
-            <span className="inline md:hidden">➕</span>
-            <span className="hidden md:inline">Nuovo</span>
+            <span className="inline md:hidden">📤</span>
+            <span className="hidden md:inline">Import/Export</span>
           </button>
+        )}
+        {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
+          <>
+            <button
+              onClick={() => {
+                setIsEditMode((prev) => !prev);
+                setSelectedItems([]);
+              }}
+              className={`py-2 px-4 rounded-full shadow-lg text-white ${
+                isEditMode ? "bg-yellow-700" : "bg-yellow-500 hover:bg-yellow-600"
+              }`}
+            >
+              <span className="inline md:hidden">{isEditMode ? "✖️" : "✏️"}</span>
+              <span className="hidden md:inline">{isEditMode ? "Chiudi" : "Modifica"}</span>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
+            >
+              <span className="inline md:hidden">➕</span>
+              <span className="hidden md:inline">Nuovo</span>
+            </button>
           </>
         )}
       </div>
@@ -396,7 +430,8 @@ export default function InventoryDetailPage() {
                   inventory_id: inventory.id
                 });
                 if (newItem) {
-                  const refreshed = inventory && await getInventoryItems(inventory.id);
+                  const getItems = isInventory ? getInventoryItems : getChecklistItems;
+                  const refreshed = inventory && await getItems(inventory.id);
                   if (refreshed) setItems(refreshed);
                   setNewItemName("");
                   setNewItemDescription("");
@@ -413,32 +448,46 @@ export default function InventoryDetailPage() {
                 <label className="block text-sm font-medium">Descrizione</label>
                 <input type="text" className="w-full border rounded p-1" value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium">Quantità</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewItemQuantity((prev) => Math.max(0, prev - 1))}
-                    className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min="0"
-                    className="w-16 border rounded p-2 text-center"
-                    value={newItemQuantity}
-                    onChange={(e) => setNewItemQuantity(Math.max(0, Number(e.target.value)))}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setNewItemQuantity((prev) => prev + 1)}
-                    className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
-                  >
-                    +
-                  </button>
+              {isInventory && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium">Quantità</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewItemQuantity((prev) => Math.max(0, prev - 1))}
+                      className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-16 border rounded p-2 text-center"
+                      value={newItemQuantity}
+                      onChange={(e) => setNewItemQuantity(Math.max(0, Number(e.target.value)))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewItemQuantity((prev) => prev + 1)}
+                      className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+              {isChecklist && (
+                <div className="mb-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={newItemQuantity > 0}
+                      onChange={(e) => setNewItemQuantity(e.target.checked ? 1 : 0)}
+                    />
+                    Elemento completato
+                  </label>
+                </div>
+              )}
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
@@ -501,20 +550,64 @@ export default function InventoryDetailPage() {
                     }
                   />
                 </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium">Quantità</label>
-                  <input
-                    type="number"
-                    className="w-full border rounded p-1"
-                    value={itemBeingEdited.quantity}
-                    onChange={(e) =>
-                      setItemBeingEdited({
-                        ...itemBeingEdited,
-                        quantity: Number(e.target.value),
-                      })
-                    }
-                  />
-                </div>
+                {isInventory && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium">Quantità</label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setItemBeingEdited((prev) =>
+                            prev ? { ...prev, quantity: Math.max(0, prev.quantity - 1) } : prev
+                          )
+                        }
+                        className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-16 border rounded p-2 text-center"
+                        value={itemBeingEdited.quantity}
+                        onChange={(e) =>
+                          setItemBeingEdited({
+                            ...itemBeingEdited,
+                            quantity: Math.max(0, Number(e.target.value)),
+                          })
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setItemBeingEdited((prev) =>
+                            prev ? { ...prev, quantity: prev.quantity + 1 } : prev
+                          )
+                        }
+                        className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {isChecklist && (
+                  <div className="mb-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={itemBeingEdited.quantity > 0}
+                        onChange={(e) =>
+                          setItemBeingEdited({
+                            ...itemBeingEdited,
+                            quantity: e.target.checked ? 1 : 0,
+                          })
+                        }
+                      />
+                      Elemento completato
+                    </label>
+                  </div>
+                )}
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"

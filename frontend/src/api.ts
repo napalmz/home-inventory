@@ -1,5 +1,14 @@
 import axios from 'axios';
-import { User, Role, Inventory, InventoryItem, InventoryWithMatches } from "./types";
+import {
+  User,
+  Role,
+  Inventory,
+  InventoryItem,
+  InventoryWithMatches,
+  Checklist,
+  ChecklistItem,
+  ChecklistWithMatches
+} from "./types";
 
 let api: ReturnType<typeof axios.create>;
 
@@ -206,6 +215,37 @@ export async function getInventoryItems(id: number): Promise<InventoryItem[]> {
   return response.data as InventoryItem[];
 }
 
+/* CREAZIONE CHECKLIST */
+export async function createChecklist(name: string): Promise<Checklist> {
+  const response = await api.post('/checklist/', { name });
+  return response.data as Checklist;
+}
+
+/* CANCELLAZIONE CHECKLIST */
+export async function deleteChecklist(id: number) {
+  await api.delete(`/checklist/${id}`);
+}
+
+/* LISTA CHECKLISTS con filtro opzionale */
+export async function getChecklists(filtro?: string): Promise<(ChecklistWithMatches)[]> {
+  const response = await api.get('/checklist/', {
+    params: filtro ? { filtro } : {},
+  });
+  return response.data as (ChecklistWithMatches)[];
+}
+
+/* RECUPERO CHECKLIST PER ID */
+export async function getChecklistById(id: number): Promise<Checklist> {
+  const response = await api.get(`/checklist/${id}`);
+  return response.data as Checklist;
+}
+
+/* RECUPERO ELENCO ITEM PER ID CHECKLIST */
+export async function getChecklistItems(id: number): Promise<ChecklistItem[]> {
+  const response = await api.get(`/checklist/item/${id}/`);
+  return response.data as ChecklistItem[];
+}
+
 /* CREAZIONE ITEM */
 export async function createItem(data: {
   name: string;
@@ -251,6 +291,14 @@ export async function unshareInventoryWithUser(inventoryId: number, username: st
   return api.delete(`/inventory/share/${inventoryId}/${username}`);
 }
 
+export async function shareChecklistWithUser(inventoryId: number, username: string) {
+  return api.post(`/checklist/share/${inventoryId}/${username}`);
+}
+
+export async function unshareChecklistWithUser(inventoryId: number, username: string) {
+  return api.delete(`/checklist/share/${inventoryId}/${username}`);
+}
+
 // === GRUPPI ===
 export async function getAllGroups() {
   const res = await api.get('/user/groups/');
@@ -263,6 +311,14 @@ export async function shareInventoryWithGroup(inventoryId: number, groupId: numb
 
 export async function unshareInventoryFromGroup(inventoryId: number, groupId: number) {
   return api.delete(`/inventory/share_group/${inventoryId}/${groupId}`);
+}
+
+export async function shareChecklistWithGroup(inventoryId: number, groupId: number) {
+  return api.post(`/checklist/share_group/${inventoryId}/${groupId}`);
+}
+
+export async function unshareChecklistFromGroup(inventoryId: number, groupId: number) {
+  return api.delete(`/checklist/share_group/${inventoryId}/${groupId}`);
 }
 
 export async function createGroup(data: { name: string; role_id: number }) {
@@ -295,9 +351,26 @@ export async function getInventoryGroupShares(inventoryId: number) {
   const response = await api.get(`/inventory/share_group/${inventoryId}`);
   return response.data;
 }
+export async function getChecklistAccessDetails(inventoryId: number) {
+  const res = await api.get(`/checklist/access_details/${inventoryId}`);
+  return res.data;
+}
+
+export async function getChecklistUserShares(inventoryId: number) {
+  const response = await api.get(`/checklist/share/${inventoryId}`);
+  return response.data;
+}
+
+export async function getChecklistGroupShares(inventoryId: number) {
+  const response = await api.get(`/checklist/share_group/${inventoryId}`);
+  return response.data;
+}
 
 export async function updateInventoryName(inventoryId: number, name: string): Promise<void> {
   await api.patch(`/inventory/${inventoryId}`, { name });
+}
+export async function updateChecklistName(inventoryId: number, name: string): Promise<void> {
+  await api.patch(`/checklist/${inventoryId}`, { name });
 }
 
 export async function getAllRoles() {

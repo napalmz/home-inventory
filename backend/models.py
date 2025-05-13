@@ -116,6 +116,7 @@ class Inventory(Base, LoggingData):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
+    type = Column(String, nullable=False, default="INVENTORY")
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", foreign_keys=[owner_id])
     items = relationship("Item", back_populates="inventory", cascade="all, delete-orphan")

@@ -30,7 +30,8 @@ def scheduled_backup():
         set_setting(db, "BACKUP_LAST_RUN", datetime.now(timezone.utc))
         
         # Controllo della retention
-        retention = int(get_setting(db, "BACKUP_RETENTION") or 10)
+        setting = get_setting(db, "BACKUP_RETENTION")
+        retention = int(setting.value if setting else 10)
         cleanup_old_backups(retention)
 
     except Exception as e:
