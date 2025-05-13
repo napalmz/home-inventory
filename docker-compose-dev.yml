@@ -37,11 +37,6 @@ services:
       - backend/.env
     volumes:
       - ./backend:/app
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/system/version"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   frontend:
     build: ./frontend
@@ -51,11 +46,6 @@ services:
       BACKEND_BASE_URL: http://backend:8000
     ports:
       - "3000:80"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     depends_on:
       - backend
 

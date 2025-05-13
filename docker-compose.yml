@@ -2,15 +2,13 @@ services:
   db:
     image: postgres:17
     container_name: inventory-db
-    #ports:
-    #  - "5432:5432"
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: inventory
       TZ: Europe/Rome
     volumes:
-      - /home/napalmz/docker-conf/home-inventory/pgdata:/var/lib/postgresql/data
+      - /home/napalmz/docker-conf/home-inventory/pgdata17:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d inventory"]
       interval: 5s
@@ -30,16 +28,9 @@ services:
       FASTAPI_ROOT_PATH: /api
     volumes:
       - /home/napalmz/docker-conf/home-inventory/backups:/app/backups
-    ports:
-      - "8001:8000"
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/system/version"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: always
 
   frontend:
@@ -50,11 +41,6 @@ services:
       BACKEND_BASE_URL: http://backend:8000
     ports:
       - "3000:80"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     depends_on:
       - backend
     restart: always
