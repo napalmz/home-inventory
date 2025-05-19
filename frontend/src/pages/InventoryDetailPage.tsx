@@ -435,7 +435,7 @@ useEffect(() => {
                   if (refreshed) setItems(refreshed);
                   setNewItemName("");
                   setNewItemDescription("");
-                  setNewItemQuantity(1);
+                  setNewItemQuantity(isChecklist ? 0 : 1);
                   setIsModalOpen(false);
                 }
               }}
