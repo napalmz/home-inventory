@@ -69,17 +69,21 @@ app.include_router(backup_router, prefix="/backup", tags=["Backups"])
 @app.get("/")
 def home():
     db = SessionLocal()
-    num_inventories = db.query(Inventory).count()
-    num_items = db.query(Item).count()
+    num_inventories = db.query(Inventory).filter(Inventory.type == "INVENTORY").count()
+    num_checklists = db.query(Inventory).filter(Inventory.type == "CHECKLIST").count()
+    num_inventories_items = db.query(Item).filter(Item.inventory.has(type="INVENTORY")).count()
+    num_checklists_items = db.query(Item).filter(Item.inventory.has(type="CHECKLIST")).count()
     num_users = db.query(User).count()
     db.close()
 
     return {
-        "title": "Home Inventory Management",
-        "message": "Benvenuto nell'applicazione di gestione inventario!",
+        "title": "Home Inventory/List Management",
+        "message": "Benvenuto nell'applicazione di gestione inventari e liste!",
         "stats": {
             "total_inventories": num_inventories,
-            "total_items": num_items,
+            "total_inventories_items": num_inventories_items,
+            "total_checklists": num_checklists,
+            "total_checklists_items": num_checklists_items,
             "total_users": num_users
         }
     }
