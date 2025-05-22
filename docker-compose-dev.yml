@@ -20,6 +20,7 @@ services:
   backend:
     build: ./backend
     container_name: inventory-backend
+    restart: unless-stopped
     environment:
       TZ: Europe/Rome
       DATABASE_URL: postgresql://admin:admin@db:5432/inventory
@@ -41,6 +42,7 @@ services:
   frontend:
     build: ./frontend
     container_name: inventory-frontend
+    restart: unless-stopped
     environment:
       TZ: Europe/Rome
       BACKEND_BASE_URL: http://backend:8000
