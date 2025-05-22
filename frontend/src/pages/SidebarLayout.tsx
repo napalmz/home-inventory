@@ -41,7 +41,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       )}
       {/* Sidebar */}
       <div
-        className={`bg-gray-800 text-white w-64 p-4 transition-transform duration-300 transform ${
+        className={`bg-gray-800 text-white dark:bg-gray-600 dark:text-gray-300 w-64 p-4 transition-transform duration-300 transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 md:relative fixed z-40 top-0 bottom-0 h-screen`}
       >
@@ -82,6 +82,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         )}
 
         <nav className="space-y-2">
+          <Link to="/" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
+            Home
+          </Link>
           {user && user.username && (
             <Link to="/inventories" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
               Inventari
@@ -118,7 +121,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       )}
 
       {/* Contenuto */}
-      <div className="flex-1 p-6 ml-0 w-full overflow-auto">{children}</div>
+      <div className="flex-1 p-6 ml-0 w-full overflow-auto dark:bg-gray-900 dark:text-white">{children}</div>
     </div>
   )
 }

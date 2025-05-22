@@ -45,7 +45,7 @@ function NewChecklistModal({ isOpen, onClose, onCreate }: {
       <Dialog open={isOpen} onClose={onClose} className="relative z-50">
         <div className="fixed inset-0 bg-black/30 " aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 rounded p-6 w-full max-w-md">
             <Dialog.Title className="text-lg font-bold mb-4">Nuova lista</Dialog.Title>
             <form onSubmit={handleSubmit}>
               <input
@@ -300,12 +300,12 @@ function ChecklistListPage() {
           {getSortedChecklists().map((inv: ChecklistWithMatches) => (
             <li
               key={inv.id}
-              className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center ${
+              className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center text-black dark:text-white ${
                 editMode
                   ? selectedChecklists.includes(inv.id)
                     ? "bg-yellow-100"
-                    : "hover:bg-yellow-50"
-                  : "hover:bg-gray-50"
+                    : "hover:bg-yellow-50 dark:hover:text-gray-600"
+                  : "hover:bg-gray-50 dark:hover:text-gray-600"
               }`}
               onClick={() => {
                 if (editMode) {
@@ -479,7 +479,7 @@ function ChecklistListPage() {
       <Dialog open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 rounded p-6 w-full max-w-md">
             <Dialog.Title className="text-lg font-semibold mb-4">Modifica lista</Dialog.Title>
             <form
               onSubmit={async (e) => {
@@ -517,7 +517,7 @@ function ChecklistListPage() {
       <Dialog open={!!ChecklistPermissionsTarget} onClose={() => setChecklistPermissionsTarget(null)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 rounded p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <Dialog.Title className="text-lg font-bold mb-4">Gestione Accessi – {ChecklistPermissionsTarget?.name}</Dialog.Title>
 
             <div className="mb-4">

@@ -169,7 +169,7 @@ export default function GroupManagementPage() {
       </div>
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white p-6 rounded shadow-md w-full max-w-md space-y-4">
+          <div className="bg-white dark:bg-gray-900 p-6 rounded shadow-md w-full max-w-md space-y-4">
             <h3 className="text-lg font-semibold">Crea nuovo gruppo</h3>
             <input
               type="text"
@@ -215,7 +215,7 @@ export default function GroupManagementPage() {
       {selectedGroup && !isUserModalOpen && (
         <>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-            <div className="bg-white p-6 rounded shadow-md w-full max-w-md space-y-4">
+            <div className="bg-white dark:bg-gray-900 p-6 rounded shadow-md w-full max-w-md space-y-4">
               <h3 className="text-lg font-semibold">Modifica gruppo</h3>
               <input
                 type="text"
@@ -263,7 +263,7 @@ export default function GroupManagementPage() {
       )}
       {isUserModalOpen && selectedGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white p-6 rounded shadow-md w-full max-w-md space-y-4">
+          <div className="bg-white dark:bg-gray-900 p-6 rounded shadow-md w-full max-w-md space-y-4">
             <h3 className="text-lg font-semibold">Utenti associati a {selectedGroup.name}</h3>
             <ul className="space-y-1 max-h-40 overflow-y-auto border rounded p-2 text-sm">
               {selectedGroup.users.map(uid => {

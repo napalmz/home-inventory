@@ -22,7 +22,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 overflow-x-hidden w-full max-w-full">
-      <div className="sticky top-0 z-10 bg-white flex flex-wrap gap-2 border-b mb-4">
+      <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 flex flex-wrap gap-2 border-b mb-4">
         {tabs.map((tab) => (
           <button
             key={tab.name}

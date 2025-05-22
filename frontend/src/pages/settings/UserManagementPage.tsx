@@ -221,7 +221,7 @@ export default function UserManagementPage() {
       <Dialog open={isModalOpen} onClose={closeModal} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white p-6 rounded w-full max-w-md space-y-4">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md space-y-4">
             <Dialog.Title className="text-lg font-semibold mb-4">
               Modifica utente
             </Dialog.Title>
@@ -300,7 +300,7 @@ export default function UserManagementPage() {
       <Dialog open={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white p-6 rounded w-full max-w-md space-y-4">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md space-y-4">
             <Dialog.Title className="text-lg font-semibold mb-4">
               Crea utente
             </Dialog.Title>

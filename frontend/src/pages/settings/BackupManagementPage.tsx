@@ -349,7 +349,7 @@ export default function BackupManagementPage() {
       </ul>
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-30 flex items-center justify-center">
-          <div className="bg-white p-4 rounded shadow w-full max-w-lg">
+          <div className="bg-white dark:bg-gray-900 p-4 rounded shadow w-full max-w-lg">
             <BackupScheduleManager
               currentConfig={scheduleConfig}
               onSaved={() => {

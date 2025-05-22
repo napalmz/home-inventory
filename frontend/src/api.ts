@@ -142,7 +142,9 @@ export async function getApiWelcomeInfo(): Promise<{
   message: string;
   stats: {
     total_inventories: number;
-    total_items: number;
+    total_inventories_items: number;
+    total_checklists: number;
+    total_checklists_items: number;
     total_users: number;
   };
 }> {
@@ -152,7 +154,9 @@ export async function getApiWelcomeInfo(): Promise<{
     message: string;
     stats: {
       total_inventories: number;
-      total_items: number;
+      total_inventories_items: number;
+      total_checklists: number;
+      total_checklists_items: number;
       total_users: number;
     };
   };

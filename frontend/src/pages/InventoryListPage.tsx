@@ -45,8 +45,8 @@ function NewInventoryModal({ isOpen, onClose, onCreate }: {
       <Dialog open={isOpen} onClose={onClose} className="relative z-50">
         <div className="fixed inset-0 bg-black/30 " aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
-            <Dialog.Title className="text-lg font-bold mb-4">Nuovo Inventario</Dialog.Title>
+          <Dialog.Panel className="bg-white dark:bg-gray-900 rounded p-6 w-full max-w-md">
+            <Dialog.Title className="text-lg font-bold mb-4 dark:text-white">Nuovo Inventario</Dialog.Title>
             <form onSubmit={handleSubmit}>
               <input
                 type="text"
@@ -60,10 +60,10 @@ function NewInventoryModal({ isOpen, onClose, onCreate }: {
                   }
                 }}
                 ref={inputRef}
-                className="w-full border px-3 py-2 mb-4"
+                className="w-full border px-3 py-2 mb-4 dark:bg-gray-800 dark:text-white"
               />
               <div className="flex justify-end space-x-2">
-                <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Annulla</button>
+                <button type="button" onClick={onClose} className="px-4 py-2 border rounded dark:bg-gray-400">Annulla</button>
                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Crea</button>
               </div>
             </form>
@@ -300,12 +300,12 @@ function InventoryListPage() {
           {getSortedInventories().map((inv: InventoryWithMatches) => (
             <li
               key={inv.id}
-              className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center ${
+              className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center text-black dark:text-white ${
                 editMode
                   ? selectedInventories.includes(inv.id)
                     ? "bg-yellow-100"
-                    : "hover:bg-yellow-50"
-                  : "hover:bg-gray-50"
+                    : "hover:bg-yellow-50 dark:hover:text-gray-600"
+                  : "hover:bg-gray-100  dark:hover:text-gray-600"
               }`}
               onClick={() => {
                 if (editMode) {
@@ -479,8 +479,8 @@ function InventoryListPage() {
       <Dialog open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-md">
-            <Dialog.Title className="text-lg font-semibold mb-4">Modifica Inventario</Dialog.Title>
+          <Dialog.Panel className="bg-white dark:bg-gray-900 rounded p-6 w-full max-w-md">
+            <Dialog.Title className="text-lg font-semibold mb-4 dark:text-white">Modifica Inventario</Dialog.Title>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -499,15 +499,11 @@ function InventoryListPage() {
                 type="text"
                 value={editedName}
                 onChange={(e) => setEditedName(e.target.value)}
-                className="w-full border px-3 py-2 mb-4"
+                className="w-full border px-3 py-2 mb-4 dark:bg-gray-800 dark:text-white"
               />
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border rounded">
-                  Annulla
-                </button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-                  Salva
-                </button>
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 border rounded dark:bg-gray-400">Annulla</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Salva</button>
               </div>
             </form>
           </Dialog.Panel>
@@ -517,7 +513,7 @@ function InventoryListPage() {
       <Dialog open={!!inventoryPermissionsTarget} onClose={() => setInventoryPermissionsTarget(null)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 rounded p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <Dialog.Title className="text-lg font-bold mb-4">Gestione Accessi – {inventoryPermissionsTarget?.name}</Dialog.Title>
 
             <div className="mb-4">

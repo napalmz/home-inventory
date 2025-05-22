@@ -136,7 +136,7 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-8 p-4 bg-white shadow-md rounded space-y-8">
+    <div className="max-w-md mx-auto mt-8 p-4 bg-white dark:bg-gray-900 shadow-md rounded space-y-8">
       <div>
         <h2 className="text-xl font-bold mb-4">Dati Anagrafici</h2>
         <form onSubmit={handleProfileSubmit} className="space-y-4">

@@ -1,17 +1,256 @@
 import { useParams, useLocation, Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useRef, useEffect, useState } from 'react';
 import {
   getInventoryById, getInventoryItems,
   getChecklistById, getChecklistItems,
   createItem, updateItem, deleteItem } from "../api";
-import { Inventory, Item } from "../types";
+import { Inventory, Item, User } from "../types";
 import { Dialog } from "@headlessui/react";
 import { useContext } from "react";
 import { AuthContext } from "../auth-context";
+import { useSwipeable } from 'react-swipeable';
+
+interface Props {
+  item: Item;
+  isMobile: boolean;
+  isChecklist: boolean;
+  isInventory: boolean;
+  user: User | null;
+  isEditMode: boolean;
+  selectedItems: number[];
+  setSelectedItems: React.Dispatch<React.SetStateAction<number[]>>;
+  setItemBeingEdited: (item: Item) => void;
+  updateItem: (id: number, item: Partial<Item>) => Promise<Item | null>;
+  deleteItem: (id: number) => Promise<void>;
+  setItems: React.Dispatch<React.SetStateAction<Item[]>>;
+}
+
+export function SwipeableItemRow({
+  item, isMobile, isChecklist, isInventory, user,
+  isEditMode, selectedItems, setSelectedItems, setItemBeingEdited,
+  updateItem, deleteItem, setItems,
+}: Props) {
+  const [action, setAction] = useState<'left' | 'right' | null>(null);
+
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        rowRef.current &&
+        !rowRef.current.contains(target) &&
+        !target.closest('.swipe-button')
+      ) {
+        setAction(null);
+      }
+    };
+    if (action) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [action]);
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => setAction('left'),
+    onSwipedRight: () => setAction('right'),
+    onTap: () => setAction(null),
+    trackMouse: false,
+    delta: 40,
+  });
+
+  const isViewer = user?.role.name === 'viewer';
+
+  const cloneItem = () => {
+    const cloned = {
+      ...item,
+      id: 0, // id fittizio, sarà gestito dal backend al salvataggio
+      name: `${item.name} (copia)`
+    };
+    setItemBeingEdited(cloned);
+  };
+
+  // Combine refs for swipeHandlers and rowRef to avoid duplicate ref assignment
+  const combinedRef = (el: HTMLDivElement | null) => {
+    rowRef.current = el;
+    if (isMobile && swipeHandlers.ref) {
+      swipeHandlers.ref(el);
+    }
+  };
+
+  return (
+    <div
+      ref={combinedRef}
+      className="relative mb-2"
+    >
+      {/* Action buttons */}
+      {(action === 'left') && !isViewer && (
+        <>
+          <button
+            className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 right-1/4 top-0 h-full w-1/4 bg-yellow-500 text-white font-bold z-10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setAction(null);
+              cloneItem();
+            }}
+          >
+            📄
+          </button>
+          <button
+            className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 right-0 top-0 h-full w-1/4 bg-blue-600 text-white font-bold z-10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setAction(null);
+              setItemBeingEdited(item);
+            }}
+          >
+            ✏️
+          </button>
+        </>
+      )}
+      {(action === 'right') && !isViewer && (
+        <button
+          className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 left-0 top-0 h-full w-1/4 bg-red-600 text-white font-bold z-10"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setAction(null);
+            if (confirm("Vuoi eliminare questo elemento?")) {
+              deleteItem(item.id).then(() => {
+                setItems(prev => prev.filter(i => i.id !== item.id));
+              });
+            }
+          }}
+        >
+          🗑️
+        </button>
+      )}
+
+      {/* Actual list item */}
+      <li
+        className={`relative border p-2 rounded shadow-sm flex flex-col md:flex-row md:justify-between md:items-center
+    ${isEditMode && selectedItems.includes(item.id) ? "bg-blue-100 dark:bg-blue-900" : "bg-white dark:bg-gray-800"}
+    md:hover:bg-gray-100 dark:md:hover:bg-gray-700
+    ${(isChecklist && item.quantity > 0) || (isInventory && item.quantity === 0) ? "text-gray-400" : ""}`}
+        onClick={() => {
+          if (isEditMode) {
+            setSelectedItems(prev =>
+              prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]
+            );
+          } else {
+            setAction(null);
+          }
+        }}
+      >
+        <div className="flex flex-col w-full md:w-auto md:flex-row md:items-center">
+          {isEditMode && (
+            <div className="mr-2 flex items-center">
+              <span className="text-xl">
+                {selectedItems.includes(item.id) ? '☑️' : '⬜️'}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-col">
+            <div className="font-semibold">{item.name}</div>
+            {item.description && (
+              <div className="text-sm text-gray-500">{item.description}</div>
+            )}
+            <div className="text-xs text-gray-400">
+              Ultima modifica: {item.username_mod} - {new Date(item.data_mod).toLocaleString()}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
+          {isChecklist ? (
+            <input
+              type="checkbox"
+              checked={item.quantity > 0}
+              disabled={isViewer}
+              onChange={(e) => {
+                if (isViewer) return;
+                const updated = { ...item, quantity: e.target.checked ? 1 : 0 };
+                updateItem(item.id, updated).then((upd) => {
+                  if (upd) {
+                    setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
+                  }
+                });
+              }}
+            />
+          ) : isInventory && !isViewer ? (
+            <div className="flex items-center gap-2">
+              {isEditMode && !isViewer && (
+                <>
+                  <button
+                    className="px-2 py-1 bg-yellow-500 text-white rounded text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      cloneItem();
+                    }}
+                  >
+                    <span className="inline md:hidden">📄</span>
+                    <span className="hidden md:inline">📄 Clona</span>
+                  </button>
+                  <button
+                    className="px-2 py-1 bg-blue-500 text-white rounded text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setItemBeingEdited(item);
+                    }}
+                  >
+                    <span className="inline md:hidden">✏️</span>
+                    <span className="hidden md:inline">✏️ Modifica</span>
+                  </button>
+                </>
+              )}
+              <button
+                className="px-2 py-1 bg-gray-300 rounded text-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const updated = { ...item, quantity: item.quantity - 1 };
+                  updateItem(item.id, updated).then((upd) => {
+                    if (upd) {
+                      setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
+                    }
+                  });
+                }}
+              >
+                -
+              </button>
+              <span className="min-w-[24px] text-center">{item.quantity}</span>
+              <button
+                className="px-2 py-1 bg-gray-300 rounded text-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const updated = { ...item, quantity: item.quantity + 1 };
+                  updateItem(item.id, updated).then((upd) => {
+                    if (upd) {
+                      setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
+                    }
+                  });
+                }}
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <span className="min-w-[24px] text-center">{item.quantity}</span>
+          )}
+        </div>
+      </li>
+    </div>
+  );
+}
 
 export default function InventoryDetailPage() {
+  const isMobile = window.innerWidth < 768;
   const authContext = useContext(AuthContext);
-  const user = authContext?.user;
+  const user = authContext?.user ?? null;
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [csvTextarea, setCsvTextarea] = useState('');
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
@@ -69,13 +308,7 @@ useEffect(() => {
       item.description?.toLowerCase().includes(filterText.toLowerCase())
     )
     .sort((a, b) => {
-      let result = 0;
-      if (sortBy === "name") result = a.name.localeCompare(b.name);
-      else if (sortBy === "quantity") result = a.quantity - b.quantity;
-      else result = new Date(a.data_mod).getTime() - new Date(b.data_mod).getTime();
-      return sortOrder === "asc" ? result : -result;
-    })
-    .sort((a, b) => {
+      // First, sort by checklist/inventory logic for completed/zero items
       if (isChecklist) {
         if (a.quantity === 1 && b.quantity === 0) return 1;
         if (a.quantity === 0 && b.quantity === 1) return -1;
@@ -83,7 +316,12 @@ useEffect(() => {
         if (a.quantity === 0 && b.quantity > 0) return 1;
         if (a.quantity > 0 && b.quantity === 0) return -1;
       }
-      return 0;
+      // Then, sort by selected sortBy/sortOrder
+      let result = 0;
+      if (sortBy === "name") result = a.name.localeCompare(b.name);
+      else if (sortBy === "quantity") result = a.quantity - b.quantity;
+      else result = new Date(a.data_mod).getTime() - new Date(b.data_mod).getTime();
+      return sortOrder === "asc" ? result : -result;
     });
 
     const handleCSVImport = async (csvText: string) => {
@@ -139,7 +377,7 @@ useEffect(() => {
 
   return (
     <div className="relative p-4">
-      <div className="sticky top-0 bg-white z-10 pb-2">
+      <div className="sticky top-0 bg-white dark:bg-gray-900 z-10 pb-2">
         <Link
           to={`/${basePath}${filtroParam ? `?filtro=${encodeURIComponent(filtroParam)}` : ""}`}
           className="text-blue-500 hover:underline mb-2 inline-block"
@@ -163,7 +401,7 @@ useEffect(() => {
 
       {inventory ? (
         <div>
-          <div className="sticky top-16 z-10 bg-white mb-4 flex flex-wrap gap-2 items-center px-1 py-2 border-b">
+          <div className="sticky top-16 z-10 bg-white dark:bg-gray-900 mb-4 flex flex-wrap gap-2 items-center px-1 py-2 border-b">
             <label className="text-sm font-medium">Ordina per:</label>
             <select
               value={sortBy}
@@ -233,100 +471,28 @@ useEffect(() => {
           </div>
           <ul className="mb-20">
             {sortedItems.map((item) => (
-              <li
+              <SwipeableItemRow
                 key={item.id}
-                onClick={() => {
-                  if (isEditMode) {
-                    setSelectedItems((prev) =>
-                      prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
-                    );
-                  }
-                }}
-                className={`border p-2 rounded mb-2 shadow-sm cursor-pointer flex justify-between items-center ${
-                  isEditMode && selectedItems.includes(item.id) ? "bg-blue-100" : ""
-                } ${(isChecklist && item.quantity > 0) || (!isChecklist && item.quantity === 0) ? "text-gray-400" : ""}`}
-              >
-                <div>
-                  <div className="font-semibold">{item.name}</div>
-                  {item.description && (
-                    <div className="text-xs text-gray-500">{item.description}</div>
-                  )}
-                  <div className="text-xs text-gray-400">
-                    Ultima modifica: {(item.username_mod)} - {new Date(item.data_mod).toLocaleString()}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isEditMode && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setItemBeingEdited(item);
-                      }}
-                      className="px-2 py-1 bg-blue-500 text-white rounded shadow hover:bg-blue-600"
-                    >
-                      <span className="inline md:hidden">✏️</span>
-                      <span className="hidden md:inline">Modifica</span>
-                    </button>
-                  )}
-                  {isInventory && user?.role.name !== 'viewer' ? (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (item.quantity > 0) {
-                            const updatedItem = { ...item, quantity: item.quantity - 1 };
-                            updateItem(item.id, updatedItem).then((updated) => {
-                              if (updated) {
-                                setItems((prev) =>
-                                  prev.map((itm) => (itm.id === updated.id ? updated : itm))
-                                );
-                              }
-                            });
-                          }
-                        }}
-                        className="px-2 py-1 bg-gray-300 text-black rounded"
-                      >
-                        −
-                      </button>
-                      <span className="min-w-[24px] text-center">{item.quantity}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const updatedItem = { ...item, quantity: item.quantity + 1 };
-                          updateItem(item.id, updatedItem).then((updated) => {
-                            if (updated) {
-                              setItems((prev) =>
-                                prev.map((itm) => (itm.id === updated.id ? updated : itm))
-                              );
-                            }
-                          });
-                        }}
-                        className="px-2 py-1 bg-gray-300 text-black rounded"
-                      >
-                        +
-                      </button>
-                    </>
-                  ) : isChecklist && user?.role.name !== 'viewer' ? (
-                    <input
-                      type="checkbox"
-                      checked={item.quantity > 0}
-                      onChange={(e) => {
-                        const updatedItem = { ...item, quantity: e.target.checked ? 1 : 0 };
-                        updateItem(item.id, updatedItem).then((updated) => {
-                          if (updated) {
-                            setItems((prev) =>
-                              prev.map((itm) => (itm.id === updated.id ? updated : itm))
-                            );
-                          }
-                        });
-                      }}
-                      className="w-5 h-5"
-                    />
-                  ) : (
-                    <span className="min-w-[24px] text-center">{item.quantity}</span>
-                  )}
-                </div>
-              </li>
+                item={item}
+                isMobile={isMobile}
+                isChecklist={isChecklist}
+                isInventory={isInventory}
+                user={user}
+                isEditMode={isEditMode}
+                selectedItems={selectedItems}
+                setSelectedItems={setSelectedItems}
+                setItemBeingEdited={setItemBeingEdited}
+                updateItem={async (id, itemArg) =>
+                  await updateItem(id, {
+                    name: itemArg.name ?? "",
+                    description: itemArg.description,
+                    quantity: itemArg.quantity ?? 0,
+                    inventory_id: itemArg.inventory_id ?? inventory?.id ?? 0,
+                  })
+                }
+                deleteItem={deleteItem}
+                setItems={setItems}
+              />
             ))}
           </ul>
         </div>
@@ -336,9 +502,9 @@ useEffect(() => {
 
       <div
         className={`z-40 gap-2 flex ${
-          window.innerWidth >= 768
-            ? 'fixed top-4 right-4 flex-row'
-            : 'fixed bottom-2 right-2 flex-col'
+          isMobile
+            ? 'fixed bottom-2 right-2 flex-col'
+            : 'fixed top-4 right-4 flex-row'
         }`}
       >
         {isEditMode && selectedItems.length > 0 && (
@@ -377,7 +543,7 @@ useEffect(() => {
             className="py-2 px-4 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800"
           >
             <span className="inline md:hidden">📲</span>
-            <span className="hidden md:inline">📲 Invia via WhatsApp</span>
+            <span className="hidden md:inline">📲 WhatsApp</span>
           </button>
         )}
         {(isInventory || isChecklist) && user?.role.name === 'admin' && (
@@ -417,7 +583,7 @@ useEffect(() => {
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white p-6 rounded w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md">
             <Dialog.Title className="text-lg font-semibold mb-4">Nuovo oggetto</Dialog.Title>
             <form
               onSubmit={async (e) => {
@@ -508,7 +674,7 @@ useEffect(() => {
       <Dialog open={!!itemBeingEdited} onClose={() => setItemBeingEdited(null)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white p-6 rounded w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md">
             <Dialog.Title className="text-lg font-semibold mb-4">Modifica oggetto</Dialog.Title>
             {itemBeingEdited && (
               <form
@@ -628,7 +794,7 @@ useEffect(() => {
       <Dialog open={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white p-6 rounded w-full max-w-lg space-y-4">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-lg space-y-4">
             <Dialog.Title className="text-lg font-semibold mb-2">Importa / Esporta CSV</Dialog.Title>
             <button
               onClick={() => {
