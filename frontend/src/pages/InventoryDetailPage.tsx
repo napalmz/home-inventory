@@ -22,43 +22,38 @@ interface Props {
   setItemBeingEdited: (item: Item) => void;
   updateItem: (id: number, item: Partial<Item>) => Promise<Item | null>;
   deleteItem: (id: number) => Promise<void>;
+  setIsCloning: React.Dispatch<React.SetStateAction<boolean>>;
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
 }
 
 export function SwipeableItemRow({
   item, isMobile, isChecklist, isInventory, user,
   isEditMode, selectedItems, setSelectedItems, setItemBeingEdited,
-  updateItem, deleteItem, setItems,
+  updateItem, deleteItem, setItems, setIsCloning, 
 }: Props) {
   const [action, setAction] = useState<'left' | 'right' | null>(null);
-
   const rowRef = useRef<HTMLDivElement>(null);
 
+  // Gestione click fuori per chiudere i pulsanti swipe
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (
-        rowRef.current &&
-        !rowRef.current.contains(target) &&
-        !target.closest('.swipe-button')
-      ) {
-        setAction(null);
+    if (!action) return;
+
+    function handleClickOutside(e: MouseEvent) {
+      // Se il target ha la classe "swipe-button", ignora
+      if ((e.target as HTMLElement).classList.contains("swipe-button")) {
+        return;
       }
-    };
-    if (action) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
+      setAction(null);
     }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [action]);
 
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => setAction('left'),
     onSwipedRight: () => setAction('right'),
-    onTap: () => setAction(null),
+    //onTap: () => setAction(null),
     trackMouse: false,
     delta: 40,
   });
@@ -72,6 +67,7 @@ export function SwipeableItemRow({
       name: `${item.name} (copia)`
     };
     setItemBeingEdited(cloned);
+    setIsCloning(true);
   };
 
   // Combine refs for swipeHandlers and rowRef to avoid duplicate ref assignment
@@ -80,6 +76,35 @@ export function SwipeableItemRow({
     if (isMobile && swipeHandlers.ref) {
       swipeHandlers.ref(el);
     }
+  };
+
+  const handleClone = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    //console.log("Clona premuto", item);
+    cloneItem();
+    setAction(null);
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    //console.log("Modifica premuto", item);
+    setItemBeingEdited(item);
+    setIsCloning(false);
+    setAction(null);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    //console.log("Elimina premuto", item);
+    if (confirm("Vuoi eliminare questo elemento?")) {
+      deleteItem(item.id).then(() => {
+        setItems((prev) => prev.filter((i) => i.id !== item.id));
+      });
+    }
+    setAction(null);
   };
 
   return (
@@ -91,24 +116,14 @@ export function SwipeableItemRow({
       {(action === 'left') && !isViewer && (
         <>
           <button
-            className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 right-1/4 top-0 h-full w-1/4 bg-yellow-500 text-white font-bold z-10"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setAction(null);
-              cloneItem();
-            }}
+            className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 right-1/4 top-0 h-full w-1/4 bg-yellow-500 text-white font-bold z-20"
+            onClick={handleClone}
           >
             📄
           </button>
           <button
-            className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 right-0 top-0 h-full w-1/4 bg-blue-600 text-white font-bold z-10"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setAction(null);
-              setItemBeingEdited(item);
-            }}
+            className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 right-0 top-0 h-full w-1/4 bg-blue-600 text-white font-bold z-20"
+            onClick={handleEdit}
           >
             ✏️
           </button>
@@ -116,17 +131,8 @@ export function SwipeableItemRow({
       )}
       {(action === 'right') && !isViewer && (
         <button
-          className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 left-0 top-0 h-full w-1/4 bg-red-600 text-white font-bold z-10"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setAction(null);
-            if (confirm("Vuoi eliminare questo elemento?")) {
-              deleteItem(item.id).then(() => {
-                setItems(prev => prev.filter(i => i.id !== item.id));
-              });
-            }
-          }}
+          className="swipe-button absolute transition-transform duration-300 ease-in-out transform translate-x-0 left-0 top-0 h-full w-1/4 bg-red-600 text-white font-bold z-20"
+          onClick={handleDelete}
         >
           🗑️
         </button>
@@ -167,6 +173,30 @@ export function SwipeableItemRow({
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
+          {isEditMode && !isViewer && (
+            <>
+              <button
+                className="px-2 py-1 bg-yellow-500 text-white rounded text-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  cloneItem();
+                }}
+              >
+                <span className="inline md:hidden">📄</span>
+                <span className="hidden md:inline">📄 Clona</span>
+              </button>
+              <button
+                className="px-2 py-1 bg-blue-500 text-white rounded text-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setItemBeingEdited(item);
+                }}
+              >
+                <span className="inline md:hidden">✏️</span>
+                <span className="hidden md:inline">✏️ Modifica</span>
+              </button>
+            </>
+          )}
           {isChecklist ? (
             <input
               type="checkbox"
@@ -184,30 +214,6 @@ export function SwipeableItemRow({
             />
           ) : isInventory && !isViewer ? (
             <div className="flex items-center gap-2">
-              {isEditMode && !isViewer && (
-                <>
-                  <button
-                    className="px-2 py-1 bg-yellow-500 text-white rounded text-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      cloneItem();
-                    }}
-                  >
-                    <span className="inline md:hidden">📄</span>
-                    <span className="hidden md:inline">📄 Clona</span>
-                  </button>
-                  <button
-                    className="px-2 py-1 bg-blue-500 text-white rounded text-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setItemBeingEdited(item);
-                    }}
-                  >
-                    <span className="inline md:hidden">✏️</span>
-                    <span className="hidden md:inline">✏️ Modifica</span>
-                  </button>
-                </>
-              )}
               <button
                 className="px-2 py-1 bg-gray-300 rounded text-sm"
                 onClick={(e) => {
@@ -261,7 +267,7 @@ export default function InventoryDetailPage() {
   const isInventory = basePath === "inventories";
   const isChecklist = basePath === "checklists";
   const [inventory, setInventory] = useState<Inventory | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isInsertMode, setisInsertMode] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [newItemName, setNewItemName] = useState("");
   const [newItemDescription, setNewItemDescription] = useState("");
@@ -280,6 +286,7 @@ export default function InventoryDetailPage() {
   });
   const [itemBeingEdited, setItemBeingEdited] = useState<Item | null>(null);
   const [filterText, setFilterText] = useState(filtroParam);
+  const [isCloning, setIsCloning] = useState(false);
 
 useEffect(() => {
   const fetchData = async () => {
@@ -492,6 +499,7 @@ useEffect(() => {
                 }
                 deleteItem={deleteItem}
                 setItems={setItems}
+                setIsCloning={setIsCloning}
               />
             ))}
           </ul>
@@ -570,7 +578,7 @@ useEffect(() => {
               <span className="hidden md:inline">{isEditMode ? "Chiudi" : "Modifica"}</span>
             </button>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => setisInsertMode(true)}
               className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
             >
               <span className="inline md:hidden">➕</span>
@@ -580,7 +588,7 @@ useEffect(() => {
         )}
       </div>
 
-      <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} className="relative z-50">
+      <Dialog open={isInsertMode} onClose={() => setisInsertMode(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md">
@@ -602,7 +610,7 @@ useEffect(() => {
                   setNewItemName("");
                   setNewItemDescription("");
                   setNewItemQuantity(isChecklist ? 0 : 1);
-                  setIsModalOpen(false);
+                  setisInsertMode(false);
                 }
               }}
             >
@@ -657,12 +665,12 @@ useEffect(() => {
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => setisInsertMode(false)}
                   className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400"
                 >
                   Chiudi
                 </button>
-                <button type="submit" className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+                <button type="submit" className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
                   Aggiungi
                 </button>
               </div>
@@ -678,8 +686,24 @@ useEffect(() => {
             <Dialog.Title className="text-lg font-semibold mb-4">Modifica oggetto</Dialog.Title>
             {itemBeingEdited && (
               <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (isCloning) {
+                  if (!inventory) return;
+                  const newItem = await createItem({
+                    name: itemBeingEdited.name,
+                    description: itemBeingEdited.description ?? "",
+                    quantity: itemBeingEdited.quantity,
+                    inventory_id: inventory.id,
+                  });
+                  if (newItem) {
+                    const getItems = isInventory ? getInventoryItems : getChecklistItems;
+                    const refreshed = inventory && await getItems(inventory.id);
+                    if (refreshed) setItems(refreshed);
+                    setItemBeingEdited(null);
+                    setIsCloning(false);
+                  }
+                } else {
                   const updated = await updateItem(itemBeingEdited.id, {
                     name: itemBeingEdited.name,
                     description: itemBeingEdited.description ?? "",
@@ -692,7 +716,8 @@ useEffect(() => {
                     );
                     setItemBeingEdited(null);
                   }
-                }}
+                }
+              }}
               >
                 <div className="mb-2">
                   <label className="block text-sm font-medium">Nome</label>
@@ -777,13 +802,16 @@ useEffect(() => {
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setItemBeingEdited(null)}
+                    onClick={() => { setItemBeingEdited(null); setIsCloning(false); }}
                     className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400"
                   >
                     Chiudi
                   </button>
-                  <button type="submit" className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
-                    Salva modifiche
+                  <button
+                    type="submit"
+                    className={`px-3 py-1 text-white rounded hover:opacity-90 ${isCloning ? "bg-yellow-500 hover:bg-yellow-600" : "bg-green-600 hover:bg-green-700"}`}
+                  >
+                    {isCloning ? "Clona" : "Salva modifiche"}
                   </button>
                 </div>
               </form>
