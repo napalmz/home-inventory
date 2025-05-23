@@ -162,7 +162,7 @@ export default function UserManagementPage() {
   
       <div className="overflow-x-auto">
         <table className="min-w-full table-auto border border-gray-300">
-          <thead className="bg-gray-100">
+          <thead className="bg-gray-100 dark:bg-gray-800">
             <tr>
               <th className="p-2 border">Username</th>
               <th className="p-2 border">Email</th>
@@ -221,7 +221,7 @@ export default function UserManagementPage() {
       <Dialog open={isModalOpen} onClose={closeModal} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md space-y-4">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-md space-y-4">
             <Dialog.Title className="text-lg font-semibold mb-4">
               Modifica utente
             </Dialog.Title>
@@ -277,7 +277,7 @@ export default function UserManagementPage() {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={closeModal}
-                className="px-3 py-1 text-sm bg-gray-300 rounded hover:bg-gray-400"
+                className="px-3 py-1 text-sm bg-gray-400 rounded hover:bg-gray-600"
               >
                 Chiudi
               </button>
@@ -300,7 +300,7 @@ export default function UserManagementPage() {
       <Dialog open={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md space-y-4">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-md space-y-4">
             <Dialog.Title className="text-lg font-semibold mb-4">
               Crea utente
             </Dialog.Title>
@@ -329,7 +329,7 @@ export default function UserManagementPage() {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="px-3 py-1 text-sm bg-gray-300 rounded hover:bg-gray-400"
+                className="px-3 py-1 text-sm bg-gray-400 rounded hover:bg-gray-600"
               >
                 Chiudi
               </button>

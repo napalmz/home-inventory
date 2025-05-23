@@ -216,7 +216,7 @@ function InventoryListPage() {
               setSearchQuery('');
               setInventories([]);
             }}
-            className="px-4 py-2 bg-gray-300 text-gray-700 rounded"
+            className="px-4 py-2 bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
           >
             <span className="inline sm:hidden">❌</span>
             <span className="hidden sm:inline">Cancella filtro</span>
@@ -301,11 +301,9 @@ function InventoryListPage() {
             <li
               key={inv.id}
               className={`p-4 border rounded shadow cursor-pointer flex justify-between items-center text-black dark:text-white ${
-                editMode
-                  ? selectedInventories.includes(inv.id)
-                    ? "bg-yellow-100"
-                    : "hover:bg-yellow-50 dark:hover:text-gray-600"
-                  : "hover:bg-gray-100  dark:hover:text-gray-600"
+                selectedInventories.includes(inv.id)
+                  ? "bg-yellow-100"
+                  : "hover:bg-gray-100 dark:hover:bg-gray-600"
               }`}
               onClick={() => {
                 if (editMode) {
@@ -322,7 +320,7 @@ function InventoryListPage() {
               {editMode ? (
                 <div className="flex justify-between items-center w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow">
-                    <h2 className="text-lg font-semibold">{inv.name}</h2>
+                    <h2 className={`text-lg font-semibold ${selectedInventories.includes(inv.id) ? "dark:text-black" : "" }`}>{inv.name}</h2>
                     <p className="text-sm text-gray-500 sm:ml-4">
                       Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
                     </p>
@@ -514,11 +512,11 @@ function InventoryListPage() {
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Panel className="bg-white dark:bg-gray-900 rounded p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
-            <Dialog.Title className="text-lg font-bold mb-4">Gestione Accessi – {inventoryPermissionsTarget?.name}</Dialog.Title>
+            <Dialog.Title className="text-lg font-bold mb-4 dark:text-white">Gestione Accessi – {inventoryPermissionsTarget?.name}</Dialog.Title>
 
             <div className="mb-4">
-              <h3 className="font-semibold text-md mb-2">Utenti con accesso</h3>
-              <ul className="mb-2 text-sm text-gray-700 space-y-1">
+              <h3 className="font-semibold text-md mb-2 dark:text-white">Utenti con accesso</h3>
+              <ul className="mb-2 text-sm text-gray-700 dark:text-white space-y-1">
               <div className="flex items-center gap-2 mt-2">
                 <select
                   className="border px-2 py-1 rounded text-sm"
@@ -548,7 +546,7 @@ function InventoryListPage() {
                 {accessUsers
                   .filter(user => user && user.username)
                   .map((user) => (
-                  <li key={user.username} className="flex justify-between items-center border-b py-1">
+                  <li key={user.username} className="flex justify-between items-center border-b py-1 dark:text-white">
                     <span>{user.username} {user.role?.name ? `(${user.role.name})` : ""}</span>
                     <button
                       onClick={async () => {
@@ -566,8 +564,8 @@ function InventoryListPage() {
             </div>
 
             <div className="mb-4">
-              <h3 className="font-semibold text-md mb-2">Gruppi con accesso</h3>
-              <ul className="mb-2 text-sm text-gray-700 space-y-1">
+              <h3 className="font-semibold text-md mb-2 dark:text-white">Gruppi con accesso</h3>
+              <ul className="mb-2 text-sm text-gray-700 dark:text-white space-y-1">
               <div className="flex items-center gap-2 mt-2">
                 <select
                   className="border px-2 py-1 rounded text-sm"
@@ -600,7 +598,7 @@ function InventoryListPage() {
                 {(accessGroups || [])
                   .filter(group => !!group)
                   .map((group) => (
-                  <li key={group.name} className="flex justify-between items-center border-b py-1">
+                  <li key={group.name} className="flex justify-between items-center border-b py-1 dark:text-white">
                     <span>{group.name} {group.role?.name ? `(${group.role.name})` : ""}</span>
                     <button
                       onClick={async () => {
@@ -621,7 +619,7 @@ function InventoryListPage() {
             </div>
 
             <div className="flex justify-end">
-              <button onClick={() => setInventoryPermissionsTarget(null)} className="px-4 py-2 border rounded">Chiudi</button>
+              <button onClick={() => setInventoryPermissionsTarget(null)} className="px-4 py-2 border rounded dark:bg-gray-400">Chiudi</button>
             </div>
           </Dialog.Panel>
         </div>

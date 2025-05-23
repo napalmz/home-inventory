@@ -191,7 +191,7 @@ export default function GroupManagementPage() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={closeAllModals}
-                className="px-3 py-1 text-sm bg-gray-300 rounded hover:bg-gray-400"
+                className="px-3 py-1 text-sm bg-gray-400 rounded hover:bg-gray-600"
               >
                 Annulla
               </button>
@@ -245,7 +245,7 @@ export default function GroupManagementPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={closeAllModals}
-                    className="px-3 py-1 text-sm bg-gray-300 rounded hover:bg-gray-400"
+                    className="px-3 py-1 text-sm bg-gray-400 rounded hover:bg-gray-600"
                   >
                     Annulla
                   </button>

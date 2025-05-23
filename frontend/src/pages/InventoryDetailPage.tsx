@@ -215,7 +215,7 @@ export function SwipeableItemRow({
           ) : isInventory && !isViewer ? (
             <div className="flex items-center gap-2">
               <button
-                className="px-2 py-1 bg-gray-300 rounded text-sm"
+                className="px-2 py-1 bg-gray-400 rounded hover:bg-gray-600 text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   const updated = { ...item, quantity: item.quantity - 1 };
@@ -230,7 +230,7 @@ export function SwipeableItemRow({
               </button>
               <span className="min-w-[24px] text-center">{item.quantity}</span>
               <button
-                className="px-2 py-1 bg-gray-300 rounded text-sm"
+                className="px-2 py-1 bg-gray-400 rounded hover:bg-gray-600 rounded text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   const updated = { ...item, quantity: item.quantity + 1 };
@@ -452,7 +452,7 @@ useEffect(() => {
                   onClick={() => {
                     setFilterText('');
                   }}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded"
+                  className="px-4 py-2 bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
                 >
                   <span className="inline sm:hidden">❌</span>
                   <span className="hidden sm:inline">Cancella filtro</span>
@@ -591,7 +591,7 @@ useEffect(() => {
       <Dialog open={isInsertMode} onClose={() => setisInsertMode(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-md">
             <Dialog.Title className="text-lg font-semibold mb-4">Nuovo oggetto</Dialog.Title>
             <form
               onSubmit={async (e) => {
@@ -629,7 +629,7 @@ useEffect(() => {
                     <button
                       type="button"
                       onClick={() => setNewItemQuantity((prev) => Math.max(0, prev - 1))}
-                      className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                      className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                     >
                       −
                     </button>
@@ -643,7 +643,7 @@ useEffect(() => {
                     <button
                       type="button"
                       onClick={() => setNewItemQuantity((prev) => prev + 1)}
-                      className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                      className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                     >
                       +
                     </button>
@@ -666,7 +666,7 @@ useEffect(() => {
                 <button
                   type="button"
                   onClick={() => setisInsertMode(false)}
-                  className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400"
+                  className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
                 >
                   Chiudi
                 </button>
@@ -682,7 +682,7 @@ useEffect(() => {
       <Dialog open={!!itemBeingEdited} onClose={() => setItemBeingEdited(null)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-md">
             <Dialog.Title className="text-lg font-semibold mb-4">Modifica oggetto</Dialog.Title>
             {itemBeingEdited && (
               <form
@@ -752,7 +752,7 @@ useEffect(() => {
                             prev ? { ...prev, quantity: Math.max(0, prev.quantity - 1) } : prev
                           )
                         }
-                        className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                        className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                       >
                         −
                       </button>
@@ -775,7 +775,7 @@ useEffect(() => {
                             prev ? { ...prev, quantity: prev.quantity + 1 } : prev
                           )
                         }
-                        className="px-3 py-2 bg-gray-300 rounded hover:bg-gray-400 text-xl leading-none"
+                        className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                       >
                         +
                       </button>
@@ -803,7 +803,7 @@ useEffect(() => {
                   <button
                     type="button"
                     onClick={() => { setItemBeingEdited(null); setIsCloning(false); }}
-                    className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400"
+                    className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
                   >
                     Chiudi
                   </button>
@@ -822,7 +822,7 @@ useEffect(() => {
       <Dialog open={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 p-6 rounded w-full max-w-lg space-y-4">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-lg space-y-4">
             <Dialog.Title className="text-lg font-semibold mb-2">Importa / Esporta CSV</Dialog.Title>
             <button
               onClick={() => {
@@ -891,7 +891,7 @@ useEffect(() => {
             <div className="flex justify-end">
               <button
                 onClick={() => setIsShareModalOpen(false)}
-                className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400"
+                className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
               >
                 Chiudi
               </button>

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getUserInfo, updateMe } from "../api";
 
 const ProfilePage = () => {
   const [email, setEmail] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
   const [maskedEmail, setMaskedEmail] = useState("");
   const [editEmail, setEditEmail] = useState(false);
   const [password, setPassword] = useState("");
@@ -15,11 +16,17 @@ const ProfilePage = () => {
   const [passwordCountdown, setPasswordCountdown] = useState(5);
   const [isPasswordError, setIsPasswordError] = useState(false);
 
+  const emailInputRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     getUserInfo()
       .then((user) => {
         if (typeof user === "object" && user !== null) {
-          if ("email" in user) setEmail((user as { email: string }).email || "");
+          if ("email" in user) {
+            const actualEmail = (user as { email: string }).email || "";
+            setEmail(actualEmail);
+            setInitialEmail(actualEmail);
+          }
           if ("email_masked" in user) setMaskedEmail((user as { email_masked: string }).email_masked || "");
         }
       })
@@ -27,6 +34,23 @@ const ProfilePage = () => {
         setMessage("Errore nel recupero delle informazioni utente.");
       });
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        editEmail &&
+        emailInputRef.current &&
+        !emailInputRef.current.contains(event.target as Node) &&
+        (email === "" || email === initialEmail)
+      ) {
+        setEditEmail(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [editEmail, email, initialEmail]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +72,7 @@ const ProfilePage = () => {
       const updatedUser = await getUserInfo();
       if (typeof updatedUser === "object" && updatedUser !== null && "email" in updatedUser) {
         setEmail((updatedUser as { email: string }).email || "");
+        setInitialEmail((updatedUser as { email: string }).email || "");
         if ("email_masked" in updatedUser) {
           setMaskedEmail((updatedUser as { email_masked: string }).email_masked || "");
         }
@@ -136,21 +161,27 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-8 p-4 bg-white dark:bg-gray-900 shadow-md rounded space-y-8">
+    <div className="max-w-md mx-auto mt-8 p-4 bg-white dark:bg-gray-900 dark:text-white shadow-md rounded space-y-8">
       <div>
         <h2 className="text-xl font-bold mb-4">Dati Anagrafici</h2>
         <form onSubmit={handleProfileSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-100">Email</label>
             {!editEmail ? (
               <p
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded cursor-pointer text-gray-600 bg-gray-100"
-                onClick={() => setEditEmail(true)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded cursor-pointer text-gray-600 bg-gray-100 dark:bg-gray-600 dark:text-gray-100"
+                onClick={() => {
+                  setEditEmail(true);
+                  setTimeout(() => {
+                    emailInputRef.current?.focus();
+                  }, 0);
+                }}
               >
-                {maskedEmail || "—"}
+                {maskedEmail || "Nessuna email fornita"}
               </p>
             ) : (
               <input
+                ref={emailInputRef}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -160,7 +191,10 @@ const ProfilePage = () => {
           </div>
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+            disabled={!editEmail}
+            className={`w-full text-white py-2 px-4 rounded ${
+              editEmail ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+            }`}
           >
             Salva Dati
           </button>
@@ -179,7 +213,7 @@ const ProfilePage = () => {
         <h2 className="text-xl font-bold mb-4">Cambia Password</h2>
         <form onSubmit={handlePasswordSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Nuova Password</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-100">Nuova Password</label>
             <input
               type="password"
               value={password}
@@ -190,7 +224,7 @@ const ProfilePage = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Ripeti Password</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-100">Ripeti Password</label>
             <input
               type="password"
               value={confirmPassword}

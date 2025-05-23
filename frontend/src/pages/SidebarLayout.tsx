@@ -35,13 +35,13 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       {!isOpen && (
-        <div className="md:hidden fixed top-4 left-4 z-50">
+        <div className="md:hidden fixed top-4 left-4 z-50 dark:text-white">
           <button onClick={toggleSidebar}>☰</button>
         </div>
       )}
       {/* Sidebar */}
       <div
-        className={`bg-gray-800 text-white dark:bg-gray-600 dark:text-gray-300 w-64 p-4 transition-transform duration-300 transform ${
+        className={`bg-gray-800 text-white dark:bg-gray-800 dark:text-gray-300 w-64 p-4 transition-transform duration-300 transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 md:relative fixed z-40 top-0 bottom-0 h-screen`}
       >

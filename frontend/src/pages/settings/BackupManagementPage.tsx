@@ -176,11 +176,11 @@ export default function BackupManagementPage() {
   return (
     <div className="space-y-4 p-4">
       <h2 className="text-lg font-semibold">Gestione Backup</h2>
-      <div className="p-2 bg-gray-100 rounded">
+      <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
           <div>
             <p className="font-medium">Backup automatico:</p>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-700 dark:text-white">
               {scheduleConfig && scheduleConfig.frequency !== "none"
                 ? `Attivo - Frequenza: ${scheduleConfig.frequency} ${
                     scheduleConfig.frequency === "hourly"
@@ -313,7 +313,7 @@ export default function BackupManagementPage() {
             return (
               <li
                 key={backup.filename}
-                className={`flex flex-col sm:flex-row sm:justify-between sm:items-center border p-2 rounded ${isAuto ? "bg-yellow-50 border-yellow-400" : ""}`}
+                className={`flex flex-col sm:flex-row sm:justify-between sm:items-center border p-2 rounded ${isAuto ? "bg-yellow-50 border-yellow-400 dark:bg-yellow-500 dark:border-yellow-700 dark:text-black" : ""}`}
               >
                 <div className="flex-1">
                   <div className="break-words">{backup.filename}
@@ -348,7 +348,7 @@ export default function BackupManagementPage() {
           })}
       </ul>
       {showScheduleModal && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-30 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 bg-black/30 bg-opacity-30 flex items-center justify-center">
           <div className="bg-white dark:bg-gray-900 p-4 rounded shadow w-full max-w-lg">
             <BackupScheduleManager
               currentConfig={scheduleConfig}
