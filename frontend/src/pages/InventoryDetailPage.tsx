@@ -198,20 +198,25 @@ export function SwipeableItemRow({
             </>
           )}
           {isChecklist ? (
-            <input
-              type="checkbox"
-              checked={item.quantity > 0}
-              disabled={isViewer}
-              onChange={(e) => {
-                if (isViewer) return;
-                const updated = { ...item, quantity: e.target.checked ? 1 : 0 };
-                updateItem(item.id, updated).then((upd) => {
-                  if (upd) {
-                    setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
-                  }
-                });
-              }}
-            />
+            <div className="flex items-center justify-center h-full w-full">
+              <input
+                type="checkbox"
+                checked={item.quantity > 0}
+                disabled={isViewer}
+                onChange={(e) => {
+                  if (isViewer) return;
+                  const updated = { ...item, quantity: e.target.checked ? 1 : 0 };
+                  updateItem(item.id, updated).then((upd) => {
+                    if (upd) {
+                      setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
+                    }
+                  });
+                }}
+                className="w-7 h-7 accent-blue-600 focus:ring-2 rounded shadow-sm border-2 border-gray-400 dark:border-gray-600"
+                style={{ minWidth: '1.75rem', minHeight: '1.75rem' }}
+                aria-label="Completato"
+              />
+            </div>
           ) : isInventory && !isViewer ? (
             <div className="flex items-center gap-2">
               <button
