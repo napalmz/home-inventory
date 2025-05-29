@@ -58,6 +58,10 @@ def update_item(item_id: int, item_update: ItemUpdate, db: Session = Depends(get
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     for field, value in item_update.model_dump(exclude_unset=True).items():
+        # Impedisci valori negativi per i campi numerici principali
+        if field in ("quantity") and value is not None:
+            if isinstance(value, (int, float)) and value < 0:
+                raise HTTPException(status_code=400, detail=f"{field} non può essere negativo")
         setattr(item, field, value)
     item.user_mod = user.id
     item.username_mod = user.username
