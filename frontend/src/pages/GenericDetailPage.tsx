@@ -267,7 +267,7 @@ export default function InventoryDetailPage() {
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const { id } = useParams();
   const location = useLocation();
-  const filtroParam = new URLSearchParams(location.search).get('filtro') || "";
+  const [filterText, setFilterText] = useState(() => new URLSearchParams(location.search).get('filtro') || "");
   const basePath = location.pathname.split("/")[1] as "inventories" | "checklists";
   const isInventory = basePath === "inventories";
   const isChecklist = basePath === "checklists";
@@ -290,7 +290,7 @@ export default function InventoryDetailPage() {
     return 'asc';
   });
   const [itemBeingEdited, setItemBeingEdited] = useState<Item | null>(null);
-  const [filterText, setFilterText] = useState(filtroParam);
+  const filtroParam = filterText;
   const [isCloning, setIsCloning] = useState(false);
 
 useEffect(() => {
@@ -456,6 +456,7 @@ useEffect(() => {
                 <button
                   onClick={() => {
                     setFilterText('');
+                    window.history.replaceState(null, '', location.pathname);
                   }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
                 >

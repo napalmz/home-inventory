@@ -1,15 +1,14 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
-import ProtectedRoute from "./pages/ProtectedRoute"
-import SidebarLayout from './pages/SidebarLayout'
-import WelcomePage from './pages/WelcomePage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import ProfilePage from './pages/ProfilePage'
-import InventoryListPage from './pages/InventoryListPage'
-import ChecklistListPage from './pages/ChecklistListPage'
-import SettingsPage from './pages/SettingsPage'
-import InventoryDetailPage from './pages/InventoryDetailPage'
+import ProtectedRoute    from "./pages/ProtectedRoute"
+import SidebarLayout     from './pages/SidebarLayout'
+import WelcomePage       from './pages/WelcomePage'
+import LoginPage         from './pages/LoginPage'
+import RegisterPage      from './pages/RegisterPage'
+import ProfilePage       from './pages/ProfilePage'
+import SettingsPage      from './pages/SettingsPage'
+import GenericListPage   from './pages/GenericListPage'
+import GenericDetailPage from './pages/GenericDetailPage'
 import { getApiVersion } from "./api";
 import { version as frontendVersion } from '../package.json';
 
@@ -57,12 +56,12 @@ function App() {
           <Route path="/" element={<WelcomePage />} />
           <Route path="/inventories" element={
             <ProtectedRoute>
-              <InventoryListPage />
+              <GenericListPage />{/* <InventoryListPage /> */}
             </ProtectedRoute>
           } />
           <Route path="/checklists" element={
             <ProtectedRoute>
-              <ChecklistListPage />
+              <GenericListPage />{/* <ChecklistListPage /> */}
             </ProtectedRoute>
           } />
           <Route path="/profile" element={
@@ -77,12 +76,12 @@ function App() {
           } />
           <Route path="/inventories/:id" element={
             <ProtectedRoute>
-              <InventoryDetailPage />
+              <GenericDetailPage />
             </ProtectedRoute>
           } />
           <Route path="/checklists/:id" element={
             <ProtectedRoute>
-              <InventoryDetailPage />
+              <GenericDetailPage />
             </ProtectedRoute>
           } />
           {/* Aggiungi qui eventuali altre rotte visibili nel layout*/}
