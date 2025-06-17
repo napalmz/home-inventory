@@ -1,14 +1,14 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from contextlib import asynccontextmanager
 import logging
 from database import SessionLocal, init_db
-from dependencies import init_roles_and_admin, get_db, initialize_settings
+from dependencies import init_roles_and_admin, get_db, initialize_settings, get_current_user
 from sqlalchemy.orm import Session
 from routes.auth import router as auth_router
 from routes.user import router as user_router
 from routes.admin import router as admin_router
-from routes.inventory import inventory_router, checklist_router
+from routes.inventory import inventory_router, checklist_router, list_inventories_base
 from routes.item import router as item_router
 from routes.system import router as system_router
 from routes.settings import router as settings_router
@@ -16,6 +16,7 @@ from routes.backup import router as backup_router
 from fastapi.middleware.cors import CORSMiddleware
 from models import Inventory, Item, User
 from scheduler import start_scheduler
+from fastapi.responses import JSONResponse
 
 logging.basicConfig(level=logging.INFO)
 
@@ -87,3 +88,22 @@ def home():
             "total_users": num_users
         }
     }
+
+@app.get("/recents")
+def get_recent_items(
+    limit: int = 5,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    inventories = list_inventories_base("INVENTORY", "", db, current_user)
+    checklists = list_inventories_base("CHECKLIST", "", db, current_user)
+
+    for i in inventories:
+        i["type"] = "INVENTORY"
+    for c in checklists:
+        c["type"] = "CHECKLIST"
+
+    combined = inventories + checklists
+    combined.sort(key=lambda x: x["data_mod"], reverse=True)
+
+    return combined[:limit]  # Restituisce gli ultimi N elementi

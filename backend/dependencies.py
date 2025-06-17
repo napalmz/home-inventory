@@ -100,6 +100,7 @@ def initialize_settings(db: Session):
         "BACKUP_INTERVAL_MINUTES": None,
         "BACKUP_RETENTION": None,  # numero di backup da mantenere
         "BACKUP_LAST_RUN": None,
+        "UI_RECENT_ITEMS_LIMIT": "10",
     }
     for key, value in defaults.items():
         if get_setting(db, key) is None:
