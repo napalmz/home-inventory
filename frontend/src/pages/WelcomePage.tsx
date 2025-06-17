@@ -1,42 +1,97 @@
-import React, { useEffect, useState } from "react";
-import { getApiWelcomeInfo } from "../api";
+import { useEffect, useState } from "react";
+import {
+  getUserInfo,
+  getApiWelcomeInfo,
+  getRecentInventoriesAndChecklists,
+  InventoryOrChecklistRecent,
+  getSetting
+} from "../api";
 
-const WelcomePage: React.FC = () => {
-  const [data, setData] = useState<{
+const WelcomePage = () => {
+  const [welcomeInfo, setWelcomeInfo] = useState<null | {
     title: string;
     message: string;
-    stats?: {
+    stats: {
       total_inventories: number;
       total_inventories_items: number;
       total_checklists: number;
       total_checklists_items: number;
       total_users: number;
     };
-  }>({ title: "", message: "" });
+  }>(null);
+
+  const [recenti, setRecenti] = useState<InventoryOrChecklistRecent[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    getApiWelcomeInfo()
-      .then((json) => setData({
-        title: json.title,
-        message: json.message,
-        stats: json.stats
-      }))
-      .catch(() =>
-        setData({ title: "Errore", message: "Impossibile contattare il server." })
-      );
+    getApiWelcomeInfo().then(setWelcomeInfo);
+
+    getUserInfo()
+      .then(() => {
+        setIsLoggedIn(true);
+        getSetting("UI_RECENT_ITEMS_LIMIT").then((limitSetting) => {
+          const limit = limitSetting?.value && !isNaN(Number(limitSetting.value)) ? Number(limitSetting.value) : 5;
+          getRecentInventoriesAndChecklists(limit).then((data) => {
+            console.log("Dati ricevuti da /recents:", data);
+            setRecenti(data);
+          });
+        });
+      })
+      .catch(() => {
+        setIsLoggedIn(false);
+      });
+
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (
-    <div className="p-8 max-w-3xl mx-auto text-center">
-      <h1 className="text-4xl font-bold mb-4">{data.title || "Benvenuto in Home Inventory"}</h1>
-      <p className="text-lg text-gray-700 dark:text-gray-400">{data.message}</p>
-      {data.stats && (
-        <div className="mt-6 text-sm text-gray-600 dark:text-gray-200 space-y-1">
-          <p>Inventari totali: {data.stats.total_inventories}</p>
-          <p>Item inventari totali: {data.stats.total_inventories_items}</p>
-          <p>Liste totali: {data.stats.total_checklists}</p>
-          <p>Item liste totali: {data.stats.total_checklists_items}</p>
-          <p>Utenti registrati: {data.stats.total_users}</p>
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <h1 className="text-3xl font-bold text-center">{welcomeInfo?.title ?? "Benvenuto"}</h1>
+
+      {welcomeInfo && (
+        <div className="text-gray-700">
+          <p className="mb-2 font-bold">{welcomeInfo.message}</p>
+          {isLoggedIn && recenti.length > 0 && (
+            <div className="bg-white shadow-md border border-gray-200 rounded p-4 mb-6">
+              <h2 className="text-lg font-semibold mb-2">Ultimi inventari e liste usati:</h2>
+              <table className="w-full table-auto text-left text-sm border-collapse">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-3 border-b border-gray-300">#</th>
+                    <th className="p-3 border-b border-gray-300">Nome</th>
+                    <th className="p-3 border-b border-gray-300">Ultima modifica</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recenti.map((rec, idx) => (
+                    <tr
+                      key={`${rec.type}-${rec.id}`}
+                      className={`cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}
+                      onClick={() => window.location.href = `/${rec.type === "INVENTORY" ? "inventories" : "checklists"}/${rec.id}`}
+                    >
+                      <td className="p-3">{idx + 1} {isMobile ? (rec.type === "INVENTORY" ? "📦" : "📝") : (rec.type === "INVENTORY" ? "INV" : "LIS")}</td>
+                      <td className="p-3">{rec.name}</td>
+                      <td className="p-3">{new Date(rec.data_mod).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="mb-2 font-semibold">Statistiche</p>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-2 text-gray-800">
+            <li>Totale inventari: {welcomeInfo.stats.total_inventories}</li>
+            <li>Totale oggetti negli inventari: {welcomeInfo.stats.total_inventories_items}</li>
+            <li>Totale checklist: {welcomeInfo.stats.total_checklists}</li>
+            <li>Totale oggetti nelle checklist: {welcomeInfo.stats.total_checklists_items}</li>
+            <li>Totale utenti: {welcomeInfo.stats.total_users}</li>
+          </ul>
         </div>
       )}
     </div>
