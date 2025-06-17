@@ -491,3 +491,14 @@ export async function updateBackupSchedule(data: {
 export async function triggerScheduledBackup(): Promise<void> {
   await api.post('/backup/schedule/trigger');
 }
+
+// Tipo per recenti inventari e checklist
+export type InventoryOrChecklistRecent = InventoryWithMatches & { type: "INVENTORY" | "CHECKLIST" };
+
+/* RECUPERO RECENTI INVENTARI E CHECKLIST */
+export async function getRecentInventoriesAndChecklists(limit?: number): Promise<InventoryOrChecklistRecent[]> {
+  const response = await api.get<InventoryOrChecklistRecent[]>('/recents', {
+    params: limit ? { limit } : {},
+  });
+  return response.data;
+}
