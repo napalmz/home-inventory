@@ -341,22 +341,25 @@ useEffect(() => {
       
         const rows = csvText.trim().split('\n');
         const [header, ...lines] = rows;
-        const columns = header.split(',').map(c => c.trim().replace(/"/g, ''));
+        //const columns = header.split(',').map(c => c.trim().replace(/"/g, ''));
+        const separator = header.includes(';') ? ';' : ',';
+        const columns = header.split(separator).map(c => c.trim().replace(/"/g, ''));
         const nameIndex = columns.indexOf('name');
         const descIndex = columns.indexOf('description');
         const qtyIndex = columns.indexOf('quantity');
       
-        if (nameIndex === -1 || qtyIndex === -1) {
-          alert('Il CSV deve contenere almeno le colonne "name" e "quantity".');
+        if (nameIndex === -1) {
+          alert('Il CSV deve contenere almeno la colonna "name".');
           return;
         }
       
         const parsedItems = lines.map(line => {
-          const parts = line.split(',').map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          //const parts = line.split(',').map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          const parts = line.split(separator).map(p => p.replace(/^"|"$/g, '').replace(/""/g, '"'));
           return {
             name: parts[nameIndex],
             description: parts[descIndex] || '',
-            quantity: parseInt(parts[qtyIndex], 10) || 0,
+            quantity: qtyIndex >= 0 ? Number(parts[qtyIndex]) || 0 : (isChecklist ? 0 : 1),
             inventory_id: inventory.id
           };
         });
