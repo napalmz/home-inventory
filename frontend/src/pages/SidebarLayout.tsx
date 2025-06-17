@@ -1,6 +1,6 @@
 import { version as frontendVersion } from '../../package.json';
 import { ReactNode, useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
 import { User } from "../types"
@@ -14,7 +14,6 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const [isOpen, setIsOpen] = useState(window.innerWidth >= 768)
   const [user, setUser] = useState<User | null>(null)
   const [apiVersion, setApiVersion] = useState<string | null>(null)
-  const navigate = useNavigate()
 
   const auth = useAuth()
 
@@ -62,11 +61,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
                 logout()
                   .then(() => {
                     setUser(null)
-                    navigate('/')
+                    window.location.href = '/'
                   })
                   .catch(() => {
                     setUser(null)
-                    navigate('/')
+                    window.location.href = '/'
                   })
               }}
               className="text-red-400 text-sm mt-1 block text-left flex items-center gap-1"
