@@ -1,10 +1,10 @@
 import { version as frontendVersion } from '../../package.json';
 import { ReactNode, useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
 import { User } from "../types"
-import { FiLogOut } from 'react-icons/fi'
+import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser } from 'react-icons/fi'
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -54,7 +54,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
             <p className="font-semibold capitalize">Ciao, {user.username}</p>
             <p className="text-sm capitalize text-gray-300">{user.role.name}</p>
             <Link to="/profile" className="text-blue-300 text-sm block mt-1" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
-              Gestione profilo
+              <span className="flex items-center gap-2"><FiUser className="shrink-0"/>Gestione profilo</span>
             </Link>
             <button
               onClick={() => {
@@ -76,28 +76,68 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           </div>
         ) : (
           <Link to="/login" className="block text-blue-300 mb-4" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
-            Login / Registrazione
+            <span className="flex items-center gap-2"><FiLogIn className="shrink-0"/>Login / Registrazione</span>
           </Link>
         )}
 
         <nav className="space-y-2">
-          <Link to="/" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
-            Home
-          </Link>
+          <NavLink
+            to="/"
+            onClick={() => window.innerWidth < 768 && toggleSidebar()}
+            className={({ isActive }) =>
+              `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+              (isActive
+                ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
+                : 'md:px-4 md:py-3')
+            }
+          >
+            <FiCompass className="text-lg shrink-0" />
+            <span>Home</span>
+          </NavLink>
           {user && user.username && (
-            <Link to="/inventories" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
-              Inventari
-            </Link>
+            <NavLink
+              to="/inventories"
+              onClick={() => window.innerWidth < 768 && toggleSidebar()}
+              className={({ isActive }) =>
+                `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+                (isActive
+                  ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
+                  : 'md:px-4 md:py-3')
+              }
+            >
+              <FiBox className="text-lg shrink-0" />
+              <span>Inventari</span>
+            </NavLink>
           )}
           {user && user.username && (
-            <Link to="/checklists" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
-              Liste
-            </Link>
+            <NavLink
+              to="/checklists"
+              onClick={() => window.innerWidth < 768 && toggleSidebar()}
+              className={({ isActive }) =>
+                `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+                (isActive
+                  ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
+                  : 'md:px-4 md:py-3')
+              }
+            >
+              <FiCheckSquare className="text-lg shrink-0" />
+              <span>Liste</span>
+            </NavLink>
           )}
           {user && user.username && user.role?.name === 'admin' && (
-            <Link to="/settings" className="block hover:text-blue-300" onClick={() => window.innerWidth < 768 && toggleSidebar()}>
-              Impostazioni
-            </Link>
+            <NavLink
+              to="/settings"
+              onClick={() => window.innerWidth < 768 && toggleSidebar()}
+              className={({ isActive }) =>
+                `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+                (isActive
+                  ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
+                  : 'md:px-4 md:py-3')
+              }
+            >
+              <FiSettings className="text-lg shrink-0" />
+              <span>Impostazioni</span>
+            </NavLink>
           )}
         </nav>
 

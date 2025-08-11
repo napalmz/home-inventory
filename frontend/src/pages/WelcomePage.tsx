@@ -75,7 +75,7 @@ const WelcomePage = () => {
                       className={`cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}
                       onClick={() => window.location.href = `/${rec.type === "INVENTORY" ? "inventories" : "checklists"}/${rec.id}`}
                     >
-                      <td className="p-3">{idx + 1} {isMobile ? (rec.type === "INVENTORY" ? "📦" : "📝") : (rec.type === "INVENTORY" ? "INV" : "LIS")}</td>
+                      <td className="p-3">{idx + 1} {isMobile ? (rec.type === "INVENTORY" ? "📦" : "📝") : (rec.type === "INVENTORY" ? "📦" : "📝")}</td>
                       <td className="p-3">{rec.name}</td>
                       <td className="p-3">{new Date(rec.data_mod).toLocaleString()}</td>
                     </tr>

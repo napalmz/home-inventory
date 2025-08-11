@@ -281,7 +281,9 @@ export default function InventoryDetailPage() {
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'quantity'>(() => {
     const stored = localStorage.getItem('item_sortBy');
-    if (stored === 'name' || stored === 'date' || stored === 'quantity') return stored;
+    // Migrazione: se era "date" (vecchio default) o non impostato, passa a "name"
+    if (stored === 'name' || stored === 'quantity') return stored as 'name' | 'quantity';
+    localStorage.setItem('item_sortBy', 'name');
     return 'name';
   });
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
