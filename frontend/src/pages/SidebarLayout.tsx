@@ -85,10 +85,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
             to="/"
             onClick={() => window.innerWidth < 768 && toggleSidebar()}
             className={({ isActive }) =>
-              `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+              `flex items-center gap-3 hover:text-blue-300 ` +
               (isActive
-                ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
-                : 'md:px-4 md:py-3')
+                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl px-4 py-3'
+                : 'px-4 py-3')
             }
           >
             <FiCompass className="text-lg shrink-0" />
@@ -99,10 +99,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               to="/inventories"
               onClick={() => window.innerWidth < 768 && toggleSidebar()}
               className={({ isActive }) =>
-                `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+                `flex items-center gap-3 hover:text-blue-300 ` +
                 (isActive
-                  ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
-                  : 'md:px-4 md:py-3')
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl px-4 py-3'
+                  : 'px-4 py-3')
               }
             >
               <FiBox className="text-lg shrink-0" />
@@ -114,10 +114,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               to="/checklists"
               onClick={() => window.innerWidth < 768 && toggleSidebar()}
               className={({ isActive }) =>
-                `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+                `flex items-center gap-3 hover:text-blue-300 ` +
                 (isActive
-                  ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
-                  : 'md:px-4 md:py-3')
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl px-4 py-3'
+                  : 'px-4 py-3')
               }
             >
               <FiCheckSquare className="text-lg shrink-0" />
@@ -129,10 +129,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               to="/settings"
               onClick={() => window.innerWidth < 768 && toggleSidebar()}
               className={({ isActive }) =>
-                `flex items-center gap-3 py-2 hover:text-blue-300 ` +
+                `flex items-center gap-3 hover:text-blue-300 ` +
                 (isActive
-                  ? 'md:bg-gradient-to-r md:from-blue-500 md:to-blue-700 md:text-white md:rounded-xl md:px-4 md:py-3'
-                  : 'md:px-4 md:py-3')
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl px-4 py-3'
+                  : 'px-4 py-3')
               }
             >
               <FiSettings className="text-lg shrink-0" />
