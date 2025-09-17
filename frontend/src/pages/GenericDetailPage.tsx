@@ -165,7 +165,7 @@ export function SwipeableItemRow({
           <div className="flex flex-col">
             <div className="font-semibold">{item.name}</div>
             {item.description && (
-              <div className="text-sm text-gray-500">{item.description}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-200">{item.description}</div>
             )}
             <div className="text-xs text-gray-400">
               Ultima modifica: {item.username_mod} - {new Date(item.data_mod).toLocaleString()}

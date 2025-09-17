@@ -55,13 +55,13 @@ const WelcomePage = () => {
       <h1 className="text-3xl font-bold text-center">{welcomeInfo?.title ?? "Benvenuto"}</h1>
 
       {welcomeInfo && (
-        <div className="text-gray-700">
+        <div className="text-gray-700 dark:text-gray-300">
           <p className="mb-2 font-bold">{welcomeInfo.message}</p>
           {isLoggedIn && recenti.length > 0 && (
-            <div className="bg-white shadow-md border border-gray-200 rounded p-4 mb-6">
+            <div className="bg-white dark:bg-black shadow-md border border-gray-200 rounded p-4 mb-6">
               <h2 className="text-lg font-semibold mb-2">Ultimi inventari e liste usati:</h2>
               <table className="w-full table-auto text-left text-sm border-collapse">
-                <thead className="bg-gray-100">
+                <thead className="bg-gray-100 dark:bg-gray-800">
                   <tr>
                     <th className="p-3 border-b border-gray-300">#</th>
                     <th className="p-3 border-b border-gray-300">Nome</th>
@@ -72,7 +72,7 @@ const WelcomePage = () => {
                   {recenti.map((rec, idx) => (
                     <tr
                       key={`${rec.type}-${rec.id}`}
-                      className={`cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}
+                      className={`cursor-pointer ${idx % 2 === 0 ? 'bg-white dark:bg-black' : 'bg-gray-50 dark:bg-gray-900'} hover:bg-gray-100 dark:hover:bg-gray-700`}
                       onClick={() => window.location.href = `/${rec.type === "INVENTORY" ? "inventories" : "checklists"}/${rec.id}`}
                     >
                       <td className="p-3">{idx + 1} {isMobile ? (rec.type === "INVENTORY" ? "📦" : "📝") : (rec.type === "INVENTORY" ? "📦" : "📝")}</td>
@@ -85,7 +85,7 @@ const WelcomePage = () => {
             </div>
           )}
           <p className="mb-2 font-semibold">Statistiche</p>
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-2 text-gray-800">
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-2 text-gray-800 dark:text-gray-200">
             <li>Totale inventari: {welcomeInfo.stats.total_inventories}</li>
             <li>Totale oggetti negli inventari: {welcomeInfo.stats.total_inventories_items}</li>
             <li>Totale checklist: {welcomeInfo.stats.total_checklists}</li>

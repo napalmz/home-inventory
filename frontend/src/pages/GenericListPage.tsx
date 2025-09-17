@@ -435,7 +435,7 @@ export default function GenericListPage() {
                 <div className="flex justify-between items-center w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow">
                     <h2 className={`text-lg font-semibold ${selectedItems.includes(inv.id) ? "dark:text-black" : "" }`}>{inv.name}</h2>
-                    <p className="text-sm text-gray-500 sm:ml-4 text-right sm:text-right w-full sm:w-auto">
+                    <p className="text-sm text-gray-500 dark:ext-gray-300 sm:ml-4 text-right sm:text-right w-full sm:w-auto">
                       Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
                     </p>
                     {(user?.role.name === 'admin' || user?.role.name === 'moderator') && (
@@ -472,7 +472,7 @@ export default function GenericListPage() {
                   {inv.matching_items && inv.matching_items.length > 0 && (
                     <div className="mt-2 p-2 border rounded bg-yellow-50">
                       <p className="text-xs font-medium text-gray-700">Corrispondenze trovate:</p>
-                      <ul className="text-sm list-disc list-inside">
+                      <ul className="text-sm list-disc list-inside dark:text-black">
                         {inv.matching_items.map((item: {
                           id: number;
                           name: string;
