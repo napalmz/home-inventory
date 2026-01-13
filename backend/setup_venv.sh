@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-VENV_DIR="venv"
+VENV_DIR=".venv"
 REQ_FILE="requirements.txt"
 
 # 1. crea venv se mancante
