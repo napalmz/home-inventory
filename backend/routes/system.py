@@ -15,6 +15,7 @@ class VersionResponse(BaseModel):
 ##################################################
 # Modello per la risposta all'HEALTHCHECK dell'API
 class HealthCheckResponse(BaseModel):
+    status: str
     version: str
 
 #################################################
