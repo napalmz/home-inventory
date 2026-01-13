@@ -41,5 +41,5 @@ RUN mkdir -p /app/backups && chmod 777 /app/backups
 # Comando per avviare l'API
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-  CMD curl -fs http://localhost:8000/system/version || exit 1
+HEALTHCHECK --interval=60s --timeout=5s --retries=3 \
+  CMD curl -fs http://localhost:8000/system/health-check || exit 1
