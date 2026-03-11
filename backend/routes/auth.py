@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from models import User, RoleEnum, Role
 from schemas import UserCreateSelf, Token, UserResponse, UserSelfUpdate
 from passlib.context import CryptContext
-from jose import jwt, JWTError
+import jwt
 import datetime
 import os
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -108,8 +108,8 @@ def get_current_user_info(request: Request, db: Session = Depends(get_db)):
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username: str = payload.get("sub")
             if not username:
-                raise JWTError()
-        except JWTError:
+                raise jwt.InvalidTokenError()
+        except jwt.InvalidTokenError:
             username = None
     else:
         username = None

@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, Se
 from database import SessionLocal, Session
 from models import User, RoleEnum, Role
 from crud import get_setting, set_setting
-from jose import jwt
+import jwt
 import os
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -78,7 +78,7 @@ def get_current_user(security_scopes: SecurityScopes,
         if user.is_blocked:  # ✅ Blocca l'accesso agli utenti disabilitati
             raise HTTPException(status_code=403, detail="Utente bloccato. Accesso negato.")
         return user
-    except jwt.PyJWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido")
 
 # Funzione per verificare il ruolo dell'utente

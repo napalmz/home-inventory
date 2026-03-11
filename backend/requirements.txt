@@ -4,8 +4,7 @@ sqlalchemy
 psycopg2-binary
 python-dotenv
 passlib
-jwt
 python-multipart
-python-jose
+PyJWT[crypto]
 alembic
 apscheduler
