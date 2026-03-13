@@ -5,6 +5,7 @@ import UserManagementPage from "./settings/UserManagementPage";
 import GroupManagementPage from "./settings/GroupManagementPage";
 //import InfoPage from "./settings/InfoPage";
 import BackupManagementPage from "./settings/BackupManagementPage";
+import AuditLogPage from "./settings/AuditLogPage";
 
 const tabs = [
   { name: "Generale", component: <GeneralSettings /> },
@@ -12,6 +13,7 @@ const tabs = [
   //{ name: "Ruoli", component: <RoleManagementPage /> },
   { name: "Gruppi", component: <GroupManagementPage /> },
   { name: "Backup", component: <BackupManagementPage /> },
+  { name: "Audit", component: <AuditLogPage /> },
   //{ name: "Info", component: <InfoPage /> },
 ];
 

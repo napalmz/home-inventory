@@ -5,6 +5,7 @@ import {
   downloadBackup,
   deleteBackup,
   restoreBackup,
+  restoreBackupGuided,
   uploadBackup,
   getBackupSchedule,
   getSetting
@@ -12,7 +13,20 @@ import {
 import BackupScheduleManager from "./BackupScheduleManager";
 
 export default function BackupManagementPage() {
-  const [backups, setBackups] = useState<{ filename: string; size: number; modified: string }[]>([]);
+  const [backups, setBackups] = useState<{
+    filename: string;
+    size: number;
+    modified: string;
+    has_metadata?: boolean;
+    db_alembic_version?: string | null;
+    current_db_alembic_version?: string | null;
+    restorable_on_current_db?: boolean;
+    metadata?: {
+      format?: string;
+      created_at?: string;
+      db_alembic_version?: string;
+    } | null;
+  }[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
@@ -31,6 +45,17 @@ export default function BackupManagementPage() {
   const [backupTypeFilter, setBackupTypeFilter] = useState<"all" | "manual" | "auto">("all");
   const [sortField, setSortField] = useState<"filename" | "modified" | "size">("modified");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [restoreTarget, setRestoreTarget] = useState<{
+    filename: string;
+    metadata?: {
+      format?: string;
+      created_at?: string;
+      db_alembic_version?: string;
+    } | null;
+    db_alembic_version?: string | null;
+    current_db_alembic_version?: string | null;
+    restorable_on_current_db?: boolean;
+  } | null>(null);
 
   useEffect(() => {
     fetchBackups();
@@ -83,7 +108,24 @@ export default function BackupManagementPage() {
     setLoading(true);
     try {
       const data = await listBackups();
-      setBackups((data as { filename: string; size: number; modified: string }[]).sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime()));
+      setBackups(
+        (
+          data as {
+            filename: string;
+            size: number;
+            modified: string;
+            has_metadata?: boolean;
+            db_alembic_version?: string | null;
+            current_db_alembic_version?: string | null;
+            restorable_on_current_db?: boolean;
+            metadata?: {
+              format?: string;
+              created_at?: string;
+              db_alembic_version?: string;
+            } | null;
+          }[]
+        ).sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime())
+      );
     } catch (error) {
       console.error("Errore nel caricamento dei backup:", error);
     } finally {
@@ -156,11 +198,10 @@ export default function BackupManagementPage() {
   };
 
   const restoreBackupLocal = async (filename: string) => {
-    if (!window.confirm(`Sei sicuro di voler ripristinare il backup ${filename}? Verranno sovrascritti i dati attuali.`)) return;
     setLoading(true);
     try {
       await restoreBackup(filename);
-      setMessage("Backup ripristinato con successo!");
+      setMessage("Ripristino base avviato con successo!");
       setMessageType("success");
     } catch (error) {
       console.error("Errore nel ripristino del backup:", error);
@@ -169,6 +210,53 @@ export default function BackupManagementPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const restoreBackupAdvancedLocal = async (filename: string) => {
+    const overwriteUsersRoles = window.confirm("Vuoi sovrascrivere anche utenti e ruoli?");
+    const overwriteSettings = window.confirm("Vuoi sovrascrivere anche i settings?");
+
+    let overwriteAdmin = false;
+    if (overwriteUsersRoles) {
+      overwriteAdmin = window.confirm("Per sovrascrivere utenti/ruoli devi sovrascrivere anche admin. Confermi?");
+      if (!overwriteAdmin) {
+        setMessage("Ripristino avanzato annullato: senza sovrascrivere admin non è possibile sovrascrivere utenti/ruoli.");
+        setMessageType("error");
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      await restoreBackupGuided(filename, {
+        mode: "advanced",
+        overwrite_users_roles: overwriteUsersRoles,
+        overwrite_settings: overwriteSettings,
+        overwrite_admin: overwriteAdmin,
+      });
+      setMessage("Ripristino avanzato avviato con successo!");
+      setMessageType("success");
+    } catch (error) {
+      console.error("Errore nel ripristino avanzato:", error);
+      setMessage("Errore nel ripristino avanzato.");
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreBaseFromModal = async () => {
+    if (!restoreTarget) return;
+    if (!window.confirm(`Confermi il ripristino BASE del backup ${restoreTarget.filename}?`)) return;
+    await restoreBackupLocal(restoreTarget.filename);
+    setRestoreTarget(null);
+  };
+
+  const handleRestoreAdvancedFromModal = async () => {
+    if (!restoreTarget) return;
+    if (!window.confirm(`Confermi il ripristino AVANZATO del backup ${restoreTarget.filename}?`)) return;
+    await restoreBackupAdvancedLocal(restoreTarget.filename);
+    setRestoreTarget(null);
   };
 
   const giorniSettimana = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
@@ -322,6 +410,34 @@ export default function BackupManagementPage() {
                   <div className="text-sm text-gray-600">
                     {(backup.size / 1024).toFixed(2)} KB - {new Date(backup.modified).toLocaleString()}
                   </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 space-y-1">
+                    <div>
+                      <span className="font-semibold">Formato:</span>{" "}
+                      {backup.metadata?.format || (backup.has_metadata ? "n/d" : "legacy/no-metadata")}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Revisione backup:</span>{" "}
+                      {backup.db_alembic_version || "n/d"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Revisione DB corrente:</span>{" "}
+                      {backup.current_db_alembic_version || "n/d"}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Ripristinabile:</span>{" "}
+                      {backup.restorable_on_current_db ? (
+                        <span className="text-green-700 dark:text-green-400 font-semibold">SI</span>
+                      ) : (
+                        <span className="text-red-700 dark:text-red-400 font-semibold">NO</span>
+                      )}
+                    </div>
+                    {backup.metadata?.created_at && (
+                      <div>
+                        <span className="font-semibold">Creato (meta):</span>{" "}
+                        {new Date(backup.metadata.created_at).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 mt-2 sm:mt-0">
                   <button
@@ -331,7 +447,15 @@ export default function BackupManagementPage() {
                     Scarica
                   </button>
                   <button
-                    onClick={() => restoreBackupLocal(backup.filename)}
+                    onClick={() =>
+                      setRestoreTarget({
+                        filename: backup.filename,
+                        metadata: backup.metadata,
+                        db_alembic_version: backup.db_alembic_version,
+                        current_db_alembic_version: backup.current_db_alembic_version,
+                        restorable_on_current_db: backup.restorable_on_current_db,
+                      })
+                    }
                     className="px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                   >
                     Ripristina
@@ -363,6 +487,62 @@ export default function BackupManagementPage() {
                 className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
               >
                 Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restoreTarget && (
+        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 p-4 rounded shadow w-full max-w-xl space-y-4">
+            <h3 className="text-lg font-semibold">Ripristino backup</h3>
+            <p className="text-sm break-all">
+              <span className="font-semibold">File:</span> {restoreTarget.filename}
+            </p>
+
+            <div className="text-sm space-y-1 border rounded p-3 bg-gray-50 dark:bg-gray-800">
+              <p>
+                <span className="font-semibold">Formato:</span> {restoreTarget.metadata?.format || "n/d"}
+              </p>
+              <p>
+                <span className="font-semibold">Revisione backup:</span> {restoreTarget.db_alembic_version || "n/d"}
+              </p>
+              <p>
+                <span className="font-semibold">Revisione DB corrente:</span> {restoreTarget.current_db_alembic_version || "n/d"}
+              </p>
+              <p>
+                <span className="font-semibold">Creato (meta):</span>{" "}
+                {restoreTarget.metadata?.created_at ? new Date(restoreTarget.metadata.created_at).toLocaleString() : "n/d"}
+              </p>
+              <p>
+                <span className="font-semibold">Ripristinabile:</span>{" "}
+                {restoreTarget.restorable_on_current_db ? (
+                  <span className="text-green-700 dark:text-green-400 font-semibold">SI</span>
+                ) : (
+                  <span className="text-red-700 dark:text-red-400 font-semibold">NO</span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                onClick={handleRestoreBaseFromModal}
+                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Base
+              </button>
+              <button
+                onClick={handleRestoreAdvancedFromModal}
+                className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Avanzato
+              </button>
+              <button
+                onClick={() => setRestoreTarget(null)}
+                className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+              >
+                Annulla
               </button>
             </div>
           </div>

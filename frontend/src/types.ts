@@ -23,6 +23,7 @@ export interface Inventory {
     data_mod: string;
     user_ins: number | null;
     user_mod: number | null;
+    version_num: number;
 }
 
 export interface InventoryItem {
@@ -37,6 +38,7 @@ export interface InventoryItem {
     username_mod: string | null;
     data_ins: string;
     data_mod: string;
+    version_num: number;
 }
 
 export interface Checklist {
@@ -48,6 +50,7 @@ export interface Checklist {
     data_mod: string;
     user_ins: number | null;
     user_mod: number | null;
+    version_num: number;
 }
 
 export interface ChecklistItem {
@@ -62,6 +65,7 @@ export interface ChecklistItem {
     username_mod: string | null;
     data_ins: string;
     data_mod: string;
+    version_num: number;
 }
 
 export interface Item {
@@ -75,6 +79,37 @@ export interface Item {
     username_mod: string | null;
     data_ins: string;
     data_mod: string;
+    version_num: number;
+}
+
+export interface ItemVersion {
+    id: number;
+    item_id: number;
+    inventory_id: number;
+    name: string;
+    description: string | null;
+    quantity: number | null;
+    version_num: number;
+    operation: "CREATE" | "UPDATE" | "DELETE";
+    changed_at: string;
+    changed_by_id: number | null;
+    changed_by_username: string | null;
+    diff: string | null;
+}
+
+export interface InventoryVersion {
+    id: number;
+    inventory_id: number;
+    name: string;
+    type: string;
+    owner_id: number | null;
+    owner_username: string | null;
+    version_num: number;
+    operation: "CREATE" | "UPDATE" | "DELETE";
+    changed_at: string;
+    changed_by_id: number | null;
+    changed_by_username: string | null;
+    diff: string | null;
 }
 
 export interface InventoryWithMatches extends Inventory {

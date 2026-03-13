@@ -433,8 +433,13 @@ export default function GenericListPage() {
             > 
               {editMode ? (
                 <div className="flex justify-between items-center w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow">
-                    <h2 className={`text-lg font-semibold ${selectedItems.includes(inv.id) ? "dark:text-black" : "" }`}>{inv.name}</h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow gap-2">
+                    <div className="flex items-center gap-2">
+                      <h2 className={`text-lg font-semibold ${selectedItems.includes(inv.id) ? "dark:text-black" : "" }`}>{inv.name}</h2>
+                      <span className="text-xs font-mono bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">
+                        v{inv.version_num}
+                      </span>
+                    </div>
                     <p className="text-sm text-gray-500 dark:ext-gray-300 sm:ml-4 text-right sm:text-right w-full sm:w-auto">
                       Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
                     </p>
@@ -464,8 +469,13 @@ export default function GenericListPage() {
                   </button>
                 </div>
               ) : (
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow">
-                  <h2 className="text-lg font-semibold">{inv.name}</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-grow gap-2">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{inv.name}</h2>
+                    <span className="text-xs font-mono bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">
+                      v{inv.version_num}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-500 sm:ml-4">
                     Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
                   </p>

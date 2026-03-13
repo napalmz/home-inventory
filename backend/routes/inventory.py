@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from dependencies import get_db
-from models import User, Inventory, Item, SharedInventory, Group, SharedInventoryGroup, RoleEnum
-from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, UserResponse, InventoryResponseWithItemCount
+from models import User, Inventory, Item, SharedInventory, Group, SharedInventoryGroup, RoleEnum, InventoryVersion, ItemVersion
+from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, UserResponse, InventoryResponseWithItemCount, InventoryVersionResponse, VersionBulkDeleteRequest
 from routes.auth import get_current_user
 from typing import List
 import re
+import json
+from datetime import datetime, timezone
 
 #router = APIRouter()
 inventory_router = APIRouter() # INVENTORY_TYPE = "INVENTORY"
@@ -40,6 +43,63 @@ def can_access_inventory(user: User, inventory: Inventory, action: str = "view")
                 return True
 
     return False
+
+#############################################################################
+# Helper per versioning inventario
+#############################################################################
+def _snapshot_inventory(inv: Inventory) -> dict:
+    return {
+        "name": inv.name,
+        "type": inv.type,
+        "owner_id": inv.owner_id,
+    }
+
+def _next_inventory_version_num(db: Session, inventory_id: int) -> int:
+    last = db.query(func.max(InventoryVersion.version_num)).filter(
+        InventoryVersion.inventory_id == inventory_id
+    ).scalar()
+    return (last or 0) + 1
+
+def _write_inventory_version(
+    db: Session, inv: Inventory, operation: str, user: User, old_snapshot: dict = None
+) -> None:
+    diff: dict = {}
+    if old_snapshot and operation == "UPDATE":
+        new_snapshot = _snapshot_inventory(inv)
+        for key, new_val in new_snapshot.items():
+            old_val = old_snapshot.get(key)
+            if old_val != new_val:
+                diff[key] = {"from": old_val, "to": new_val}
+
+    version = InventoryVersion(
+        inventory_id=inv.id,
+        name=inv.name,
+        type=inv.type,
+        owner_id=inv.owner_id,
+        owner_username=inv.owner.username if inv.owner else None,
+        version_num=_next_inventory_version_num(db, inv.id),
+        operation=operation,
+        changed_by_id=user.id,
+        changed_by_username=user.username,
+        diff=json.dumps(diff) if diff else None,
+    )
+    db.add(version)
+
+def _build_inventory_response(db: Session, inv: Inventory) -> InventoryResponse:
+    current_version = db.query(func.max(InventoryVersion.version_num)).filter(
+        InventoryVersion.inventory_id == inv.id
+    ).scalar() or 0
+    resp = InventoryResponse.model_validate(inv)
+    resp.version_num = current_version
+    return resp
+
+def _current_item_version_num(db: Session, item_id: int) -> int:
+    return (
+        db.query(func.max(ItemVersion.version_num))
+        .filter(ItemVersion.item_id == item_id)
+        .scalar()
+        or 0
+    )
 
 #############################################################################
 # Lista degli inventari visibili all'utente
@@ -91,7 +151,7 @@ def list_inventories_base(
 
         result.append({
             **InventoryResponseWithItemCount(
-                **InventoryResponse.model_validate(inv).model_dump(),
+                **_build_inventory_response(db, inv).model_dump(),
                 item_count=len(inv.items)
             ).model_dump(),
             "matching_items": matching_items if filtro else None
@@ -107,10 +167,14 @@ def create_inventory_base(
     user: User = Depends(get_current_user)
 ):
     new_inventory = Inventory(name=inventory.name, owner_id=user.id, type=inventory_type)
+    new_inventory.user_ins = user.id
+    new_inventory.user_mod = user.id
     db.add(new_inventory)
+    db.flush()  # ottieni new_inventory.id
+    _write_inventory_version(db, new_inventory, "CREATE", user)
     db.commit()
     db.refresh(new_inventory)
-    return InventoryResponse.model_validate(new_inventory)  # Converti il modello SQLAlchemy in Pydantic
+    return _build_inventory_response(db, new_inventory)
 
 # Aggiornamento inventario
 def update_inventory_base(
@@ -126,10 +190,14 @@ def update_inventory_base(
     if not can_access_inventory(user, inventory, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
 
+    old_snapshot = _snapshot_inventory(inventory)
     inventory.name = update.name
+    inventory.user_mod = user.id
+    inventory.data_mod = datetime.now(timezone.utc)
+    _write_inventory_version(db, inventory, "UPDATE", user, old_snapshot)
     db.commit()
     db.refresh(inventory)
-    return InventoryResponse.model_validate(inventory)
+    return _build_inventory_response(db, inventory)
 
 # Eliminazione inventario
 def delete_inventory_base(
@@ -144,6 +212,7 @@ def delete_inventory_base(
     if not can_access_inventory(user, inventory, action="delete"):
         raise HTTPException(status_code=403, detail="Accesso negato")
 
+    _write_inventory_version(db, inventory, "DELETE", user)  # registra prima della delete
     db.delete(inventory)
     db.commit()
     return {"detail": "Inventario eliminato"}
@@ -170,6 +239,7 @@ def list_items_base(
             **item.__dict__,
             username_ins=item.user_ins_rel.username if item.user_ins_rel else None,
             username_mod=item.user_mod_rel.username if item.user_mod_rel else None,
+            version_num=_current_item_version_num(db, item.id),
         )
         for item in inventory.items
     ]
@@ -457,7 +527,7 @@ def get_by_id_base(
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     return InventoryResponseWithItemCount(
-        **InventoryResponse.model_validate(inventory).model_dump(),
+        **_build_inventory_response(db, inventory).model_dump(),
         item_count=len(inventory.items)
     )
 
@@ -904,4 +974,258 @@ def get_checklist_by_id(
         db=db,
         user=user
     )
+
 #############################################################################
+# Cronologia versioni inventario
+@inventory_router.get("/{inventory_id}/history", response_model=List[InventoryVersionResponse])
+def get_inventory_history(inventory_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # Se l'inventario esiste ancora, verifica i permessi
+    inv = db.query(Inventory).filter_by(id=inventory_id, type="INVENTORY").first()
+    if inv:
+        if not can_access_inventory(user, inv, action="view"):
+            raise HTTPException(status_code=403, detail="Accesso negato")
+    else:
+        latest = (
+            db.query(InventoryVersion)
+            .filter(InventoryVersion.inventory_id == inventory_id)
+            .order_by(InventoryVersion.version_num.desc())
+            .first()
+        )
+        if latest and user.role.name != "admin" and latest.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="Accesso negato")
+
+    versions = (
+        db.query(InventoryVersion)
+        .filter(InventoryVersion.inventory_id == inventory_id)
+        .order_by(InventoryVersion.version_num.asc())
+        .all()
+    )
+    return versions
+
+# Cronologia versioni checklist
+@checklist_router.get("/{inventory_id}/history", response_model=List[InventoryVersionResponse])
+def get_checklist_history(inventory_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    inv = db.query(Inventory).filter_by(id=inventory_id, type="CHECKLIST").first()
+    if inv:
+        if not can_access_inventory(user, inv, action="view"):
+            raise HTTPException(status_code=403, detail="Accesso negato")
+    else:
+        latest = (
+            db.query(InventoryVersion)
+            .filter(InventoryVersion.inventory_id == inventory_id)
+            .order_by(InventoryVersion.version_num.desc())
+            .first()
+        )
+        if latest and user.role.name != "admin" and latest.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="Accesso negato")
+
+    versions = (
+        db.query(InventoryVersion)
+        .filter(InventoryVersion.inventory_id == inventory_id)
+        .order_by(InventoryVersion.version_num.asc())
+        .all()
+    )
+    return versions
+
+#############################################################################
+# Rollback a una versione precedente
+@inventory_router.post("/{inventory_id}/rollback/{version_num}", response_model=InventoryResponse)
+def rollback_inventory(
+    inventory_id: int,
+    version_num: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    target = db.query(InventoryVersion).filter(
+        InventoryVersion.inventory_id == inventory_id,
+        InventoryVersion.version_num == version_num,
+    ).first()
+    if not target or target.operation == "DELETE":
+        raise HTTPException(status_code=400, detail="Versione non valida per il rollback")
+
+    inv = db.query(Inventory).filter_by(id=inventory_id, type="INVENTORY").first()
+
+    # Ripristino di inventario cancellato
+    if not inv:
+        if target.type != "INVENTORY":
+            raise HTTPException(status_code=400, detail="Versione non compatibile")
+        if user.role.name == "viewer":
+            raise HTTPException(status_code=403, detail="Accesso negato")
+        if user.role.name != "admin" and target.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="Accesso negato")
+
+        restored = Inventory(
+            id=inventory_id,
+            name=target.name,
+            type="INVENTORY",
+            owner_id=target.owner_id or user.id,
+            user_ins=user.id,
+            user_mod=user.id,
+            data_mod=datetime.now(timezone.utc),
+        )
+        db.add(restored)
+        db.flush()
+        _write_inventory_version(db, restored, "CREATE", user)
+        db.commit()
+        db.refresh(restored)
+        return _build_inventory_response(db, restored)
+
+    if not can_access_inventory(user, inv, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
+
+    old_snapshot = _snapshot_inventory(inv)
+    inv.name = target.name
+    inv.user_mod = user.id
+    inv.data_mod = datetime.now(timezone.utc)
+    _write_inventory_version(db, inv, "UPDATE", user, old_snapshot)
+    db.commit()
+    db.refresh(inv)
+    return _build_inventory_response(db, inv)
+
+# Rollback checklist
+@checklist_router.post("/{inventory_id}/rollback/{version_num}", response_model=InventoryResponse)
+def rollback_checklist(
+    inventory_id: int,
+    version_num: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    target = db.query(InventoryVersion).filter(
+        InventoryVersion.inventory_id == inventory_id,
+        InventoryVersion.version_num == version_num,
+    ).first()
+    if not target or target.operation == "DELETE":
+        raise HTTPException(status_code=400, detail="Versione non valida per il rollback")
+
+    inv = db.query(Inventory).filter_by(id=inventory_id, type="CHECKLIST").first()
+
+    # Ripristino di checklist cancellata
+    if not inv:
+        if target.type != "CHECKLIST":
+            raise HTTPException(status_code=400, detail="Versione non compatibile")
+        if user.role.name == "viewer":
+            raise HTTPException(status_code=403, detail="Accesso negato")
+        if user.role.name != "admin" and target.owner_id != user.id:
+            raise HTTPException(status_code=403, detail="Accesso negato")
+
+        restored = Inventory(
+            id=inventory_id,
+            name=target.name,
+            type="CHECKLIST",
+            owner_id=target.owner_id or user.id,
+            user_ins=user.id,
+            user_mod=user.id,
+            data_mod=datetime.now(timezone.utc),
+        )
+        db.add(restored)
+        db.flush()
+        _write_inventory_version(db, restored, "CREATE", user)
+        db.commit()
+        db.refresh(restored)
+        return _build_inventory_response(db, restored)
+
+    if not can_access_inventory(user, inv, action="edit"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
+
+    old_snapshot = _snapshot_inventory(inv)
+    inv.name = target.name
+    inv.user_mod = user.id
+    inv.data_mod = datetime.now(timezone.utc)
+    _write_inventory_version(db, inv, "UPDATE", user, old_snapshot)
+    db.commit()
+    db.refresh(inv)
+    return _build_inventory_response(db, inv)
+
+
+#############################################################################
+# Pulizia cronologia versioni inventario/checklist (solo admin)
+@inventory_router.delete("/{inventory_id}/history/{version_num}")
+def delete_inventory_history_version(
+    inventory_id: int,
+    version_num: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if user.role.name != "admin":
+        raise HTTPException(status_code=403, detail="Solo admin può cancellare versioni")
+
+    deleted = (
+        db.query(InventoryVersion)
+        .filter(InventoryVersion.inventory_id == inventory_id, InventoryVersion.version_num == version_num, InventoryVersion.type == "INVENTORY")
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail="Versione non trovata")
+    return {"detail": "Versione eliminata", "deleted": deleted}
+
+
+@inventory_router.post("/{inventory_id}/history/delete")
+def delete_inventory_history_versions(
+    inventory_id: int,
+    payload: VersionBulkDeleteRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if user.role.name != "admin":
+        raise HTTPException(status_code=403, detail="Solo admin può cancellare versioni")
+    if not payload.version_nums:
+        raise HTTPException(status_code=400, detail="Nessuna versione selezionata")
+
+    deleted = (
+        db.query(InventoryVersion)
+        .filter(
+            InventoryVersion.inventory_id == inventory_id,
+            InventoryVersion.type == "INVENTORY",
+            InventoryVersion.version_num.in_(payload.version_nums),
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"detail": "Pulizia cronologia completata", "deleted": deleted}
+
+
+@checklist_router.delete("/{inventory_id}/history/{version_num}")
+def delete_checklist_history_version(
+    inventory_id: int,
+    version_num: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if user.role.name != "admin":
+        raise HTTPException(status_code=403, detail="Solo admin può cancellare versioni")
+
+    deleted = (
+        db.query(InventoryVersion)
+        .filter(InventoryVersion.inventory_id == inventory_id, InventoryVersion.version_num == version_num, InventoryVersion.type == "CHECKLIST")
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail="Versione non trovata")
+    return {"detail": "Versione eliminata", "deleted": deleted}
+
+
+@checklist_router.post("/{inventory_id}/history/delete")
+def delete_checklist_history_versions(
+    inventory_id: int,
+    payload: VersionBulkDeleteRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if user.role.name != "admin":
+        raise HTTPException(status_code=403, detail="Solo admin può cancellare versioni")
+    if not payload.version_nums:
+        raise HTTPException(status_code=400, detail="Nessuna versione selezionata")
+
+    deleted = (
+        db.query(InventoryVersion)
+        .filter(
+            InventoryVersion.inventory_id == inventory_id,
+            InventoryVersion.type == "CHECKLIST",
+            InventoryVersion.version_num.in_(payload.version_nums),
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"detail": "Pulizia cronologia completata", "deleted": deleted}

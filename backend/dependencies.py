@@ -101,6 +101,7 @@ def initialize_settings(db: Session):
         "BACKUP_RETENTION": None,  # numero di backup da mantenere
         "BACKUP_LAST_RUN": None,
         "UI_RECENT_ITEMS_LIMIT": "10",
+        "AUDIT_RETENTION_DAYS": "90",  # giorni prima di pulire le versioni storiche
     }
     for key, value in defaults.items():
         if get_setting(db, key) is None:

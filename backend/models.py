@@ -168,3 +168,47 @@ class Setting(Base, LoggingData):
     key = Column(String, primary_key=True)
     value = Column(String)
     protected = Column(Boolean, default=False)  # ← nuovo campo
+
+################################################
+# Shadow table: versioni storiche degli item
+class ItemVersion(Base):
+    __tablename__ = "item_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_id = Column(Integer, nullable=False, index=True)       # no FK → sopravvive alla delete
+    inventory_id = Column(Integer, nullable=False, index=True)  # snapshot del contesto
+    # snapshot del record al momento dell'azione
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    quantity = Column(Integer, nullable=True)
+    # metadati versione
+    version_num = Column(Integer, nullable=False)
+    operation = Column(String(16), nullable=False)               # CREATE | UPDATE | DELETE
+    changed_at = Column(DateTime, server_default=func.now(), nullable=False)
+    changed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_by_username = Column(String, nullable=True)
+    diff = Column(String, nullable=True)                         # JSON: {"field": {"from": v, "to": v}}
+
+    changed_by = relationship("User", foreign_keys=[changed_by_id])
+
+################################################
+# Shadow table: versioni storiche degli inventari/liste
+class InventoryVersion(Base):
+    __tablename__ = "inventory_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    inventory_id = Column(Integer, nullable=False, index=True)   # no FK → sopravvive alla delete
+    # snapshot
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)
+    owner_id = Column(Integer, nullable=True)
+    owner_username = Column(String, nullable=True)
+    # metadati versione
+    version_num = Column(Integer, nullable=False)
+    operation = Column(String(16), nullable=False)               # CREATE | UPDATE | DELETE
+    changed_at = Column(DateTime, server_default=func.now(), nullable=False)
+    changed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_by_username = Column(String, nullable=True)
+    diff = Column(String, nullable=True)                         # JSON
+
+    changed_by = relationship("User", foreign_keys=[changed_by_id])

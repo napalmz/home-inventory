@@ -9,6 +9,7 @@ import { Dialog } from "@headlessui/react";
 import { useContext } from "react";
 import { AuthContext } from "../auth-context";
 import { useSwipeable } from 'react-swipeable';
+import { HistoryModal } from "../components/HistoryModal";
 
 interface Props {
   item: Item;
@@ -32,6 +33,7 @@ export function SwipeableItemRow({
   updateItem, deleteItem, setItems, setIsCloning, 
 }: Props) {
   const [action, setAction] = useState<'left' | 'right' | null>(null);
+  const [isItemHistoryOpen, setIsItemHistoryOpen] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
 
   // Gestione click fuori per chiudere i pulsanti swipe
@@ -163,7 +165,12 @@ export function SwipeableItemRow({
             </div>
           )}
           <div className="flex flex-col">
-            <div className="font-semibold">{item.name}</div>
+            <div className="font-semibold flex items-center gap-2">
+              <span>{item.name}</span>
+              <span className="text-xs font-mono bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">
+                v{item.version_num}
+              </span>
+            </div>
             {item.description && (
               <div className="text-sm text-gray-500 dark:text-gray-200">{item.description}</div>
             )}
@@ -173,6 +180,17 @@ export function SwipeableItemRow({
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
+          <button
+            className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 whitespace-nowrap"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsItemHistoryOpen(true);
+            }}
+            title="Visualizza cronologia item"
+          >
+            <span className="inline md:hidden">🕓</span>
+            <span className="hidden md:inline">Cronologia</span>
+          </button>
           {isEditMode && !isViewer && (
             <>
               <button
@@ -254,6 +272,19 @@ export function SwipeableItemRow({
           )}
         </div>
       </li>
+
+      <HistoryModal
+        isOpen={isItemHistoryOpen}
+        onClose={() => setIsItemHistoryOpen(false)}
+        onRollback={async () => {
+          const getItems = isInventory ? getInventoryItems : getChecklistItems;
+          const refreshed = await getItems(item.inventory_id);
+          if (refreshed) setItems(refreshed as Item[]);
+        }}
+        entityType="item"
+        entityId={item.id}
+        entityName={item.name}
+      />
     </div>
   );
 }
@@ -294,6 +325,7 @@ export default function InventoryDetailPage() {
   const [itemBeingEdited, setItemBeingEdited] = useState<Item | null>(null);
   const filtroParam = filterText;
   const [isCloning, setIsCloning] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
 useEffect(() => {
   const fetchData = async () => {
@@ -403,11 +435,23 @@ useEffect(() => {
         </Link>
         {inventory && (
           <>
-            <h2 className="text-xl font-bold">
-              {isChecklist ? "Lista: " : "Inventario: "}
-              {inventory.name}
-            </h2>
-            <p className="text-sm text-gray-600 mb-2">
+            <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                {isChecklist ? "Lista: " : "Inventario: "}
+                {inventory.name}
+                <span className="text-sm font-mono bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">
+                  v{inventory.version_num}
+                </span>
+              </h2>
+              <button
+                onClick={() => setIsHistoryOpen(true)}
+                className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 whitespace-nowrap"
+                title="Visualizza cronologia modifiche"
+              >
+                📋 Cronologia
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
               Creato da: {inventory.owner.username ? `${inventory.owner.username}` : "Sconosciuto"} | Data modifica:{" "}
               {new Date(inventory.data_mod).toLocaleString()}
             </p>
@@ -910,6 +954,24 @@ useEffect(() => {
           </Dialog.Panel>
         </div>
       </Dialog>
+
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onRollback={async () => {
+          // Refresh inventory and items after rollback
+          if (!inventory) return;
+          const getById = isInventory ? getInventoryById : getChecklistById;
+          const getItems = isInventory ? getInventoryItems : getChecklistItems;
+          const updated = await getById(inventory.id);
+          if (updated) setInventory(updated);
+          const refreshed = await getItems(inventory.id);
+          if (refreshed) setItems(refreshed);
+        }}
+        entityType={isInventory ? "inventory" : "checklist"}
+        entityId={inventory?.id || 0}
+        entityName={inventory?.name || ""}
+      />
     </div>
   );
 }

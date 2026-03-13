@@ -102,6 +102,7 @@ class InventoryUpdate(InventoryBase):
 class InventoryResponse(InventoryBase, LoggingResponse):
     id: int
     owner: 'UserResponse'  # Riferimento all'utente proprietario
+    version_num: int = 0
     
     class Config:
         from_attributes = True
@@ -139,6 +140,7 @@ class ItemResponse(ItemBase, LoggingResponse):
     id: int
     username_ins: Optional[str] = None
     username_mod: Optional[str] = None
+    version_num: int = 0
     
     class Config:
         from_attributes = True
@@ -148,6 +150,55 @@ ItemCreate.model_rebuild()
 ItemUpdate.model_rebuild()
 ItemDelete.model_rebuild()
 ItemResponse.model_rebuild()
+
+################################################
+# Versioni storica degli item (shadow table)
+class ItemVersionResponse(BaseModel):
+    id: int
+    item_id: int
+    inventory_id: int
+    name: str
+    description: Optional[str] = None
+    quantity: Optional[int] = None
+    version_num: int
+    operation: str
+    changed_at: datetime
+    changed_by_id: Optional[int] = None
+    changed_by_username: Optional[str] = None
+    diff: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+ItemVersionResponse.model_rebuild()
+
+################################################
+# Versione storica degli inventari/liste (shadow table)
+class InventoryVersionResponse(BaseModel):
+    id: int
+    inventory_id: int
+    name: str
+    type: str
+    owner_id: Optional[int] = None
+    owner_username: Optional[str] = None
+    version_num: int
+    operation: str
+    changed_at: datetime
+    changed_by_id: Optional[int] = None
+    changed_by_username: Optional[str] = None
+    diff: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+InventoryVersionResponse.model_rebuild()
+
+################################################
+# Richiesta cancellazione massiva versioni
+class VersionBulkDeleteRequest(BaseModel):
+    version_nums: List[int]
+
+VersionBulkDeleteRequest.model_rebuild()
 
 ##############################################################
 # Modello per la gestione del token di accesso

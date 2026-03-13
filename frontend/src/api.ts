@@ -7,7 +7,9 @@ import {
   InventoryWithMatches,
   Checklist,
   ChecklistItem,
-  ChecklistWithMatches
+  ChecklistWithMatches,
+  ItemVersion,
+  InventoryVersion
 } from "./types";
 
 let api: ReturnType<typeof axios.create>;
@@ -429,7 +431,35 @@ export async function restoreBackup(filename: string): Promise<void> {
   await api.request({
     url: `/backup/restore/${encodeURIComponent(filename)}`,
     method: 'POST',
-    data: true
+    data: {
+      confirm: true,
+      mode: 'base',
+      overwrite_users_roles: false,
+      overwrite_settings: false,
+      overwrite_admin: false,
+    }
+  });
+}
+
+export async function restoreBackupGuided(
+  filename: string,
+  options: {
+    mode: 'base' | 'advanced';
+    overwrite_users_roles?: boolean;
+    overwrite_settings?: boolean;
+    overwrite_admin?: boolean;
+  }
+): Promise<void> {
+  await api.request({
+    url: `/backup/restore/${encodeURIComponent(filename)}`,
+    method: 'POST',
+    data: {
+      confirm: true,
+      mode: options.mode,
+      overwrite_users_roles: options.overwrite_users_roles ?? false,
+      overwrite_settings: options.overwrite_settings ?? false,
+      overwrite_admin: options.overwrite_admin ?? false,
+    }
   });
 }
 
@@ -501,4 +531,91 @@ export async function getRecentInventoriesAndChecklists(limit?: number): Promise
     params: limit ? { limit } : {},
   });
   return response.data;
+}
+
+/* === CRONOLOGIA VERSIONI ITEM === */
+export async function getItemHistory(itemId: number): Promise<ItemVersion[]> {
+  const response = await api.get(`/item/${itemId}/history`);
+  return response.data as ItemVersion[];
+}
+
+export async function rollbackItem(itemId: number, versionNum: number): Promise<InventoryItem> {
+  const response = await api.post(`/item/${itemId}/rollback/${versionNum}`);
+  return response.data as InventoryItem;
+}
+
+export async function deleteItemHistoryVersion(itemId: number, versionNum: number): Promise<void> {
+  await api.delete(`/item/${itemId}/history/${versionNum}`);
+}
+
+export async function deleteItemHistoryVersions(itemId: number, versionNums: number[]): Promise<void> {
+  await api.post(`/item/${itemId}/history/delete`, { version_nums: versionNums });
+}
+
+/* === CRONOLOGIA VERSIONI INVENTARIO/CHECKLIST === */
+export async function getInventoryHistory(inventoryId: number): Promise<InventoryVersion[]> {
+  const response = await api.get(`/inventory/${inventoryId}/history`);
+  return response.data as InventoryVersion[];
+}
+
+export async function rollbackInventory(inventoryId: number, versionNum: number): Promise<Inventory> {
+  const response = await api.post(`/inventory/${inventoryId}/rollback/${versionNum}`);
+  return response.data as Inventory;
+}
+
+export async function deleteInventoryHistoryVersion(inventoryId: number, versionNum: number): Promise<void> {
+  await api.delete(`/inventory/${inventoryId}/history/${versionNum}`);
+}
+
+export async function deleteInventoryHistoryVersions(inventoryId: number, versionNums: number[]): Promise<void> {
+  await api.post(`/inventory/${inventoryId}/history/delete`, { version_nums: versionNums });
+}
+
+export async function getChecklistHistory(checklistId: number): Promise<InventoryVersion[]> {
+  const response = await api.get(`/checklist/${checklistId}/history`);
+  return response.data as InventoryVersion[];
+}
+
+export async function rollbackChecklist(checklistId: number, versionNum: number): Promise<Checklist> {
+  const response = await api.post(`/checklist/${checklistId}/rollback/${versionNum}`);
+  return response.data as Checklist;
+}
+
+export async function deleteChecklistHistoryVersion(checklistId: number, versionNum: number): Promise<void> {
+  await api.delete(`/checklist/${checklistId}/history/${versionNum}`);
+}
+
+export async function deleteChecklistHistoryVersions(checklistId: number, versionNums: number[]): Promise<void> {
+  await api.post(`/checklist/${checklistId}/history/delete`, { version_nums: versionNums });
+}
+
+/* === AUDIT LOGS CENTRALIZZATI === */
+export async function getItemAuditLogs(
+  inventoryId?: number,
+  userId?: number,
+  operation?: string
+): Promise<ItemVersion[]> {
+  const response = await api.get('/audit/logs/items', {
+    params: {
+      ...(inventoryId && { inventory_id: inventoryId }),
+      ...(userId && { user_id: userId }),
+      ...(operation && { operation }),
+    },
+  });
+  return response.data as ItemVersion[];
+}
+
+export async function getInventoryAuditLogs(
+  userId?: number,
+  operation?: string,
+  inventoryType?: "INVENTORY" | "CHECKLIST"
+): Promise<InventoryVersion[]> {
+  const response = await api.get('/audit/logs/inventories', {
+    params: {
+      ...(userId && { user_id: userId }),
+      ...(operation && { operation }),
+      ...(inventoryType && { inventory_type: inventoryType }),
+    },
+  });
+  return response.data as InventoryVersion[];
 }

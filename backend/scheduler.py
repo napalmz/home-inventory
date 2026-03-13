@@ -3,10 +3,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from database import SessionLocal
 from routes.backup import create_backup, BACKUP_DIR
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from crud import get_setting, set_setting
 import logging
 import traceback
+from sqlalchemy import and_
+from models import ItemVersion, InventoryVersion
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,32 @@ def cleanup_old_backups(retention_count: int):
             deleted += 1
         logger.info(f"Backup eliminati: {deleted}")
 
+def cleanup_old_audit_versions():
+    """Pulisce i log di audit più vecchi di AUDIT_RETENTION_DAYS"""
+    db = SessionLocal()
+    try:
+        setting = get_setting(db, "AUDIT_RETENTION_DAYS")
+        retention_days = int(setting.value if setting else 90)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
+
+        # Elimina ItemVersion precedenti alla data cutoff
+        deleted_items = db.query(ItemVersion).filter(
+            ItemVersion.changed_at < cutoff_date
+        ).delete(synchronize_session=False)
+
+        # Elimina InventoryVersion precedenti alla data cutoff
+        deleted_inventories = db.query(InventoryVersion).filter(
+            InventoryVersion.changed_at < cutoff_date
+        ).delete(synchronize_session=False)
+
+        db.commit()
+        if deleted_items + deleted_inventories > 0:
+            logger.info(f"Pulizia audit: {deleted_items} item versions + {deleted_inventories} inventory versions eliminate (>= {retention_days} giorni)")
+    except Exception as e:
+        logger.error(f"Errore nella pulizia audit: {traceback.format_exc()}")
+    finally:
+        db.close()
+
 def scheduled_backup():
     logger.info("Backup automatico avviato...")
     db = SessionLocal()
@@ -33,6 +61,9 @@ def scheduled_backup():
         setting = get_setting(db, "BACKUP_RETENTION")
         retention = int(setting.value if setting else 10)
         cleanup_old_backups(retention)
+        
+        # Pulizia audit log
+        cleanup_old_audit_versions()
 
     except Exception as e:
         logger.error(f"Errore nel backup automatico: {traceback.format_exc()}")
