@@ -4,7 +4,7 @@ Route centralizzato per audit log e query storiche
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, false
-from datetime import datetime
+from datetime import datetime, timezone
 from models import ItemVersion, InventoryVersion, User
 from schemas import ItemVersionResponse, InventoryVersionResponse
 from routes.auth import get_current_user
@@ -22,6 +22,8 @@ def get_item_audit_logs(
     inventory_id: Optional[int] = None,
     user_id: Optional[int] = None,
     operation: Optional[str] = None,
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -38,6 +40,12 @@ def get_item_audit_logs(
         query = query.filter(ItemVersion.changed_by_id == user_id)
     if operation:
         query = query.filter(ItemVersion.operation == operation)
+    if from_date:
+        normalized_from = from_date.astimezone(timezone.utc).replace(tzinfo=None) if from_date.tzinfo else from_date
+        query = query.filter(ItemVersion.changed_at >= normalized_from)
+    if to_date:
+        normalized_to = to_date.astimezone(timezone.utc).replace(tzinfo=None) if to_date.tzinfo else to_date
+        query = query.filter(ItemVersion.changed_at <= normalized_to)
 
     # Permessi: solo admin vede tutto, altri vedono solo i loro inventari
     if current_user.role.name != "admin":
@@ -64,6 +72,8 @@ def get_inventory_audit_logs(
     user_id: Optional[int] = None,
     operation: Optional[str] = None,
     inventory_type: Optional[str] = None,
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -79,6 +89,12 @@ def get_inventory_audit_logs(
         query = query.filter(InventoryVersion.operation == operation)
     if inventory_type in ("INVENTORY", "CHECKLIST"):
         query = query.filter(InventoryVersion.type == inventory_type)
+    if from_date:
+        normalized_from = from_date.astimezone(timezone.utc).replace(tzinfo=None) if from_date.tzinfo else from_date
+        query = query.filter(InventoryVersion.changed_at >= normalized_from)
+    if to_date:
+        normalized_to = to_date.astimezone(timezone.utc).replace(tzinfo=None) if to_date.tzinfo else to_date
+        query = query.filter(InventoryVersion.changed_at <= normalized_to)
 
     # Permessi
     if current_user.role.name != "admin":

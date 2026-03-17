@@ -39,6 +39,11 @@ class RestoreRequest(BaseModel):
     overwrite_admin: bool = False
 
 
+class BackupBulkDeleteRequest(BaseModel):
+    confirm: bool
+    filenames: list[str]
+
+
 def _backup_meta_path(file_path: Path) -> Path:
     return file_path.parent / f"{file_path.name}.meta.json"
 
@@ -205,6 +210,45 @@ def delete_backup(filename: str, confirm: bool = Body(...)):
         raise HTTPException(status_code=500, detail=f"Errore durante la cancellazione: {str(e)}")
 
     return {"message": "Backup cancellato"}
+
+
+@router.post("/delete-bulk")
+def delete_backups_bulk(payload: BackupBulkDeleteRequest):
+    if not payload.confirm:
+        raise HTTPException(status_code=400, detail="Cancellazione non confermata")
+    if not payload.filenames:
+        raise HTTPException(status_code=400, detail="Nessun backup selezionato")
+
+    deleted: list[str] = []
+    missing: list[str] = []
+    invalid: list[str] = []
+
+    for filename in payload.filenames:
+        if not filename.endswith(".sql"):
+            invalid.append(filename)
+            continue
+
+        file_path = BACKUP_DIR / filename
+        if not file_path.exists():
+            missing.append(filename)
+            continue
+
+        try:
+            file_path.unlink()
+            meta_path = _backup_meta_path(file_path)
+            if meta_path.exists():
+                meta_path.unlink()
+            deleted.append(filename)
+        except Exception:
+            logger.exception(f"Errore durante la cancellazione del backup {filename}")
+            missing.append(filename)
+
+    return {
+        "message": "Cancellazione massiva completata",
+        "deleted": deleted,
+        "missing": missing,
+        "invalid": invalid,
+    }
 
 @router.post("/restore/{filename}")
 def restore_backup(filename: str, payload: RestoreRequest = Body(...)):

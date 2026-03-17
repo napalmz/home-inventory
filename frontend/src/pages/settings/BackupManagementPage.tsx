@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listBackups,
   createBackup,
   downloadBackup,
   deleteBackup,
+  deleteBackupsBulk,
   restoreBackup,
   restoreBackupGuided,
   uploadBackup,
@@ -45,6 +46,7 @@ export default function BackupManagementPage() {
   const [backupTypeFilter, setBackupTypeFilter] = useState<"all" | "manual" | "auto">("all");
   const [sortField, setSortField] = useState<"filename" | "modified" | "size">("modified");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedBackupNames, setSelectedBackupNames] = useState<string[]>([]);
   const [restoreTarget, setRestoreTarget] = useState<{
     filename: string;
     metadata?: {
@@ -133,6 +135,40 @@ export default function BackupManagementPage() {
     }
   };
 
+  const displayedBackups = useMemo(() => {
+    return backups
+      .filter((b) => {
+        const matchText = b.filename.toLowerCase().includes(filterText.toLowerCase());
+        const isAuto = b.filename.startsWith("auto_");
+        const matchType =
+          backupTypeFilter === "all" ||
+          (backupTypeFilter === "manual" && !isAuto) ||
+          (backupTypeFilter === "auto" && isAuto);
+        return matchText && matchType;
+      })
+      .sort((a, b) => {
+        const aVal = a[sortField];
+        const bVal = b[sortField];
+        if (sortField === "modified") {
+          return sortDirection === "asc"
+            ? new Date(aVal).getTime() - new Date(bVal).getTime()
+            : new Date(bVal).getTime() - new Date(aVal).getTime();
+        }
+        return sortDirection === "asc"
+          ? aVal > bVal
+            ? 1
+            : -1
+          : aVal < bVal
+          ? 1
+          : -1;
+      });
+  }, [backups, filterText, backupTypeFilter, sortField, sortDirection]);
+
+  useEffect(() => {
+    const available = new Set(displayedBackups.map((b) => b.filename));
+    setSelectedBackupNames((prev) => prev.filter((name) => available.has(name)));
+  }, [displayedBackups]);
+
   const createBackupLocal = async () => {
     setLoading(true);
     try {
@@ -191,6 +227,53 @@ export default function BackupManagementPage() {
     } catch (error) {
       console.error("Errore nell'eliminazione del backup:", error);
       setMessage("Errore nell'eliminazione del backup.");
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleBackupSelection = (filename: string) => {
+    setSelectedBackupNames((prev) =>
+      prev.includes(filename) ? prev.filter((f) => f !== filename) : [...prev, filename]
+    );
+  };
+
+  const selectAllDisplayed = () => {
+    setSelectedBackupNames(displayedBackups.map((b) => b.filename));
+  };
+
+  const clearSelection = () => {
+    setSelectedBackupNames([]);
+  };
+
+  const downloadSelectedBackups = () => {
+    if (selectedBackupNames.length === 0) return;
+    selectedBackupNames.forEach((filename) => downloadBackupLocal(filename));
+    setMessage(`Avviato download di ${selectedBackupNames.length} backup`);
+    setMessageType("success");
+  };
+
+  const deleteSelectedBackups = async () => {
+    if (selectedBackupNames.length === 0) return;
+    if (!window.confirm(`Sei sicuro di voler eliminare ${selectedBackupNames.length} backup selezionati?`)) return;
+
+    setLoading(true);
+    try {
+      const result = await deleteBackupsBulk(selectedBackupNames);
+      const deletedCount = result.deleted.length;
+      const skippedCount = result.missing.length + result.invalid.length;
+      setMessage(
+        skippedCount > 0
+          ? `Eliminati ${deletedCount} backup. Saltati ${skippedCount} elementi non validi/non trovati.`
+          : `Eliminati ${deletedCount} backup con successo!`
+      );
+      setMessageType(skippedCount > 0 ? "error" : "success");
+      clearSelection();
+      fetchBackups();
+    } catch (error) {
+      console.error("Errore nell'eliminazione massiva dei backup:", error);
+      setMessage("Errore nell'eliminazione massiva dei backup.");
       setMessageType("error");
     } finally {
       setLoading(false);
@@ -369,41 +452,52 @@ export default function BackupManagementPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={selectAllDisplayed}
+          className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-sm"
+        >
+          Seleziona tutti (visibili)
+        </button>
+        <button
+          onClick={clearSelection}
+          className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 text-sm"
+        >
+          Deseleziona
+        </button>
+        <button
+          onClick={downloadSelectedBackups}
+          disabled={selectedBackupNames.length === 0}
+          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          Scarica selezionati ({selectedBackupNames.length})
+        </button>
+        <button
+          onClick={deleteSelectedBackups}
+          disabled={selectedBackupNames.length === 0}
+          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          Elimina selezionati ({selectedBackupNames.length})
+        </button>
+      </div>
+
       <ul className="space-y-2">
-        {backups
-          .filter((b) => {
-            const matchText = b.filename.toLowerCase().includes(filterText.toLowerCase());
-            const isAuto = b.filename.startsWith("auto_");
-            const matchType =
-              backupTypeFilter === "all" ||
-              (backupTypeFilter === "manual" && !isAuto) ||
-              (backupTypeFilter === "auto" && isAuto);
-            return matchText && matchType;
-          })
-          .sort((a, b) => {
-            const aVal = a[sortField];
-            const bVal = b[sortField];
-            if (sortField === "modified") {
-              return sortDirection === "asc"
-                ? new Date(aVal).getTime() - new Date(bVal).getTime()
-                : new Date(bVal).getTime() - new Date(aVal).getTime();
-            }
-            return sortDirection === "asc"
-              ? aVal > bVal
-                ? 1
-                : -1
-              : aVal < bVal
-              ? 1
-              : -1;
-          })
-          .map((backup) => {
+        {displayedBackups.map((backup) => {
             const isAuto = backup.filename.startsWith("auto_");
             return (
               <li
                 key={backup.filename}
                 className={`flex flex-col sm:flex-row sm:justify-between sm:items-center border p-2 rounded ${isAuto ? "bg-yellow-50 border-yellow-400 dark:bg-yellow-500 dark:border-yellow-700 dark:text-black" : ""}`}
               >
-                <div className="flex-1">
+                <div className="flex items-start gap-3 flex-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedBackupNames.includes(backup.filename)}
+                    onChange={() => toggleBackupSelection(backup.filename)}
+                    className="mt-1 w-4 h-4"
+                    title={`Seleziona ${backup.filename}`}
+                  />
+                  <div className="flex-1">
                   <div className="break-words">{backup.filename}
                     {isAuto && <span className="inline-block text-xs font-semibold text-yellow-700 bg-yellow-200 rounded px-2 py-0.5 ml-2">Automatico</span>}
                   </div>
@@ -437,6 +531,7 @@ export default function BackupManagementPage() {
                         {new Date(backup.metadata.created_at).toLocaleString()}
                       </div>
                     )}
+                  </div>
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 mt-2 sm:mt-0">

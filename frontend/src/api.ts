@@ -472,6 +472,24 @@ export async function deleteBackup(filename: string): Promise<void> {
   });
 }
 
+export async function deleteBackupsBulk(filenames: string[]): Promise<{
+  message: string;
+  deleted: string[];
+  missing: string[];
+  invalid: string[];
+}> {
+  const response = await api.post('/backup/delete-bulk', {
+    confirm: true,
+    filenames,
+  });
+  return response.data as {
+    message: string;
+    deleted: string[];
+    missing: string[];
+    invalid: string[];
+  };
+}
+
 // Upload di un backup esistente
 export async function uploadBackup(file: File): Promise<void> {
   const formData = new FormData();
@@ -593,13 +611,17 @@ export async function deleteChecklistHistoryVersions(checklistId: number, versio
 export async function getItemAuditLogs(
   inventoryId?: number,
   userId?: number,
-  operation?: string
+  operation?: string,
+  fromDate?: string,
+  toDate?: string
 ): Promise<ItemVersion[]> {
   const response = await api.get('/audit/logs/items', {
     params: {
       ...(inventoryId && { inventory_id: inventoryId }),
       ...(userId && { user_id: userId }),
       ...(operation && { operation }),
+      ...(fromDate && { from_date: fromDate }),
+      ...(toDate && { to_date: toDate }),
     },
   });
   return response.data as ItemVersion[];
@@ -608,13 +630,17 @@ export async function getItemAuditLogs(
 export async function getInventoryAuditLogs(
   userId?: number,
   operation?: string,
-  inventoryType?: "INVENTORY" | "CHECKLIST"
+  inventoryType?: "INVENTORY" | "CHECKLIST",
+  fromDate?: string,
+  toDate?: string
 ): Promise<InventoryVersion[]> {
   const response = await api.get('/audit/logs/inventories', {
     params: {
       ...(userId && { user_id: userId }),
       ...(operation && { operation }),
       ...(inventoryType && { inventory_type: inventoryType }),
+      ...(fromDate && { from_date: fromDate }),
+      ...(toDate && { to_date: toDate }),
     },
   });
   return response.data as InventoryVersion[];

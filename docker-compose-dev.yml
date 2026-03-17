@@ -21,7 +21,7 @@ services:
     build: ./backend
     container_name: inventory-backend
     restart: always
-    environment:
+    environment:  
       TZ: Europe/Rome
       DATABASE_URL: postgresql://admin:admin@db:5432/inventory
       POSTGRES_HOST: db

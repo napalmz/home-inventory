@@ -7,8 +7,7 @@ from datetime import datetime, timezone, timedelta
 from crud import get_setting, set_setting
 import logging
 import traceback
-from sqlalchemy import and_
-from models import ItemVersion, InventoryVersion
+from models import ItemVersion, InventoryVersion, Item, Inventory
 
 logger = logging.getLogger(__name__)
 
@@ -25,21 +24,27 @@ def cleanup_old_backups(retention_count: int):
         logger.info(f"Backup eliminati: {deleted}")
 
 def cleanup_old_audit_versions():
-    """Pulisce i log di audit più vecchi di AUDIT_RETENTION_DAYS"""
+    """Pulisce solo i log di audit orfani più vecchi di AUDIT_RETENTION_DAYS.
+
+    Un record audit è considerato orfano quando l'entità principale non esiste più.
+    Le versioni di entità ancora presenti non vengono mai eliminate da questa retention.
+    """
     db = SessionLocal()
     try:
         setting = get_setting(db, "AUDIT_RETENTION_DAYS")
         retention_days = int(setting.value if setting else 90)
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
 
-        # Elimina ItemVersion precedenti alla data cutoff
+        # Elimina ItemVersion orfani precedenti alla data cutoff
         deleted_items = db.query(ItemVersion).filter(
-            ItemVersion.changed_at < cutoff_date
+            ItemVersion.changed_at < cutoff_date,
+            ~ItemVersion.item_id.in_(db.query(Item.id))
         ).delete(synchronize_session=False)
 
-        # Elimina InventoryVersion precedenti alla data cutoff
+        # Elimina InventoryVersion orfani precedenti alla data cutoff
         deleted_inventories = db.query(InventoryVersion).filter(
-            InventoryVersion.changed_at < cutoff_date
+            InventoryVersion.changed_at < cutoff_date,
+            ~InventoryVersion.inventory_id.in_(db.query(Inventory.id))
         ).delete(synchronize_session=False)
 
         db.commit()
