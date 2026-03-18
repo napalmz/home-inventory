@@ -1,17 +1,19 @@
 # Step 1: Build static files
-FROM node:23 AS build
+FROM node:24 AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 COPY . .
 RUN npm run build
 
 # Step 2: Serve static files and reverse proxy API via nginx
-FROM nginx:alpine
+FROM nginx:1.29
 WORKDIR /app
 
 # Install required tools
-RUN apk add --no-cache bash curl
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bash curl gettext-base \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy built frontend files
 COPY --from=build /app/dist /usr/share/nginx/html
