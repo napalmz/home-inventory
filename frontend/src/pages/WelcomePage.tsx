@@ -66,6 +66,7 @@ const WelcomePage = () => {
                     <th className="p-3 border-b border-gray-300">#</th>
                     <th className="p-3 border-b border-gray-300">Nome</th>
                     <th className="p-3 border-b border-gray-300">Ultima modifica</th>
+                    <th className="p-3 border-b border-gray-300">Utente modifica</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -78,6 +79,7 @@ const WelcomePage = () => {
                       <td className="p-3">{idx + 1} {isMobile ? (rec.type === "INVENTORY" ? "📦" : "📝") : (rec.type === "INVENTORY" ? "📦" : "📝")}</td>
                       <td className="p-3">{rec.name}</td>
                       <td className="p-3">{new Date(rec.data_mod).toLocaleString()}</td>
+                      <td className="p-3">{rec.username_mod || "-"}</td>
                     </tr>
                   ))}
                 </tbody>

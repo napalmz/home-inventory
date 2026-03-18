@@ -541,7 +541,10 @@ export async function triggerScheduledBackup(): Promise<void> {
 }
 
 // Tipo per recenti inventari e checklist
-export type InventoryOrChecklistRecent = InventoryWithMatches & { type: "INVENTORY" | "CHECKLIST" };
+export type InventoryOrChecklistRecent = InventoryWithMatches & {
+  type: "INVENTORY" | "CHECKLIST";
+  username_mod?: string | null;
+};
 
 /* RECUPERO RECENTI INVENTARI E CHECKLIST */
 export async function getRecentInventoriesAndChecklists(limit?: number): Promise<InventoryOrChecklistRecent[]> {

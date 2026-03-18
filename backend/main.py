@@ -108,4 +108,19 @@ def get_recent_items(
     combined = inventories + checklists
     combined.sort(key=lambda x: x["data_mod"], reverse=True)
 
-    return combined[:limit]  # Restituisce gli ultimi N elementi
+    # Arricchisce i risultati recenti con username dell'ultimo modificatore.
+    recent_slice = combined[:limit]
+    user_mod_ids = {
+        item.get("user_mod")
+        for item in recent_slice
+        if item.get("user_mod") is not None
+    }
+    username_by_id = {
+        user.id: user.username
+        for user in db.query(User).filter(User.id.in_(user_mod_ids)).all()
+    } if user_mod_ids else {}
+
+    for item in recent_slice:
+        item["username_mod"] = username_by_id.get(item.get("user_mod"))
+
+    return recent_slice  # Restituisce gli ultimi N elementi

@@ -82,7 +82,7 @@ class User(Base, LoggingData):
                           primaryjoin="User.id == UserGroupAssociation.user_id",
                           secondaryjoin="Group.id == UserGroupAssociation.group_id",
                           back_populates="users",
-                          overlaps="group_associations,user"
+                          overlaps="group_associations,user,group"
                         )
 
 ################################################
@@ -99,7 +99,7 @@ class Group(Base, LoggingData):
     user_associations = relationship("UserGroupAssociation",
                                      back_populates="group",
                                      foreign_keys="[UserGroupAssociation.group_id]",
-                                     overlaps="users"
+                                     overlaps="users,groups"
                                     )
     # Relazione Many-to-Many con User con chiavi esplicite
     users = relationship("User",
@@ -107,7 +107,7 @@ class Group(Base, LoggingData):
                          primaryjoin="Group.id == UserGroupAssociation.group_id",
                          secondaryjoin="User.id == UserGroupAssociation.user_id",
                          back_populates="groups",
-                         overlaps="user_associations,group"
+                         overlaps="user_associations,group,group_associations,user"
                         )
 
 ################################################
