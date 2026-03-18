@@ -611,6 +611,7 @@ export async function deleteChecklistHistoryVersions(checklistId: number, versio
 export async function getItemAuditLogs(
   inventoryId?: number,
   userId?: number,
+  userScope?: "active" | "none" | "deleted",
   operation?: string,
   fromDate?: string,
   toDate?: string
@@ -619,6 +620,7 @@ export async function getItemAuditLogs(
     params: {
       ...(inventoryId && { inventory_id: inventoryId }),
       ...(userId && { user_id: userId }),
+      ...(userScope && { user_scope: userScope }),
       ...(operation && { operation }),
       ...(fromDate && { from_date: fromDate }),
       ...(toDate && { to_date: toDate }),
@@ -629,6 +631,7 @@ export async function getItemAuditLogs(
 
 export async function getInventoryAuditLogs(
   userId?: number,
+  userScope?: "active" | "none" | "deleted",
   operation?: string,
   inventoryType?: "INVENTORY" | "CHECKLIST",
   fromDate?: string,
@@ -637,6 +640,7 @@ export async function getInventoryAuditLogs(
   const response = await api.get('/audit/logs/inventories', {
     params: {
       ...(userId && { user_id: userId }),
+      ...(userScope && { user_scope: userScope }),
       ...(operation && { operation }),
       ...(inventoryType && { inventory_type: inventoryType }),
       ...(fromDate && { from_date: fromDate }),

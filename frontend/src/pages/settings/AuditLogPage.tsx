@@ -2,13 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getInventoryAuditLogs,
   getItemAuditLogs,
+  getUsers,
   getSetting,
   setSetting,
 } from "../../api";
+import { User } from "../../types";
 import { InventoryVersion, ItemVersion } from "../../types";
 
 type OperationFilter = "" | "CREATE" | "UPDATE" | "DELETE";
 type TargetFilter = "ALL" | "ITEMS" | "INVENTORIES";
+type UserScopeFilter = "" | "active" | "none" | "deleted";
 
 function toLocalInputValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -18,6 +21,9 @@ function toLocalInputValue(date: Date): string {
 export default function AuditLogPage() {
   const [target, setTarget] = useState<TargetFilter>("ALL");
   const [operation, setOperation] = useState<OperationFilter>("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [userScope, setUserScope] = useState<UserScopeFilter>("");
+  const [users, setUsers] = useState<User[]>([]);
   const [fromDate, setFromDate] = useState(() => {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -95,10 +101,12 @@ export default function AuditLogPage() {
     setLoading(true);
     setMessage("");
     try {
+      const userId = selectedUserId ? Number(selectedUserId) : undefined;
       if (target === "ALL" || target === "ITEMS") {
         const logs = await getItemAuditLogs(
           undefined,
-          undefined,
+          userId,
+          userScope || undefined,
           operation || undefined,
           fromDate || undefined,
           toDate || undefined
@@ -110,7 +118,8 @@ export default function AuditLogPage() {
 
       if (target === "ALL" || target === "INVENTORIES") {
         const logs = await getInventoryAuditLogs(
-          undefined,
+          userId,
+          userScope || undefined,
           operation || undefined,
           undefined,
           fromDate || undefined,
@@ -125,7 +134,16 @@ export default function AuditLogPage() {
     } finally {
       setLoading(false);
     }
-  }, [target, operation, fromDate, toDate]);
+  }, [target, selectedUserId, userScope, operation, fromDate, toDate]);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const list = await getUsers();
+      setUsers(list);
+    } catch {
+      setUsers([]);
+    }
+  }, []);
 
   const loadRetention = useCallback(async () => {
     try {
@@ -137,9 +155,24 @@ export default function AuditLogPage() {
   }, []);
 
   useEffect(() => {
+    loadUsers();
     loadRetention();
     loadLogs();
-  }, [loadRetention, loadLogs]);
+  }, [loadUsers, loadRetention, loadLogs]);
+
+  const onChangeSelectedUser = (value: string) => {
+    setSelectedUserId(value);
+    if (value) {
+      setUserScope("");
+    }
+  };
+
+  const onChangeUserScope = (value: UserScopeFilter) => {
+    setUserScope(value);
+    if (value) {
+      setSelectedUserId("");
+    }
+  };
 
   const saveRetention = async () => {
     const parsed = Number(retentionDays);
@@ -227,6 +260,30 @@ export default function AuditLogPage() {
             <option value="CREATE">CREATE</option>
             <option value="UPDATE">UPDATE</option>
             <option value="DELETE">DELETE</option>
+          </select>
+
+          <select
+            value={selectedUserId}
+            onChange={(e) => onChangeSelectedUser(e.target.value)}
+            className="border rounded px-2 py-1"
+          >
+            <option value="">Utente: tutti</option>
+            {users.map((user) => (
+              <option key={user.id} value={String(user.id)}>
+                {user.username} (id {user.id})
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={userScope}
+            onChange={(e) => onChangeUserScope(e.target.value as UserScopeFilter)}
+            className="border rounded px-2 py-1"
+          >
+            <option value="">Stato utente: tutti</option>
+            <option value="active">Solo utente esistente</option>
+            <option value="none">Solo senza utente</option>
+            <option value="deleted">Solo utente eliminato/non risolto</option>
           </select>
 
           <button

@@ -3,7 +3,7 @@ Route centralizzato per audit log e query storiche
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, false
+from sqlalchemy import and_, or_, desc, false, func
 from datetime import datetime, timezone
 from models import ItemVersion, InventoryVersion, User
 from schemas import ItemVersionResponse, InventoryVersionResponse
@@ -21,6 +21,7 @@ router = APIRouter()
 def get_item_audit_logs(
     inventory_id: Optional[int] = None,
     user_id: Optional[int] = None,
+    user_scope: Optional[str] = None,
     operation: Optional[str] = None,
     from_date: Optional[datetime] = None,
     to_date: Optional[datetime] = None,
@@ -38,6 +39,28 @@ def get_item_audit_logs(
         query = query.filter(ItemVersion.inventory_id == inventory_id)
     if user_id:
         query = query.filter(ItemVersion.changed_by_id == user_id)
+    if user_scope:
+        username_present = and_(
+            ItemVersion.changed_by_username.isnot(None),
+            func.length(func.trim(ItemVersion.changed_by_username)) > 0,
+        )
+        if user_scope == "active":
+            query = query.filter(ItemVersion.changed_by_id.isnot(None))
+        elif user_scope == "none":
+            query = query.filter(
+                ItemVersion.changed_by_id.is_(None),
+                ~username_present,
+            )
+        elif user_scope == "deleted":
+            query = query.filter(
+                ItemVersion.changed_by_id.is_(None),
+                username_present,
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="user_scope non valido. Valori ammessi: active, none, deleted",
+            )
     if operation:
         query = query.filter(ItemVersion.operation == operation)
     if from_date:
@@ -70,6 +93,7 @@ def get_item_audit_logs(
 @router.get("/logs/inventories", response_model=List[InventoryVersionResponse])
 def get_inventory_audit_logs(
     user_id: Optional[int] = None,
+    user_scope: Optional[str] = None,
     operation: Optional[str] = None,
     inventory_type: Optional[str] = None,
     from_date: Optional[datetime] = None,
@@ -85,6 +109,28 @@ def get_inventory_audit_logs(
 
     if user_id:
         query = query.filter(InventoryVersion.changed_by_id == user_id)
+    if user_scope:
+        username_present = and_(
+            InventoryVersion.changed_by_username.isnot(None),
+            func.length(func.trim(InventoryVersion.changed_by_username)) > 0,
+        )
+        if user_scope == "active":
+            query = query.filter(InventoryVersion.changed_by_id.isnot(None))
+        elif user_scope == "none":
+            query = query.filter(
+                InventoryVersion.changed_by_id.is_(None),
+                ~username_present,
+            )
+        elif user_scope == "deleted":
+            query = query.filter(
+                InventoryVersion.changed_by_id.is_(None),
+                username_present,
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="user_scope non valido. Valori ammessi: active, none, deleted",
+            )
     if operation:
         query = query.filter(InventoryVersion.operation == operation)
     if inventory_type in ("INVENTORY", "CHECKLIST"):
