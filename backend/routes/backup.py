@@ -142,6 +142,7 @@ def create_backup(db: Session = Depends(get_db), prefix: str = "manual"):
             "-h", os.getenv("POSTGRES_HOST", "db"),
             "-d", os.getenv("POSTGRES_DB", "inventory"),
             "--data-only",
+            "--disable-triggers", #Aggiunto per evitare problemi di FK durante il restore, soprattutto con tabelle condivise e versioning
             "--column-inserts",
             "-f", str(full_backup_path)
         ], check=True, env=env)
