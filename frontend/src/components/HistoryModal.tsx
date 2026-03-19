@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo } from 'react';
+import { useState, useEffect, useContext, useMemo, ReactNode, useCallback } from 'react';
 import { Dialog } from '@headlessui/react';
 import { ItemVersion, InventoryVersion } from '../types';
 import {
@@ -22,11 +22,20 @@ interface HistoryModalProps {
   onClose: () => void;
   onRollback?: () => void;
   entityType: 'item' | 'inventory' | 'checklist';
+  itemContainerType?: 'INVENTORY' | 'CHECKLIST';
   entityId: number;
   entityName: string;
 }
 
-export function HistoryModal({ isOpen, onClose, onRollback, entityType, entityId, entityName }: HistoryModalProps) {
+export function HistoryModal({
+  isOpen,
+  onClose,
+  onRollback,
+  entityType,
+  itemContainerType,
+  entityId,
+  entityName,
+}: HistoryModalProps) {
   const authContext = useContext(AuthContext);
   const isAdmin = authContext?.user?.role?.name === 'admin';
   const canRollback = authContext?.user?.role?.name !== 'viewer';
@@ -63,34 +72,69 @@ export function HistoryModal({ isOpen, onClose, onRollback, entityType, entityId
     return String(value);
   };
 
-  const describeVersion = (version: ItemVersion | InventoryVersion) => {
+  const formatChecklistState = (value: unknown) => {
+    const numeric = Number(value);
+    return !Number.isNaN(numeric) && numeric > 0;
+  };
+
+  const renderChecklistStatus = (value: unknown) => (
+    <span
+      className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-400 bg-gray-100 text-gray-700 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-200"
+      style={{
+        fontSize: "16px",
+        lineHeight: "1",
+        fontWeight: "600",
+      }}
+      aria-hidden="true"
+      title={formatChecklistState(value) ? 'check' : 'uncheck'}
+    >
+      {formatChecklistState(value) ? '✓' : ''}
+    </span>
+  );
+
+  const describeVersion = (version: ItemVersion | InventoryVersion): { label: string; content: ReactNode }[] => {
     if (version.operation === 'CREATE') {
-      return [{ label: 'Azione', text: 'Record creato' }];
+      return [{ label: 'Azione', content: 'Record creato' }];
     }
     if (version.operation === 'DELETE') {
-      return [{ label: 'Azione', text: 'Record eliminato' }];
+      return [{ label: 'Azione', content: 'Record eliminato' }];
     }
 
     if (!version.diff) {
-      return [{ label: 'Modifiche', text: 'Nessuna modifica dettagliata disponibile' }];
+      return [{ label: 'Modifiche', content: 'Nessuna modifica dettagliata disponibile' }];
     }
 
     try {
       const parsed = JSON.parse(version.diff) as Record<string, { from: unknown; to: unknown }>;
       const entries = Object.entries(parsed);
       if (entries.length === 0) {
-        return [{ label: 'Modifiche', text: 'Nessuna modifica rilevata' }];
+        return [{ label: 'Modifiche', content: 'Nessuna modifica rilevata' }];
       }
+
+      const isChecklistQuantity =
+        version.operation === 'UPDATE' &&
+        entityType === 'item' &&
+        itemContainerType === 'CHECKLIST';
+
       return entries.map(([field, values]) => ({
-        label: fieldLabel(field),
-        text: `${formatValue(values?.from)} -> ${formatValue(values?.to)}`,
+        label: field === 'quantity' && isChecklistQuantity ? 'Status' : fieldLabel(field),
+        content:
+          field === 'quantity' && isChecklistQuantity
+            ? (
+              <>
+                {renderChecklistStatus(values?.from)}
+                <span>{' -> '}</span>
+                {renderChecklistStatus(values?.to)}
+              </>
+            )
+            : `${formatValue(values?.from)} -> ${formatValue(values?.to)}`,
       }));
     } catch {
-      return [{ label: 'Modifiche', text: 'Formato modifiche non leggibile' }];
+      return [{ label: 'Modifiche', content: 'Formato modifiche non leggibile' }];
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -110,12 +154,12 @@ export function HistoryModal({ isOpen, onClose, onRollback, entityType, entityId
     } finally {
       setLoading(false);
     }
-  };
+  }, [entityId, entityType]);
 
   useEffect(() => {
     if (!isOpen) return;
     fetchHistory();
-  }, [isOpen, entityType, entityId]);
+  }, [isOpen, fetchHistory]);
 
   const handleRollback = async (versionNum: number) => {
     if (!window.confirm(`Vuoi ripristinare la versione ${versionNum}?`)) return;
@@ -267,7 +311,7 @@ export function HistoryModal({ isOpen, onClose, onRollback, entityType, entityId
                         <div className="text-xs bg-gray-50 dark:bg-gray-700/40 rounded p-3 space-y-1">
                           {describeVersion(version).map((entry, entryIdx) => (
                             <p key={entryIdx} className="text-gray-700 dark:text-gray-200">
-                              <span className="font-semibold">{entry.label}:</span> {entry.text}
+                              <span className="font-semibold">{entry.label}:</span> {entry.content}
                             </p>
                           ))}
                         </div>

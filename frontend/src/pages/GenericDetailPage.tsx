@@ -282,6 +282,7 @@ export function SwipeableItemRow({
           if (refreshed) setItems(refreshed as Item[]);
         }}
         entityType="item"
+        itemContainerType={isChecklist ? 'CHECKLIST' : 'INVENTORY'}
         entityId={item.id}
         entityName={item.name}
       />

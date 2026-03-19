@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   getInventoryAuditLogs,
   getItemAuditLogs,
@@ -49,6 +50,32 @@ export default function AuditLogPage() {
   const getInventoryTypeIcon = (inventoryType?: string | null) =>
     inventoryType === "CHECKLIST" ? "📝" : "📦";
 
+  const getInventoryPath = (inventoryType: string | null | undefined, inventoryId: number) => {
+    if (inventoryType === "CHECKLIST") return `/checklists/${inventoryId}`;
+    if (inventoryType === "INVENTORY") return `/inventories/${inventoryId}`;
+    return null;
+  };
+
+  const isChecklistChecked = (value: unknown) => {
+    const numeric = Number(value);
+    return !Number.isNaN(numeric) && numeric > 0;
+  };
+
+  const renderChecklistStatus = (value: unknown) => (
+    <span
+      className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-400 bg-gray-100 text-gray-700 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-200"
+      style={{
+        fontSize: "16px",
+        lineHeight: "1",
+        fontWeight: "600",
+      }}
+      aria-hidden="true"
+      title={isChecklistChecked(value) ? "check" : "uncheck"}
+    >
+      {isChecklistChecked(value) ? "✓" : ""}
+    </span>
+  );
+
   const fieldLabel = (field: string) => {
     const labels: Record<string, string> = {
       name: "Nome",
@@ -89,8 +116,19 @@ export default function AuditLogPage() {
         <div className="space-y-1">
           {entries.map(([field, values]) => (
             <div key={field}>
-              <span className="font-semibold">{fieldLabel(field)}:</span>{" "}
-              <span>{formatValue(values?.from)} -&gt; {formatValue(values?.to)}</span>
+              {field === "quantity" && "inventory_type" in log && log.inventory_type === "CHECKLIST" ? (
+                <>
+                  <span className="font-semibold">Status:</span>{" "}
+                  {renderChecklistStatus(values?.from)}
+                  <span>{" -> "}</span>
+                  {renderChecklistStatus(values?.to)}
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">{fieldLabel(field)}:</span>{" "}
+                  <span>{`${formatValue(values?.from)} -> ${formatValue(values?.to)}`}</span>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -378,7 +416,17 @@ export default function AuditLogPage() {
                       <td className="p-2">{new Date(log.changed_at).toLocaleString()}</td>
                       <td className="p-2">{log.operation}</td>
                       <td className="p-2">
-                        {getInventoryTypeIcon(log.inventory_type)} #{log.inventory_id} - {log.inventory_name || "-"}
+                        {(() => {
+                          const path = getInventoryPath(log.inventory_type, log.inventory_id);
+                          const label = `${getInventoryTypeIcon(log.inventory_type)} #${log.inventory_id} - ${log.inventory_name || "-"}`;
+                          return path ? (
+                            <Link to={path} className="text-blue-600 hover:underline dark:text-blue-400">
+                              {label}
+                            </Link>
+                          ) : (
+                            <span>{label}</span>
+                          );
+                        })()}
                       </td>
                       <td className="p-2">#{log.item_id} - {log.name}</td>
                       <td className="p-2">{log.changed_by_username || "-"}</td>
@@ -412,7 +460,19 @@ export default function AuditLogPage() {
                     <tr key={`inv-${log.id}`} className="border-t">
                       <td className="p-2">{new Date(log.changed_at).toLocaleString()}</td>
                       <td className="p-2">{log.operation}</td>
-                      <td className="p-2">{getInventoryTypeIcon(log.type)} #{log.inventory_id} - {log.name}</td>
+                      <td className="p-2">
+                        {(() => {
+                          const path = getInventoryPath(log.type, log.inventory_id);
+                          const label = `${getInventoryTypeIcon(log.type)} #${log.inventory_id} - ${log.name}`;
+                          return path ? (
+                            <Link to={path} className="text-blue-600 hover:underline dark:text-blue-400">
+                              {label}
+                            </Link>
+                          ) : (
+                            <span>{label}</span>
+                          );
+                        })()}
+                      </td>
                       <td className="p-2">{log.changed_by_username || "-"}</td>
                       <td className="p-2">v{log.version_num}</td>
                       <td className="p-2">{renderDiff(log)}</td>
