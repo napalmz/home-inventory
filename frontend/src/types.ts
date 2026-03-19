@@ -86,6 +86,8 @@ export interface ItemVersion {
     id: number;
     item_id: number;
     inventory_id: number;
+    inventory_name?: string | null;
+    inventory_type?: string | null;
     name: string;
     description: string | null;
     quantity: number | null;

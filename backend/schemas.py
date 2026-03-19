@@ -157,6 +157,8 @@ class ItemVersionResponse(BaseModel):
     id: int
     item_id: int
     inventory_id: int
+    inventory_name: Optional[str] = None
+    inventory_type: Optional[str] = None
     name: str
     description: Optional[str] = None
     quantity: Optional[int] = None

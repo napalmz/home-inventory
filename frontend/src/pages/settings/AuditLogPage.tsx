@@ -46,6 +46,9 @@ export default function AuditLogPage() {
     [inventoryLogs]
   );
 
+  const getInventoryTypeIcon = (inventoryType?: string | null) =>
+    inventoryType === "CHECKLIST" ? "📝" : "📦";
+
   const fieldLabel = (field: string) => {
     const labels: Record<string, string> = {
       name: "Nome",
@@ -362,6 +365,7 @@ export default function AuditLogPage() {
                   <tr>
                     <th className="text-left p-2">Quando</th>
                     <th className="text-left p-2">Operazione</th>
+                    <th className="text-left p-2">Inventario/Lista</th>
                     <th className="text-left p-2">Item</th>
                     <th className="text-left p-2">Utente</th>
                     <th className="text-left p-2">Versione</th>
@@ -373,6 +377,9 @@ export default function AuditLogPage() {
                     <tr key={`item-${log.id}`} className="border-t">
                       <td className="p-2">{new Date(log.changed_at).toLocaleString()}</td>
                       <td className="p-2">{log.operation}</td>
+                      <td className="p-2">
+                        {getInventoryTypeIcon(log.inventory_type)} #{log.inventory_id} - {log.inventory_name || "-"}
+                      </td>
                       <td className="p-2">#{log.item_id} - {log.name}</td>
                       <td className="p-2">{log.changed_by_username || "-"}</td>
                       <td className="p-2">v{log.version_num}</td>
@@ -405,7 +412,7 @@ export default function AuditLogPage() {
                     <tr key={`inv-${log.id}`} className="border-t">
                       <td className="p-2">{new Date(log.changed_at).toLocaleString()}</td>
                       <td className="p-2">{log.operation}</td>
-                      <td className="p-2">#{log.inventory_id} - {log.name} ({log.type})</td>
+                      <td className="p-2">{getInventoryTypeIcon(log.type)} #{log.inventory_id} - {log.name}</td>
                       <td className="p-2">{log.changed_by_username || "-"}</td>
                       <td className="p-2">v{log.version_num}</td>
                       <td className="p-2">{renderDiff(log)}</td>

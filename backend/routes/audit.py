@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, false, func
 from datetime import datetime, timezone
-from models import ItemVersion, InventoryVersion, User
+from models import ItemVersion, InventoryVersion, User, Inventory
 from schemas import ItemVersionResponse, InventoryVersionResponse
 from routes.auth import get_current_user
 from dependencies import get_db
-from typing import List, Optional
+from typing import List, Optional, cast
 
 router = APIRouter()
 
@@ -72,7 +72,6 @@ def get_item_audit_logs(
 
     # Permessi: solo admin vede tutto, altri vedono solo i loro inventari
     if current_user.role.name != "admin":
-        from models import Inventory
         visible_inventory_ids = (
             db.query(Inventory.id)
             .filter(
@@ -88,7 +87,45 @@ def get_item_audit_logs(
         else:
             query = query.filter(false())  # No access
 
-    return query.order_by(desc(ItemVersion.changed_at)).all()
+    logs = query.order_by(desc(ItemVersion.changed_at)).all()
+
+    # Arricchisce ogni log item con nome/tipo inventario per una visualizzazione audit piu leggibile.
+    inventory_ids = {
+        cast(int, log.inventory_id)
+        for log in logs
+        if log.inventory_id is not None
+    }
+    inventory_map = {}
+
+    if inventory_ids:
+        current_inventories = (
+            db.query(Inventory.id, Inventory.name, Inventory.type)
+            .filter(Inventory.id.in_(inventory_ids))
+            .all()
+        )
+        for inv_id, inv_name, inv_type in current_inventories:
+            inventory_map[inv_id] = (inv_name, inv_type)
+
+        missing_ids = [inv_id for inv_id in inventory_ids if inv_id not in inventory_map]
+        if missing_ids:
+            fallback_versions = (
+                db.query(InventoryVersion)
+                .filter(InventoryVersion.inventory_id.in_(missing_ids))
+                .order_by(InventoryVersion.inventory_id.asc(), InventoryVersion.version_num.desc())
+                .all()
+            )
+            for version in fallback_versions:
+                version_inventory_id = cast(int, version.inventory_id)
+                if version_inventory_id not in inventory_map:
+                    inventory_map[version_inventory_id] = (version.name, version.type)
+
+    for log in logs:
+        log_inventory_id = cast(int, log.inventory_id)
+        inv_name, inv_type = inventory_map.get(log_inventory_id, (None, None))
+        setattr(log, "inventory_name", inv_name)
+        setattr(log, "inventory_type", inv_type)
+
+    return logs
 
 @router.get("/logs/inventories", response_model=List[InventoryVersionResponse])
 def get_inventory_audit_logs(
