@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from models import User, Item, Inventory, ItemVersion
 from dependencies import get_db
-from schemas import ItemCreate, ItemUpdate, ItemDelete, ItemResponse, ItemVersionResponse, VersionBulkDeleteRequest
+from schemas import ItemCreate, ItemUpdate, ItemDelete, ItemMetadataValueResponse, ItemResponse, ItemVersionResponse, VersionBulkDeleteRequest
 from routes.auth import get_current_user
 from routes.inventory import can_access_inventory
 from fastapi import status
@@ -55,6 +55,7 @@ def _write_item_version(
     user: User,
     old_snapshot: dict[str, Any] | None = None,
     merge_quantity_updates: bool = True,
+    extra_diff: dict[str, Any] | None = None,
 ) -> None:
     diff: dict = {}
     new_snapshot = None
@@ -64,6 +65,9 @@ def _write_item_version(
             old_val = old_snapshot.get(key)
             if old_val != new_val:
                 diff[key] = {"from": old_val, "to": new_val}
+
+        if extra_diff:
+            diff.update(extra_diff)
 
         # Evita versioni vuote quando non cambia nulla
         if not diff:
@@ -151,9 +155,26 @@ def _build_item_response(db: Session, item: Item) -> ItemResponse:
         ItemVersion.item_id == item.id
     ).scalar() or 0
     return ItemResponse(
-        **item.__dict__,
+        id=cast(int, item.id),
+        name=cast(str, item.name),
+        description=cast(str | None, item.description),
+        quantity=cast(int, item.quantity),
+        inventory_id=cast(int, item.inventory_id),
+        data_ins=item.data_ins,
+        data_mod=item.data_mod,
+        user_ins=item.user_ins,
+        user_mod=item.user_mod,
         username_ins=item.user_ins_rel.username if item.user_ins_rel else None,
         username_mod=item.user_mod_rel.username if item.user_mod_rel else None,
+        metadata_values=[
+            ItemMetadataValueResponse(
+                **value.__dict__,
+                definition_key=value.definition.key if value.definition else None,
+                definition_label=value.definition.label if value.definition else None,
+                field_type=value.definition.field_type if value.definition else None,
+            )
+            for value in item.metadata_values
+        ],
         version_num=current_version,
     )
 

@@ -1,7 +1,14 @@
 from __future__ import annotations
-from typing import List, Optional, TYPE_CHECKING
-from pydantic import BaseModel
-from datetime import datetime
+from typing import List, Literal, Optional, TYPE_CHECKING
+from decimal import Decimal
+from pydantic import BaseModel, model_validator
+from datetime import datetime, date
+from metadata_model import (
+    InventoryContainerType,
+    MetadataDefinitionScope,
+    MetadataFieldType,
+    MetadataFilterOperator,
+)
 
 ################################################
 # Modello base per aggiungere campi comuni
@@ -140,6 +147,7 @@ class ItemResponse(ItemBase, LoggingResponse):
     id: int
     username_ins: Optional[str] = None
     username_mod: Optional[str] = None
+    metadata_values: List['ItemMetadataValueResponse'] = []
     version_num: int = 0
     
     class Config:
@@ -149,7 +157,6 @@ ItemBase.model_rebuild()
 ItemCreate.model_rebuild()
 ItemUpdate.model_rebuild()
 ItemDelete.model_rebuild()
-ItemResponse.model_rebuild()
 
 ################################################
 # Versioni storica degli item (shadow table)
@@ -235,3 +242,376 @@ class AppSettingResponse(BaseModel):
 
 AppSettingUpdate.model_rebuild()
 AppSettingResponse.model_rebuild()
+
+##############################################################
+# Metadati EAV - Assegnazioni
+
+class MetadataAssignmentCreate(BaseModel):
+    scope: MetadataDefinitionScope
+    inventory_type: Optional[InventoryContainerType] = None
+    inventory_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def validate_assignment_target(self):
+        if self.scope == MetadataDefinitionScope.GLOBAL:
+            if self.inventory_type is not None or self.inventory_id is not None:
+                raise ValueError("Per scope GLOBAL non specificare inventory_type o inventory_id")
+        elif self.scope == MetadataDefinitionScope.INVENTORY_TYPE:
+            if self.inventory_type is None:
+                raise ValueError("Per scope INVENTORY_TYPE inventory_type è obbligatorio")
+            if self.inventory_id is not None:
+                raise ValueError("Per scope INVENTORY_TYPE inventory_id non deve essere specificato")
+        elif self.scope == MetadataDefinitionScope.INVENTORY:
+            if self.inventory_id is None:
+                raise ValueError("Per scope INVENTORY inventory_id è obbligatorio")
+        return self
+
+
+class MetadataAssignmentResponse(BaseModel):
+    id: int
+    definition_id: int
+    scope: MetadataDefinitionScope
+    inventory_type: Optional[InventoryContainerType] = None
+    inventory_id: Optional[int] = None
+    data_ins: Optional[datetime] = None
+    data_mod: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+##############################################################
+# Metadati EAV - Definizioni
+
+class MetadataDefinitionBase(BaseModel):
+    key: str
+    label: str
+    description: Optional[str] = None
+    field_type: MetadataFieldType
+    sort_order: int = 0
+    is_required: bool = False
+    is_active: bool = True
+
+
+class MetadataDefinitionCreate(MetadataDefinitionBase):
+    pass
+
+
+class MetadataDefinitionUpdate(BaseModel):
+    key: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_required: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class MetadataDefinitionResponse(MetadataDefinitionBase, LoggingResponse):
+    id: int
+    assignments: List[MetadataAssignmentResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+MetadataAssignmentCreate.model_rebuild()
+MetadataAssignmentResponse.model_rebuild()
+MetadataDefinitionBase.model_rebuild()
+MetadataDefinitionCreate.model_rebuild()
+MetadataDefinitionUpdate.model_rebuild()
+MetadataDefinitionResponse.model_rebuild()
+
+
+##############################################################
+# Metadati EAV - Valori typed
+class ItemMetadataTypedValue(BaseModel):
+    value_text: Optional[str] = None
+    value_number: Optional[Decimal] = None
+    value_boolean: Optional[bool] = None
+    value_date: Optional[date] = None
+
+    @model_validator(mode="after")
+    def validate_single_typed_value(self):
+        set_count = sum(
+            value is not None
+            for value in (
+                self.value_text,
+                self.value_number,
+                self.value_boolean,
+                self.value_date,
+            )
+        )
+        if set_count != 1:
+            raise ValueError("Esattamente un valore tra text/number/boolean/date deve essere valorizzato")
+        return self
+
+
+class ItemMetadataValueCreate(ItemMetadataTypedValue):
+    item_id: int
+    definition_id: int
+
+
+class ItemMetadataValueUpdate(ItemMetadataTypedValue):
+    pass
+
+
+class ItemMetadataValueResponse(ItemMetadataTypedValue, LoggingResponse):
+    id: int
+    item_id: int
+    definition_id: int
+    definition_key: Optional[str] = None
+    definition_label: Optional[str] = None
+    field_type: Optional[MetadataFieldType] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ItemMetadataValueUpsert(ItemMetadataTypedValue):
+    definition_id: int
+
+
+class ItemMetadataBulkUpsertRequest(BaseModel):
+    item_id: int
+    values: List[ItemMetadataValueUpsert]
+
+
+ItemMetadataTypedValue.model_rebuild()
+ItemMetadataValueCreate.model_rebuild()
+ItemMetadataValueUpdate.model_rebuild()
+ItemMetadataValueResponse.model_rebuild()
+ItemMetadataValueUpsert.model_rebuild()
+ItemMetadataBulkUpsertRequest.model_rebuild()
+ItemResponse.model_rebuild()
+
+
+##############################################################
+# Filtri numerici avanzati su metadati
+class NumericMetadataFilterCriterion(BaseModel):
+    definition_id: int
+    operator: MetadataFilterOperator
+    value_number: Optional[Decimal] = None
+    range_from: Optional[Decimal] = None
+    range_to: Optional[Decimal] = None
+
+    @model_validator(mode="after")
+    def validate_numeric_operator_payload(self):
+        between_operator = MetadataFilterOperator.BETWEEN
+        unary_operators = {
+            MetadataFilterOperator.EQUALS,
+            MetadataFilterOperator.NOT_EQUALS,
+            MetadataFilterOperator.GREATER_THAN,
+            MetadataFilterOperator.GREATER_THAN_OR_EQUAL,
+            MetadataFilterOperator.LESS_THAN,
+            MetadataFilterOperator.LESS_THAN_OR_EQUAL,
+        }
+        null_operators = {
+            MetadataFilterOperator.IS_NULL,
+            MetadataFilterOperator.IS_NOT_NULL,
+        }
+
+        if self.operator == between_operator:
+            if self.range_from is None or self.range_to is None:
+                raise ValueError("Per operator=between sono obbligatori range_from e range_to")
+            if self.range_from > self.range_to:
+                raise ValueError("range_from non può essere maggiore di range_to")
+            return self
+
+        if self.operator in unary_operators:
+            if self.value_number is None:
+                raise ValueError("Per questo operatore è obbligatorio value_number")
+            return self
+
+        if self.operator in null_operators:
+            return self
+
+        raise ValueError("Operatore non supportato per filtri numerici")
+
+
+class NumericMetadataFilterRequest(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"] = "all"
+    criteria: List[NumericMetadataFilterCriterion]
+
+    @model_validator(mode="after")
+    def validate_criteria(self):
+        if not self.criteria:
+            raise ValueError("Almeno un criterio numerico è obbligatorio")
+        return self
+
+
+class NumericMetadataFilterResponse(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"]
+    item_ids: List[int]
+    count: int
+
+
+NumericMetadataFilterCriterion.model_rebuild()
+NumericMetadataFilterRequest.model_rebuild()
+NumericMetadataFilterResponse.model_rebuild()
+
+
+##############################################################
+# Filtri date avanzati su metadati
+class DateMetadataFilterCriterion(BaseModel):
+    definition_id: int
+    operator: MetadataFilterOperator
+    value_date: Optional[date] = None
+    range_from: Optional[date] = None
+    range_to: Optional[date] = None
+
+    @model_validator(mode="after")
+    def validate_date_operator_payload(self):
+        between_operator = MetadataFilterOperator.BETWEEN
+        unary_operators = {
+            MetadataFilterOperator.EQUALS,
+            MetadataFilterOperator.NOT_EQUALS,
+            MetadataFilterOperator.GREATER_THAN,
+            MetadataFilterOperator.GREATER_THAN_OR_EQUAL,
+            MetadataFilterOperator.LESS_THAN,
+            MetadataFilterOperator.LESS_THAN_OR_EQUAL,
+        }
+        null_operators = {
+            MetadataFilterOperator.IS_NULL,
+            MetadataFilterOperator.IS_NOT_NULL,
+        }
+
+        if self.operator == between_operator:
+            if self.range_from is None or self.range_to is None:
+                raise ValueError("Per operator=between sono obbligatori range_from e range_to")
+            if self.range_from > self.range_to:
+                raise ValueError("range_from non può essere maggiore di range_to")
+            return self
+
+        if self.operator in unary_operators:
+            if self.value_date is None:
+                raise ValueError("Per questo operatore è obbligatorio value_date")
+            return self
+
+        if self.operator in null_operators:
+            return self
+
+        raise ValueError("Operatore non supportato per filtri date")
+
+
+class DateMetadataFilterRequest(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"] = "all"
+    criteria: List[DateMetadataFilterCriterion]
+
+    @model_validator(mode="after")
+    def validate_criteria(self):
+        if not self.criteria:
+            raise ValueError("Almeno un criterio date è obbligatorio")
+        return self
+
+
+class DateMetadataFilterResponse(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"]
+    item_ids: List[int]
+    count: int
+
+
+DateMetadataFilterCriterion.model_rebuild()
+DateMetadataFilterRequest.model_rebuild()
+DateMetadataFilterResponse.model_rebuild()
+
+
+##############################################################
+# Filtri boolean avanzati su metadati
+class BooleanMetadataFilterCriterion(BaseModel):
+    definition_id: int
+    operator: MetadataFilterOperator
+    value_boolean: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def validate_boolean_operator_payload(self):
+        binary_operators = {
+            MetadataFilterOperator.EQUALS,
+            MetadataFilterOperator.NOT_EQUALS,
+        }
+        unary_operators = {
+            MetadataFilterOperator.IS_NULL,
+            MetadataFilterOperator.IS_NOT_NULL,
+        }
+
+        if self.operator in binary_operators:
+            if self.value_boolean is None:
+                raise ValueError("Per questo operatore è obbligatorio value_boolean")
+            return self
+
+        if self.operator in unary_operators:
+            return self
+
+        raise ValueError("Operatore non supportato per filtri boolean")
+
+
+class BooleanMetadataFilterRequest(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"] = "all"
+    criteria: List[BooleanMetadataFilterCriterion]
+
+    @model_validator(mode="after")
+    def validate_criteria(self):
+        if not self.criteria:
+            raise ValueError("Almeno un criterio boolean è obbligatorio")
+        return self
+
+
+class BooleanMetadataFilterResponse(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"]
+    item_ids: List[int]
+    count: int
+
+
+BooleanMetadataFilterCriterion.model_rebuild()
+BooleanMetadataFilterRequest.model_rebuild()
+BooleanMetadataFilterResponse.model_rebuild()
+
+
+##############################################################
+# Template filtri salvati
+class FilterTemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    filter_type: Literal["numeric", "date", "text", "composite"]
+    criteria: dict
+    is_shared: bool = False
+
+
+class FilterTemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    criteria: Optional[dict] = None
+    is_shared: Optional[bool] = None
+
+
+class FilterTemplateResponse(FilterTemplateCreate, LoggingResponse):
+    id: int
+    inventory_id: int
+
+    class Config:
+        from_attributes = True
+
+
+class FilterTemplateListResponse(BaseModel):
+    id: int
+    inventory_id: int
+    name: str
+    description: Optional[str] = None
+    filter_type: str
+    is_shared: bool
+    data_ins: datetime
+    data_mod: datetime
+
+    class Config:
+        from_attributes = True
+
+
+FilterTemplateCreate.model_rebuild()
+FilterTemplateUpdate.model_rebuild()
+FilterTemplateResponse.model_rebuild()
+FilterTemplateListResponse.model_rebuild()

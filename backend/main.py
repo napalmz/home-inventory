@@ -14,6 +14,8 @@ from routes.system import router as system_router
 from routes.settings import router as settings_router
 from routes.backup import router as backup_router
 from routes.audit import router as audit_router
+from routes.metadata import router as metadata_router
+from routes.filters import router as filters_router
 from fastapi.middleware.cors import CORSMiddleware
 from models import Inventory, Item, User
 from scheduler import start_scheduler
@@ -68,6 +70,8 @@ app.include_router(system_router, prefix="/system", tags=["System"])
 app.include_router(settings_router, prefix="/settings", tags=["Settings"])
 app.include_router(backup_router, prefix="/backup", tags=["Backups"])
 app.include_router(audit_router, prefix="/audit", tags=["Audit"])
+app.include_router(metadata_router, prefix="/metadata", tags=["Metadata"])
+app.include_router(filters_router, prefix="/filter-templates", tags=["Filter Templates"])
 
 @app.get("/")
 def home():

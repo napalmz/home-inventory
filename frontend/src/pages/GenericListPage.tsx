@@ -493,6 +493,10 @@ export default function GenericListPage() {
                           highlighted?: {
                             name: string;
                             description?: string | null;
+                            metadata_text?: Array<{
+                              definition_label: string;
+                              value_text: string;
+                            }>;
                           };
                         }) => (
                           <li key={item.id}>
@@ -517,6 +521,22 @@ export default function GenericListPage() {
                                   }}
                                 />
                               </>
+                            )}
+                            {item.highlighted?.metadata_text && item.highlighted.metadata_text.length > 0 && (
+                              <ul className="ml-4 mt-1 list-disc text-xs text-gray-600 dark:text-gray-700">
+                                {item.highlighted.metadata_text.map((metadata, index) => (
+                                  <li key={`${item.id}-meta-${index}`}>
+                                    <span
+                                      dangerouslySetInnerHTML={{
+                                        __html: `${metadata.definition_label}: ${metadata.value_text}`.replace(
+                                          /\*\*(.*?)\*\*/g,
+                                          "<span style='background-color: #cce5ff; padding: 0 2px; border-radius: 2px;'>$1</span>"
+                                        ),
+                                      }}
+                                    />
+                                  </li>
+                                ))}
+                              </ul>
                             )}
                           </li>
                         ))}

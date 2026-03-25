@@ -72,6 +72,17 @@ export function HistoryModal({
     return String(value);
   };
 
+  const formatTypedMetadataValue = (typed: unknown): string => {
+    if (typed === null || typed === undefined) return 'vuoto';
+    if (typeof typed !== 'object') return String(typed);
+    const t = typed as Record<string, unknown>;
+    if (t.value_text !== undefined && t.value_text !== null) return String(t.value_text);
+    if (t.value_number !== undefined && t.value_number !== null) return String(t.value_number);
+    if (t.value_boolean !== undefined && t.value_boolean !== null) return t.value_boolean ? 'sì' : 'no';
+    if (t.value_date !== undefined && t.value_date !== null) return String(t.value_date);
+    return 'vuoto';
+  };
+
   const formatChecklistState = (value: unknown) => {
     const numeric = Number(value);
     return !Number.isNaN(numeric) && numeric > 0;
@@ -105,7 +116,7 @@ export function HistoryModal({
     }
 
     try {
-      const parsed = JSON.parse(version.diff) as Record<string, { from: unknown; to: unknown }>;
+      const parsed = JSON.parse(version.diff) as Record<string, unknown>;
       const entries = Object.entries(parsed);
       if (entries.length === 0) {
         return [{ label: 'Modifiche', content: 'Nessuna modifica rilevata' }];
@@ -116,19 +127,37 @@ export function HistoryModal({
         entityType === 'item' &&
         itemContainerType === 'CHECKLIST';
 
-      return entries.map(([field, values]) => ({
-        label: field === 'quantity' && isChecklistQuantity ? 'Status' : fieldLabel(field),
-        content:
-          field === 'quantity' && isChecklistQuantity
-            ? (
-              <>
-                {renderChecklistStatus(values?.from)}
-                <span>{' -> '}</span>
-                {renderChecklistStatus(values?.to)}
-              </>
-            )
-            : `${formatValue(values?.from)} -> ${formatValue(values?.to)}`,
-      }));
+      const result: { label: string; content: ReactNode }[] = [];
+
+      for (const [field, values] of entries) {
+        if (field === 'metadata' && Array.isArray(values)) {
+          for (const change of values) {
+            const c = change as Record<string, unknown>;
+            const label = (c.definition_label as string | undefined) ?? (c.definition_key as string | undefined) ?? 'Metadato';
+            result.push({
+              label,
+              content: `${formatTypedMetadataValue(c.from)} -> ${formatTypedMetadataValue(c.to)}`,
+            });
+          }
+        } else {
+          const v = values as { from: unknown; to: unknown } | null | undefined;
+          result.push({
+            label: field === 'quantity' && isChecklistQuantity ? 'Status' : fieldLabel(field),
+            content:
+              field === 'quantity' && isChecklistQuantity
+                ? (
+                  <>
+                    {renderChecklistStatus(v?.from)}
+                    <span>{' -> '}</span>
+                    {renderChecklistStatus(v?.to)}
+                  </>
+                )
+                : `${formatValue(v?.from)} -> ${formatValue(v?.to)}`,
+          });
+        }
+      }
+
+      return result;
     } catch {
       return [{ label: 'Modifiche', content: 'Formato modifiche non leggibile' }];
     }

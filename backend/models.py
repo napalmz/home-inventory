@@ -1,5 +1,24 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean, func, UniqueConstraint
+from typing import Any, cast
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Date,
+    ForeignKey,
+    Table,
+    Boolean,
+    Numeric,
+    Text,
+    func,
+    UniqueConstraint,
+    CheckConstraint,
+)
+try:
+    from sqlalchemy.dialects.postgresql import JSON
+except ImportError:
+    from sqlalchemy import JSON
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base, Session
 from enum import Enum
@@ -19,14 +38,13 @@ class LoggingData:
     def user_mod(cls):
         return Column(Integer, ForeignKey('users.id'), nullable=True)
 
-    # Esplicita le relazioni per evitare ambiguità
     @declared_attr
     def user_ins_rel(cls):
-        return relationship("User", foreign_keys=[cls.user_ins])
+        return relationship("User", foreign_keys=cast(Any, [cls.user_ins]))
 
     @declared_attr
     def user_mod_rel(cls):
-        return relationship("User", foreign_keys=[cls.user_mod])
+        return relationship("User", foreign_keys=cast(Any, [cls.user_mod]))
 
 ################################################
 class RoleEnum(str, Enum):
@@ -137,6 +155,82 @@ class Item(Base, LoggingData):
     quantity = Column(Integer, index=True)
     inventory_id = Column(Integer, ForeignKey("inventories.id"), nullable=False)
     inventory = relationship("Inventory", back_populates="items")
+    metadata_values = relationship("ItemMetadataValue", back_populates="item", cascade="all, delete-orphan")
+
+################################################
+class MetadataDefinition(Base, LoggingData):
+    __tablename__ = "metadata_definitions"
+    __table_args__ = (
+        CheckConstraint("field_type IN ('TEXT', 'NUMBER', 'BOOLEAN', 'DATE')", name="ck_metadata_definitions_field_type"),
+        UniqueConstraint("key", name="uq_metadata_definitions_key"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(64), nullable=False)
+    label = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    field_type = Column(String(16), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_required = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    assignments = relationship("MetadataDefinitionAssignment", back_populates="definition", cascade="all, delete-orphan")
+    item_values = relationship("ItemMetadataValue", back_populates="definition", cascade="all, delete-orphan")
+
+
+################################################
+class MetadataDefinitionAssignment(Base, LoggingData):
+    """Associazione tra una definizione metadato e il suo scope di applicazione."""
+    __tablename__ = "metadata_definition_assignments"
+    __table_args__ = (
+        CheckConstraint("scope IN ('GLOBAL', 'INVENTORY_TYPE', 'INVENTORY')", name="ck_mda_scope"),
+        CheckConstraint(
+            "inventory_type IS NULL OR inventory_type IN ('INVENTORY', 'CHECKLIST')",
+            name="ck_mda_inventory_type",
+        ),
+        CheckConstraint(
+            "(scope = 'GLOBAL' AND inventory_id IS NULL AND inventory_type IS NULL) OR "
+            "(scope = 'INVENTORY_TYPE' AND inventory_id IS NULL AND inventory_type IS NOT NULL) OR "
+            "(scope = 'INVENTORY' AND inventory_id IS NOT NULL)",
+            name="ck_mda_scope_target",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    definition_id = Column(Integer, ForeignKey("metadata_definitions.id", ondelete="CASCADE"), nullable=False, index=True)
+    scope = Column(String(32), nullable=False)
+    inventory_type = Column(String(16), nullable=True, index=True)
+    inventory_id = Column(Integer, ForeignKey("inventories.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    definition = relationship("MetadataDefinition", back_populates="assignments")
+    inventory = relationship("Inventory")
+
+################################################
+class ItemMetadataValue(Base, LoggingData):
+    __tablename__ = "item_metadata_values"
+    __table_args__ = (
+        UniqueConstraint("item_id", "definition_id", name="uq_item_metadata_values_item_definition"),
+        CheckConstraint(
+            "(" 
+            "CASE WHEN value_text IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN value_number IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN value_boolean IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN value_date IS NOT NULL THEN 1 ELSE 0 END"
+            ") = 1",
+            name="ck_item_metadata_values_single_typed_value",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
+    definition_id = Column(Integer, ForeignKey("metadata_definitions.id", ondelete="CASCADE"), nullable=False, index=True)
+    value_text = Column(Text, nullable=True)
+    value_number = Column(Numeric(14, 4), nullable=True)
+    value_boolean = Column(Boolean, nullable=True)
+    value_date = Column(Date, nullable=True)
+
+    item = relationship("Item", back_populates="metadata_values")
+    definition = relationship("MetadataDefinition", back_populates="item_values")
 
 ################################################
 class SharedInventory(Base, LoggingData):
@@ -212,3 +306,21 @@ class InventoryVersion(Base):
     diff = Column(String, nullable=True)                         # JSON
 
     changed_by = relationship("User", foreign_keys=[changed_by_id])
+
+################################################
+# Template filtri salvati per inventari
+class FilterTemplate(Base, LoggingData):
+    __tablename__ = "filter_templates"
+    __table_args__ = (
+        UniqueConstraint("inventory_id", "name", name="uq_filter_templates_inventory_name"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    inventory_id = Column(Integer, ForeignKey("inventories.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    filter_type = Column(String(32), nullable=False)  # "numeric", "date", "text", "composite"
+    criteria = Column(JSON, nullable=False)  # JSON: {"filter_type": ..., "criteria": [...], "match_mode": "all"|"any"}
+    is_shared = Column(Boolean, nullable=False, default=False)
+    
+    inventory = relationship("Inventory")

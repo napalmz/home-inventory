@@ -9,7 +9,26 @@ import {
   ChecklistItem,
   ChecklistWithMatches,
   ItemVersion,
-  InventoryVersion
+  InventoryVersion,
+  MetadataDefinition,
+  MetadataDefinitionCreate,
+  MetadataAssignment,
+  MetadataAssignmentCreate,
+  MetadataDefinitionUpdate,
+  ItemMetadataValue,
+  ItemMetadataValueCreate,
+  ItemMetadataValueUpdate,
+  ItemMetadataBulkUpsertRequest,
+  NumericMetadataFilterRequest,
+  NumericMetadataFilterResponse,
+  DateMetadataFilterRequest,
+  DateMetadataFilterResponse,
+  BooleanMetadataFilterRequest,
+  BooleanMetadataFilterResponse,
+  FilterTemplate,
+  FilterTemplateCreate,
+  FilterTemplateListItem,
+  FilterTemplateUpdate,
 } from "./types";
 
 let api: ReturnType<typeof axios.create>;
@@ -651,4 +670,171 @@ export async function getInventoryAuditLogs(
     },
   });
   return response.data as InventoryVersion[];
+}
+
+/* === METADATA DEFINITIONS === */
+export async function getMetadataDefinitions(
+  inventoryId: number,
+  includeInactive = false,
+): Promise<MetadataDefinition[]> {
+  const response = await api.get('/metadata/applicable', {
+    params: {
+      inventory_id: inventoryId,
+      include_inactive: includeInactive,
+    },
+  });
+  return response.data as MetadataDefinition[];
+}
+
+export async function listAllMetadataDefinitions(
+  includeInactive = true,
+): Promise<MetadataDefinition[]> {
+  const response = await api.get('/metadata/definitions', {
+    params: {
+      include_inactive: includeInactive,
+    },
+  });
+  return response.data as MetadataDefinition[];
+}
+
+export async function getMetadataDefinition(definitionId: number): Promise<MetadataDefinition> {
+  const response = await api.get(`/metadata/definitions/${definitionId}`);
+  return response.data as MetadataDefinition;
+}
+
+export async function createMetadataDefinition(
+  payload: MetadataDefinitionCreate,
+): Promise<MetadataDefinition> {
+  const response = await api.post('/metadata/definitions', payload);
+  return response.data as MetadataDefinition;
+}
+
+export async function updateMetadataDefinition(
+  definitionId: number,
+  payload: MetadataDefinitionUpdate,
+): Promise<MetadataDefinition> {
+  const response = await api.patch(`/metadata/definitions/${definitionId}`, payload);
+  return response.data as MetadataDefinition;
+}
+
+export async function deleteMetadataDefinition(definitionId: number): Promise<{ detail: string }> {
+  const response = await api.delete(`/metadata/definitions/${definitionId}`);
+  return response.data as { detail: string };
+}
+
+export async function createMetadataAssignment(
+  definitionId: number,
+  payload: MetadataAssignmentCreate,
+): Promise<MetadataAssignment> {
+  const response = await api.post(`/metadata/definitions/${definitionId}/assignments`, payload);
+  return response.data as MetadataAssignment;
+}
+
+export async function deleteMetadataAssignment(assignmentId: number): Promise<{ detail: string }> {
+  const response = await api.delete(`/metadata/assignments/${assignmentId}`);
+  return response.data as { detail: string };
+}
+
+/* === ITEM METADATA VALUES === */
+export async function getItemMetadataValues(itemId: number): Promise<ItemMetadataValue[]> {
+  const response = await api.get('/metadata/values', {
+    params: { item_id: itemId },
+  });
+  return response.data as ItemMetadataValue[];
+}
+
+export async function getItemMetadataValue(valueId: number): Promise<ItemMetadataValue> {
+  const response = await api.get(`/metadata/values/${valueId}`);
+  return response.data as ItemMetadataValue;
+}
+
+export async function createItemMetadataValue(
+  payload: ItemMetadataValueCreate,
+): Promise<ItemMetadataValue> {
+  const response = await api.post('/metadata/values', payload);
+  return response.data as ItemMetadataValue;
+}
+
+export async function updateItemMetadataValue(
+  valueId: number,
+  payload: ItemMetadataValueUpdate,
+): Promise<ItemMetadataValue> {
+  const response = await api.patch(`/metadata/values/${valueId}`, payload);
+  return response.data as ItemMetadataValue;
+}
+
+export async function deleteItemMetadataValue(valueId: number): Promise<{ detail: string }> {
+  const response = await api.delete(`/metadata/values/${valueId}`);
+  return response.data as { detail: string };
+}
+
+export async function bulkUpsertItemMetadataValues(
+  payload: ItemMetadataBulkUpsertRequest,
+): Promise<ItemMetadataValue[]> {
+  const response = await api.put('/metadata/values/bulk-upsert', payload);
+  return response.data as ItemMetadataValue[];
+}
+
+/* === METADATA ADVANCED FILTERS === */
+export async function filterItemsByNumericMetadata(
+  payload: NumericMetadataFilterRequest,
+): Promise<NumericMetadataFilterResponse> {
+  const response = await api.post('/metadata/filters/numeric', payload);
+  return response.data as NumericMetadataFilterResponse;
+}
+
+export async function filterItemsByDateMetadata(
+  payload: DateMetadataFilterRequest,
+): Promise<DateMetadataFilterResponse> {
+  const response = await api.post('/metadata/filters/date', payload);
+  return response.data as DateMetadataFilterResponse;
+}
+
+export async function filterItemsByBooleanMetadata(
+  payload: BooleanMetadataFilterRequest,
+): Promise<BooleanMetadataFilterResponse> {
+  const response = await api.post('/metadata/filters/boolean', payload);
+  return response.data as BooleanMetadataFilterResponse;
+}
+
+/* === FILTER TEMPLATES === */
+export async function getFilterTemplates(
+  inventoryId: number,
+  includeShared = true,
+): Promise<FilterTemplateListItem[]> {
+  const response = await api.get('/filter-templates', {
+    params: {
+      inventory_id: inventoryId,
+      include_shared: includeShared,
+    },
+  });
+  return response.data as FilterTemplateListItem[];
+}
+
+export async function getFilterTemplate(templateId: number): Promise<FilterTemplate> {
+  const response = await api.get(`/filter-templates/${templateId}`);
+  return response.data as FilterTemplate;
+}
+
+export async function createFilterTemplate(
+  inventoryId: number,
+  payload: FilterTemplateCreate,
+): Promise<FilterTemplate> {
+  const response = await api.post('/filter-templates', payload, {
+    params: { inventory_id: inventoryId },
+  });
+  return response.data as FilterTemplate;
+}
+
+export async function updateFilterTemplate(
+  templateId: number,
+  payload: FilterTemplateUpdate,
+): Promise<FilterTemplate> {
+  const response = await api.patch(`/filter-templates/${templateId}`, payload);
+  return response.data as FilterTemplate;
+}
+
+export async function deleteFilterTemplate(templateId: number): Promise<{ detail: string }> {
+  const response = await api.delete(`/filter-templates/${templateId}`);
+  return response.data as { detail: string };
 }
