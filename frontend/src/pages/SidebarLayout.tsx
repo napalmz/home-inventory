@@ -147,7 +147,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           <p>API v{apiVersion ?? '...'}</p>
           <p>Frontend v{frontendVersion}</p>
           <p className="mt-1">
-            © {new Date().getFullYear()} <a href="https://github.com/napalmz" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">napalmz</a>
+            © 2025-{new Date().getFullYear()} <a href="https://github.com/napalmz" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">napalmz</a>
           </p>
         </div>
 
