@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Any, List
+from typing import Any, List, cast
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -39,6 +39,9 @@ from schemas import (
     NumericMetadataFilterCriterion,
     NumericMetadataFilterRequest,
     NumericMetadataFilterResponse,
+    TextMetadataFilterCriterion,
+    TextMetadataFilterRequest,
+    TextMetadataFilterResponse,
 )
 
 
@@ -55,15 +58,15 @@ SCOPE_PRIORITY = {
 # Helpers – risorse
 # ---------------------------------------------------------------------------
 
-def _get_inventory_or_404(db: Session, inventory_id: int) -> Inventory:
-    obj = db.query(Inventory).filter(Inventory.id == inventory_id).first()
+def _get_inventory_or_404(db: Session, inventory_id: Any) -> Inventory:
+    obj = db.query(Inventory).filter(Inventory.id == cast(int, inventory_id)).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     return obj
 
 
-def _get_definition_or_404(db: Session, definition_id: int) -> MetadataDefinition:
-    obj = db.query(MetadataDefinition).filter(MetadataDefinition.id == definition_id).first()
+def _get_definition_or_404(db: Session, definition_id: Any) -> MetadataDefinition:
+    obj = db.query(MetadataDefinition).filter(MetadataDefinition.id == cast(int, definition_id)).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Definizione metadato non trovata")
     return obj
@@ -78,8 +81,8 @@ def _get_assignment_or_404(db: Session, assignment_id: int) -> MetadataDefinitio
     return obj
 
 
-def _get_item_or_404(db: Session, item_id: int) -> Item:
-    obj = db.query(Item).filter(Item.id == item_id).first()
+def _get_item_or_404(db: Session, item_id: Any) -> Item:
+    obj = db.query(Item).filter(Item.id == cast(int, item_id)).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Item non trovato")
     return obj
@@ -93,8 +96,8 @@ def _to_jsonable_metadata_value(value: Any) -> Any:
     return value
 
 
-def _get_value_or_404(db: Session, value_id: int) -> ItemMetadataValue:
-    obj = db.query(ItemMetadataValue).filter(ItemMetadataValue.id == value_id).first()
+def _get_value_or_404(db: Session, value_id: Any) -> ItemMetadataValue:
+    obj = db.query(ItemMetadataValue).filter(ItemMetadataValue.id == cast(int, value_id)).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Valore metadato non trovato")
     return obj
@@ -116,6 +119,8 @@ def _assert_can_manage_assignment(
 ) -> Inventory | None:
     # Per scope INVENTORY basta avere accesso edit all'inventario; altrimenti serve admin.
     if payload.scope == MetadataDefinitionScope.INVENTORY:
+        if payload.inventory_id is None:
+            raise HTTPException(status_code=400, detail="inventory_id obbligatorio per scope INVENTORY")
         inventory = _get_inventory_or_404(db, payload.inventory_id)
         if not can_access_inventory(user, inventory, action="edit"):
             raise HTTPException(status_code=403, detail="Accesso negato")
@@ -128,7 +133,37 @@ def _assert_can_manage_assignment(
 # Helpers – validazione definizioni
 # ---------------------------------------------------------------------------
 
-def _validate_definition_rules(key: str | None = None, sort_order: int | None = None) -> None:
+def _normalize_list_options(raw_options: Any) -> list[dict[str, str]]:
+    if raw_options in (None, ""):
+        return []
+
+    normalized: list[dict[str, str]] = []
+    seen_values: set[str] = set()
+    for entry in raw_options:
+        if isinstance(entry, dict):
+            value = str(entry.get("value", "")).strip()
+            label = str(entry.get("label", "")).strip() or value
+        else:
+            value = str(getattr(entry, "value", "")).strip()
+            label = str(getattr(entry, "label", "")).strip() or value
+
+        if not value:
+            raise HTTPException(status_code=400, detail="Le opzioni LIST devono avere un valore non vuoto")
+        if value in seen_values:
+            raise HTTPException(status_code=400, detail=f"Opzione LIST duplicata non consentita: {value}")
+
+        seen_values.add(value)
+        normalized.append({"value": value, "label": label})
+
+    return normalized
+
+
+def _validate_definition_rules(
+    key: str | None = None,
+    sort_order: int | None = None,
+    field_type: MetadataFieldType | None = None,
+    list_options: Any = None,
+) -> list[dict[str, str]] | None:
     if key is not None:
         normalized = key.strip()
         if not normalized:
@@ -141,6 +176,20 @@ def _validate_definition_rules(key: str | None = None, sort_order: int | None = 
     if sort_order is not None and sort_order < 0:
         raise HTTPException(status_code=400, detail="sort_order deve essere >= 0")
 
+    if field_type == MetadataFieldType.LIST:
+        normalized_list_options = _normalize_list_options(list_options)
+        if not normalized_list_options:
+            raise HTTPException(status_code=400, detail="Per il tipo LIST è obbligatoria almeno un'opzione")
+        return normalized_list_options
+
+    if list_options is not None:
+        normalized_list_options = _normalize_list_options(list_options)
+        if normalized_list_options:
+            raise HTTPException(status_code=400, detail="list_options è consentito solo per field_type=LIST")
+        return []
+
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Helpers – risoluzione definizioni applicabili
@@ -152,7 +201,7 @@ def _resolve_applicable_definitions(
     include_inactive: bool = False,
 ) -> list[MetadataDefinition]:
     # Restituisce le definizioni applicabili a un inventario con priorita' GLOBAL < TYPE < INVENTORY.
-    pairs: list[tuple[MetadataDefinition, MetadataDefinitionAssignment]] = (
+    raw_pairs = (
         db.query(MetadataDefinition, MetadataDefinitionAssignment)
         .join(MetadataDefinitionAssignment, MetadataDefinitionAssignment.definition_id == MetadataDefinition.id)
         .filter(
@@ -170,18 +219,22 @@ def _resolve_applicable_definitions(
         )
         .all()
     )
+    pairs: list[tuple[MetadataDefinition, MetadataDefinitionAssignment]] = [
+        (cast(MetadataDefinition, d), cast(MetadataDefinitionAssignment, a))
+        for d, a in raw_pairs
+    ]
     if not include_inactive:
-        pairs = [(d, a) for d, a in pairs if d.is_active]
+        pairs = [(d, a) for d, a in pairs if cast(bool, d.is_active)]
 
     # Ordina per priorità crescente; l'ultimo valore per chiave vince (più specifico)
     pairs_sorted = sorted(
         pairs,
-        key=lambda pair: SCOPE_PRIORITY.get(MetadataDefinitionScope(pair[1].scope), 0),
+        key=lambda pair: SCOPE_PRIORITY.get(MetadataDefinitionScope(cast(str, pair[1].scope)), 0),
     )
     by_key: dict[str, MetadataDefinition] = {}
     for definition, _assignment in pairs_sorted:
-        by_key[definition.key] = definition
-    return sorted(by_key.values(), key=lambda d: (d.sort_order, d.id))
+        by_key[cast(str, definition.key)] = definition
+    return sorted(by_key.values(), key=lambda d: (cast(int, d.sort_order), cast(int, d.id)))
 
 
 def _definition_applies_to_inventory(
@@ -249,33 +302,54 @@ def _assert_typed_values_match_definition(definition: MetadataDefinition, typed_
             detail=f"Tipo valore non coerente: atteso {field_type.value} ({expected_column})",
         )
     if expected_column == "value_text" and isinstance(typed_values["value_text"], str):
-        if not typed_values["value_text"].strip():
+        typed_values["value_text"] = typed_values["value_text"].strip()
+        if not typed_values["value_text"]:
             raise HTTPException(status_code=400, detail="Il valore text non può essere vuoto")
+        if field_type == MetadataFieldType.LIST:
+            allowed_values = {entry["value"] for entry in _normalize_list_options(definition.list_options)}
+            if not allowed_values:
+                raise HTTPException(status_code=400, detail="Definizione LIST senza opzioni configurate")
+            if typed_values["value_text"] not in allowed_values:
+                raise HTTPException(status_code=400, detail="Valore non consentito per questo campo LIST")
 
 
 def _assert_definition_is_active(definition: MetadataDefinition) -> None:
-    if not definition.is_active:
+    if not cast(bool, definition.is_active):
         raise HTTPException(status_code=400, detail="Definizione metadato inattiva")
 
 
 def _to_value_response(
     value: ItemMetadataValue, definition: MetadataDefinition
 ) -> ItemMetadataValueResponse:
+    definition_field_type = cast(str, definition.field_type)
+    stored_value_text = cast(str | None, value.value_text)
+    display_value: str | None = None
+    if definition_field_type == MetadataFieldType.LIST.value and stored_value_text is not None:
+        display_value = next(
+            (
+                entry["label"]
+                for entry in _normalize_list_options(definition.list_options)
+                if entry["value"] == stored_value_text
+            ),
+            stored_value_text,
+        )
+
     return ItemMetadataValueResponse(
-        id=value.id,
-        item_id=value.item_id,
-        definition_id=value.definition_id,
-        value_text=value.value_text,
-        value_number=value.value_number,
-        value_boolean=value.value_boolean,
-        value_date=value.value_date,
-        data_ins=value.data_ins,
-        data_mod=value.data_mod,
-        user_ins=value.user_ins,
-        user_mod=value.user_mod,
-        definition_key=definition.key,
-        definition_label=definition.label,
-        field_type=definition.field_type,
+        id=cast(int, value.id),
+        item_id=cast(int, value.item_id),
+        definition_id=cast(int, value.definition_id),
+        value_text=stored_value_text,
+        value_number=cast(Decimal | None, value.value_number),
+        value_boolean=cast(bool | None, value.value_boolean),
+        value_date=cast(date | None, value.value_date),
+        data_ins=cast(datetime, value.data_ins),
+        data_mod=cast(datetime, value.data_mod),
+        user_ins=cast(int | None, value.user_ins),
+        user_mod=cast(int | None, value.user_mod),
+        definition_key=cast(str, definition.key),
+        definition_label=cast(str, definition.label),
+        field_type=MetadataFieldType(definition_field_type),
+        display_value=display_value,
     )
 
 
@@ -330,6 +404,51 @@ def _touch_item_for_metadata_change(
 # Helpers – predicati filtri avanzati
 # ---------------------------------------------------------------------------
 
+def _build_text_metadata_predicate(
+    db: Session,
+    criterion: TextMetadataFilterCriterion,
+    definition: MetadataDefinition,
+):
+    field_type = MetadataFieldType(definition.field_type)
+    if field_type not in {MetadataFieldType.TEXT, MetadataFieldType.LIST}:
+        raise HTTPException(status_code=400, detail=f"La definizione {definition.id} non è di tipo TEXT/LIST")
+
+    row_exists = db.query(ItemMetadataValue.id).filter(
+        ItemMetadataValue.item_id == Item.id,
+        ItemMetadataValue.definition_id == criterion.definition_id,
+    ).exists()
+    predicate = [
+        ItemMetadataValue.item_id == Item.id,
+        ItemMetadataValue.definition_id == criterion.definition_id,
+    ]
+    op = criterion.operator
+
+    if op == MetadataFilterOperator.IS_NULL:
+        return ~row_exists
+    elif op == MetadataFilterOperator.IS_NOT_NULL:
+        return row_exists
+    else:
+        predicate.append(ItemMetadataValue.value_text.is_not(None))
+        if field_type == MetadataFieldType.LIST and op in {
+            MetadataFilterOperator.CONTAINS,
+            MetadataFilterOperator.NOT_CONTAINS,
+        }:
+            raise HTTPException(status_code=400, detail="L'operatore scelto non è supportato per il tipo LIST")
+
+        if op == MetadataFilterOperator.EQUALS:
+            predicate.append(ItemMetadataValue.value_text == criterion.value_text)
+        elif op == MetadataFilterOperator.NOT_EQUALS:
+            predicate.append(ItemMetadataValue.value_text != criterion.value_text)
+        elif op == MetadataFilterOperator.CONTAINS:
+            predicate.append(ItemMetadataValue.value_text.ilike(f"%{criterion.value_text}%"))
+        elif op == MetadataFilterOperator.NOT_CONTAINS:
+            predicate.append(~ItemMetadataValue.value_text.ilike(f"%{criterion.value_text}%"))
+        else:
+            raise HTTPException(status_code=400, detail=f"Operatore non supportato: {op.value}")
+
+    return db.query(ItemMetadataValue.id).filter(and_(*predicate)).exists()
+
+
 def _build_numeric_metadata_predicate(
     db: Session,
     criterion: NumericMetadataFilterCriterion,
@@ -337,15 +456,19 @@ def _build_numeric_metadata_predicate(
 ):
     if MetadataFieldType(definition.field_type) != MetadataFieldType.NUMBER:
         raise HTTPException(status_code=400, detail=f"La definizione {definition.id} non è di tipo NUMBER")
+    row_exists = db.query(ItemMetadataValue.id).filter(
+        ItemMetadataValue.item_id == Item.id,
+        ItemMetadataValue.definition_id == criterion.definition_id,
+    ).exists()
     predicate = [
         ItemMetadataValue.item_id == Item.id,
         ItemMetadataValue.definition_id == criterion.definition_id,
     ]
     op = criterion.operator
     if op == MetadataFilterOperator.IS_NULL:
-        predicate.append(ItemMetadataValue.value_number.is_(None))
+        return ~row_exists
     elif op == MetadataFilterOperator.IS_NOT_NULL:
-        predicate.append(ItemMetadataValue.value_number.is_not(None))
+        return row_exists
     else:
         predicate.append(ItemMetadataValue.value_number.is_not(None))
         if op == MetadataFilterOperator.EQUALS:
@@ -374,15 +497,19 @@ def _build_date_metadata_predicate(
 ):
     if MetadataFieldType(definition.field_type) != MetadataFieldType.DATE:
         raise HTTPException(status_code=400, detail=f"La definizione {definition.id} non è di tipo DATE")
+    row_exists = db.query(ItemMetadataValue.id).filter(
+        ItemMetadataValue.item_id == Item.id,
+        ItemMetadataValue.definition_id == criterion.definition_id,
+    ).exists()
     predicate = [
         ItemMetadataValue.item_id == Item.id,
         ItemMetadataValue.definition_id == criterion.definition_id,
     ]
     op = criterion.operator
     if op == MetadataFilterOperator.IS_NULL:
-        predicate.append(ItemMetadataValue.value_date.is_(None))
+        return ~row_exists
     elif op == MetadataFilterOperator.IS_NOT_NULL:
-        predicate.append(ItemMetadataValue.value_date.is_not(None))
+        return row_exists
     else:
         predicate.append(ItemMetadataValue.value_date.is_not(None))
         if op == MetadataFilterOperator.EQUALS:
@@ -408,6 +535,43 @@ def _build_date_metadata_predicate(
 # ROUTES – Filtri avanzati
 # ===========================================================================
 
+@router.post("/filters/text", response_model=TextMetadataFilterResponse)
+def filter_items_by_text_metadata(
+    payload: TextMetadataFilterRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    inventory = _get_inventory_or_404(db, payload.inventory_id)
+    if not can_access_inventory(user, inventory, action="view"):
+        raise HTTPException(status_code=403, detail="Accesso negato")
+    definition_ids = {c.definition_id for c in payload.criteria}
+    definitions = {
+        cast(int, d.id): d
+        for d in _resolve_applicable_definitions(db, inventory)
+        if cast(int, d.id) in definition_ids
+    }
+    if len(definitions) != len(definition_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="Una o più definizioni non sono valide per questo inventario o risultano inattive",
+        )
+    exists_predicates = [
+        _build_text_metadata_predicate(db, c, definitions[c.definition_id]) for c in payload.criteria
+    ]
+    query = db.query(Item.id).filter(Item.inventory_id == payload.inventory_id)
+    if payload.match_mode == "all":
+        query = query.filter(and_(*exists_predicates))
+    else:
+        query = query.filter(or_(*exists_predicates))
+    item_ids = [r[0] for r in query.order_by(Item.id.asc()).all()]
+    return TextMetadataFilterResponse(
+        inventory_id=payload.inventory_id,
+        match_mode=payload.match_mode,
+        item_ids=item_ids,
+        count=len(item_ids),
+    )
+
+
 @router.post("/filters/numeric", response_model=NumericMetadataFilterResponse)
 def filter_items_by_numeric_metadata(
     payload: NumericMetadataFilterRequest,
@@ -419,7 +583,9 @@ def filter_items_by_numeric_metadata(
         raise HTTPException(status_code=403, detail="Accesso negato")
     definition_ids = {c.definition_id for c in payload.criteria}
     definitions = {
-        d.id: d for d in _resolve_applicable_definitions(db, inventory) if d.id in definition_ids
+        cast(int, d.id): d
+        for d in _resolve_applicable_definitions(db, inventory)
+        if cast(int, d.id) in definition_ids
     }
     if len(definitions) != len(definition_ids):
         raise HTTPException(
@@ -454,7 +620,9 @@ def filter_items_by_date_metadata(
         raise HTTPException(status_code=403, detail="Accesso negato")
     definition_ids = {c.definition_id for c in payload.criteria}
     definitions = {
-        d.id: d for d in _resolve_applicable_definitions(db, inventory) if d.id in definition_ids
+        cast(int, d.id): d
+        for d in _resolve_applicable_definitions(db, inventory)
+        if cast(int, d.id) in definition_ids
     }
     if len(definitions) != len(definition_ids):
         raise HTTPException(
@@ -485,15 +653,19 @@ def _build_boolean_metadata_predicate(
 ):
     if MetadataFieldType(definition.field_type) != MetadataFieldType.BOOLEAN:
         raise HTTPException(status_code=400, detail=f"La definizione {definition.id} non è di tipo BOOLEAN")
+    row_exists = db.query(ItemMetadataValue.id).filter(
+        ItemMetadataValue.item_id == Item.id,
+        ItemMetadataValue.definition_id == criterion.definition_id,
+    ).exists()
     predicate = [
         ItemMetadataValue.item_id == Item.id,
         ItemMetadataValue.definition_id == criterion.definition_id,
     ]
     op = criterion.operator
     if op == MetadataFilterOperator.IS_NULL:
-        predicate.append(ItemMetadataValue.value_boolean.is_(None))
+        return ~row_exists
     elif op == MetadataFilterOperator.IS_NOT_NULL:
-        predicate.append(ItemMetadataValue.value_boolean.is_not(None))
+        return row_exists
     elif op == MetadataFilterOperator.EQUALS:
         predicate.append(ItemMetadataValue.value_boolean.is_not(None))
         predicate.append(ItemMetadataValue.value_boolean == criterion.value_boolean)
@@ -516,7 +688,9 @@ def filter_items_by_boolean_metadata(
         raise HTTPException(status_code=403, detail="Accesso negato")
     definition_ids = {c.definition_id for c in payload.criteria}
     definitions = {
-        d.id: d for d in _resolve_applicable_definitions(db, inventory) if d.id in definition_ids
+        cast(int, d.id): d
+        for d in _resolve_applicable_definitions(db, inventory)
+        if cast(int, d.id) in definition_ids
     }
     if len(definitions) != len(definition_ids):
         raise HTTPException(
@@ -550,13 +724,14 @@ def list_metadata_definitions(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Elenca tutte le definizioni con le loro assegnazioni (solo admin)."""
-    _require_admin(user)
-    return (
-        db.query(MetadataDefinition)
-        .order_by(MetadataDefinition.sort_order.asc(), MetadataDefinition.id.asc())
-        .all()
-    )
+    """Elenca le definizioni metadato. Admin vede tutte; gli altri vedono solo quelle attive."""
+    from models import RoleEnum
+    query = db.query(MetadataDefinition)
+    if user.role.name != RoleEnum.admin.value:
+        query = query.filter(MetadataDefinition.is_active.is_(True))
+    elif not include_inactive:
+        query = query.filter(MetadataDefinition.is_active.is_(True))
+    return query.order_by(MetadataDefinition.sort_order.asc(), MetadataDefinition.id.asc()).all()
 
 
 @router.get("/applicable", response_model=List[MetadataDefinitionResponse])
@@ -590,11 +765,18 @@ def create_metadata_definition(
     user: User = Depends(get_current_user),
 ):
     _require_admin(user)
-    _validate_definition_rules(key=payload.key, sort_order=payload.sort_order)
+    normalized_list_options = _validate_definition_rules(
+        key=payload.key,
+        sort_order=payload.sort_order,
+        field_type=payload.field_type,
+        list_options=payload.list_options,
+    )
     payload.key = payload.key.strip()
     if db.query(MetadataDefinition).filter(MetadataDefinition.key == payload.key).first():
         raise HTTPException(status_code=409, detail="Chiave metadato già esistente")
-    definition = MetadataDefinition(**payload.model_dump())
+    payload_data = payload.model_dump()
+    payload_data["list_options"] = normalized_list_options if payload.field_type == MetadataFieldType.LIST else None
+    definition = MetadataDefinition(**payload_data)
     definition.user_ins = user.id
     definition.user_mod = user.id
     db.add(definition)
@@ -614,6 +796,13 @@ def update_metadata_definition(
     definition = _get_definition_or_404(db, definition_id)
     updates = payload.model_dump(exclude_unset=True)
     _validate_definition_rules(key=updates.get("key"), sort_order=updates.get("sort_order"))
+    if "list_options" in updates:
+        current_field_type = _coerce_field_type(definition)
+        normalized_list_options = _validate_definition_rules(
+            field_type=current_field_type,
+            list_options=updates.get("list_options"),
+        )
+        updates["list_options"] = normalized_list_options if current_field_type == MetadataFieldType.LIST else None
     if "key" in updates:
         updates["key"] = updates["key"].strip()
         if db.query(MetadataDefinition).filter(
@@ -681,6 +870,8 @@ def create_metadata_assignment(
         MetadataDefinitionAssignment.scope == payload.scope.value,
     )
     if payload.scope == MetadataDefinitionScope.INVENTORY_TYPE:
+        if payload.inventory_type is None:
+            raise HTTPException(status_code=400, detail="inventory_type obbligatorio per scope INVENTORY_TYPE")
         dup_q = dup_q.filter(MetadataDefinitionAssignment.inventory_type == payload.inventory_type.value)
     elif payload.scope == MetadataDefinitionScope.INVENTORY:
         dup_q = dup_q.filter(MetadataDefinitionAssignment.inventory_id == payload.inventory_id)
@@ -710,7 +901,10 @@ def delete_metadata_assignment(
     assignment = _get_assignment_or_404(db, assignment_id)
     scope = MetadataDefinitionScope(assignment.scope)
     if scope == MetadataDefinitionScope.INVENTORY:
-        inventory = _get_inventory_or_404(db, assignment.inventory_id)
+        inventory_id = cast(int | None, assignment.inventory_id)
+        if inventory_id is None:
+            raise HTTPException(status_code=400, detail="Assegnazione INVENTORY senza inventory_id")
+        inventory = _get_inventory_or_404(db, inventory_id)
         if not can_access_inventory(user, inventory, action="edit"):
             raise HTTPException(status_code=403, detail="Accesso negato")
     else:
@@ -866,7 +1060,7 @@ def delete_item_metadata_value(
     if not can_access_inventory(user, inventory, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
     definition = _get_definition_or_404(db, value.definition_id)
-    if definition.is_required:
+    if cast(bool, definition.is_required):
         raise HTTPException(status_code=400, detail="Non è possibile eliminare un valore metadato obbligatorio")
     before_value = _snapshot_metadata_value(value)
     db.delete(value)
@@ -898,7 +1092,7 @@ def bulk_upsert_item_metadata_values(
     if not can_access_inventory(user, inventory, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
     definitions = {
-        d.id: d for d in _resolve_applicable_definitions(db, inventory, include_inactive=True)
+        cast(int, d.id): d for d in _resolve_applicable_definitions(db, inventory, include_inactive=True)
     }
     result: List[ItemMetadataValueResponse] = []
     metadata_changes: list[dict[str, Any]] = []

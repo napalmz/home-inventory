@@ -29,6 +29,7 @@ type DefinitionFormState = {
   label: string;
   description: string;
   fieldType: MetadataFieldType;
+  listOptionsText: string;
   sortOrder: number;
   isRequired: boolean;
   isActive: boolean;
@@ -45,6 +46,7 @@ const initialDefinitionFormState: DefinitionFormState = {
   label: "",
   description: "",
   fieldType: "TEXT",
+  listOptionsText: "",
   sortOrder: 0,
   isRequired: false,
   isActive: true,
@@ -55,6 +57,25 @@ const initialAssignmentFormState: AssignmentFormState = {
   inventoryType: "INVENTORY",
   inventoryId: "",
 };
+
+function formatListOptionsText(options: MetadataDefinition["list_options"] | undefined): string {
+  return (options ?? [])
+    .map((option) => (option.label && option.label !== option.value ? `${option.value}|${option.label}` : option.value))
+    .join("\n");
+}
+
+function parseListOptionsText(text: string): Array<{ value: string; label: string }> {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [rawValue, ...labelParts] = line.split("|");
+      const value = rawValue.trim();
+      const label = labelParts.join("|").trim() || value;
+      return { value, label };
+    });
+}
 
 export default function MetadataDefinitionsPage() {
   const [containers, setContainers] = useState<ContainerOption[]>([]);
@@ -175,6 +196,7 @@ export default function MetadataDefinitionsPage() {
       label: definition.label,
       description: definition.description ?? "",
       fieldType: definition.field_type,
+      listOptionsText: formatListOptionsText(definition.list_options),
       sortOrder: definition.sort_order,
       isRequired: definition.is_required,
       isActive: definition.is_active,
@@ -187,6 +209,12 @@ export default function MetadataDefinitionsPage() {
       return;
     }
 
+    const listOptions = parseListOptionsText(definitionFormState.listOptionsText);
+    if (definitionFormState.fieldType === "LIST" && listOptions.length === 0) {
+      showMessage("Per il tipo LIST inserisci almeno un'opzione (una per riga).", "error");
+      return;
+    }
+
     setSavingDefinition(true);
     try {
       if (editingId) {
@@ -194,6 +222,7 @@ export default function MetadataDefinitionsPage() {
           key: definitionFormState.key.trim(),
           label: definitionFormState.label.trim(),
           description: definitionFormState.description.trim() || null,
+          list_options: definitionFormState.fieldType === "LIST" ? listOptions : [],
           sort_order: definitionFormState.sortOrder,
           is_required: definitionFormState.isRequired,
           is_active: definitionFormState.isActive,
@@ -205,6 +234,7 @@ export default function MetadataDefinitionsPage() {
           label: definitionFormState.label.trim(),
           description: definitionFormState.description.trim() || null,
           field_type: definitionFormState.fieldType,
+          list_options: definitionFormState.fieldType === "LIST" ? listOptions : [],
           sort_order: definitionFormState.sortOrder,
           is_required: definitionFormState.isRequired,
           is_active: definitionFormState.isActive,
@@ -372,6 +402,7 @@ export default function MetadataDefinitionsPage() {
                   <option value="NUMBER">NUMBER</option>
                   <option value="BOOLEAN">BOOLEAN</option>
                   <option value="DATE">DATE</option>
+                  <option value="LIST">LIST</option>
                 </select>
               </div>
 
@@ -389,6 +420,21 @@ export default function MetadataDefinitionsPage() {
                 />
               </div>
             </div>
+
+            {definitionFormState.fieldType === "LIST" && (
+              <div>
+                <label className="mb-1 block text-sm font-medium">Opzioni lista</label>
+                <textarea
+                  className="min-h-28 w-full rounded border px-3 py-2 dark:bg-gray-900"
+                  value={definitionFormState.listOptionsText}
+                  onChange={(event) => setDefinitionFormState((current) => ({ ...current, listOptionsText: event.target.value }))}
+                  placeholder={"Una per riga.\nEsempio semplice: Nuovo\nEsempio con valore stabile: used|Usato"}
+                />
+                <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
+                  Ogni riga crea una voce del dropdown. Se usi <code>valore|Etichetta</code>, nel DB viene salvato il valore a sinistra.
+                </div>
+              </div>
+            )}
 
             <label className="flex items-center gap-2 text-sm">
               <input

@@ -143,7 +143,7 @@ export interface ChecklistWithMatches extends Checklist {
     })[];
 }
 
-export type MetadataFieldType = "TEXT" | "NUMBER" | "BOOLEAN" | "DATE";
+export type MetadataFieldType = "TEXT" | "NUMBER" | "BOOLEAN" | "DATE" | "LIST";
 
 export type MetadataDefinitionScope = "GLOBAL" | "INVENTORY_TYPE" | "INVENTORY";
 
@@ -178,12 +178,18 @@ export interface MetadataAssignmentCreate {
     inventory_id?: number | null;
 }
 
+export interface MetadataListOption {
+    value: string;
+    label: string;
+}
+
 export interface MetadataDefinition {
     id: number;
     key: string;
     label: string;
     description?: string | null;
     field_type: MetadataFieldType;
+    list_options: MetadataListOption[];
     sort_order: number;
     is_required: boolean;
     is_active: boolean;
@@ -199,6 +205,7 @@ export interface MetadataDefinitionCreate {
     label: string;
     description?: string | null;
     field_type: MetadataFieldType;
+    list_options?: MetadataListOption[];
     sort_order?: number;
     is_required?: boolean;
     is_active?: boolean;
@@ -208,6 +215,7 @@ export interface MetadataDefinitionUpdate {
     key?: string;
     label?: string;
     description?: string | null;
+    list_options?: MetadataListOption[];
     sort_order?: number;
     is_required?: boolean;
     is_active?: boolean;
@@ -227,6 +235,7 @@ export interface ItemMetadataValue extends ItemMetadataTypedValue {
     definition_key?: string | null;
     definition_label?: string | null;
     field_type?: MetadataFieldType;
+    display_value?: string | null;
     data_ins: string;
     data_mod: string;
     user_ins: number | null;
@@ -247,6 +256,25 @@ export interface ItemMetadataValueUpsert extends ItemMetadataTypedValue {
 export interface ItemMetadataBulkUpsertRequest {
     item_id: number;
     values: ItemMetadataValueUpsert[];
+}
+
+export interface TextMetadataFilterCriterion {
+    definition_id: number;
+    operator: MetadataFilterOperator;
+    value_text?: string | null;
+}
+
+export interface TextMetadataFilterRequest {
+    inventory_id: number;
+    match_mode?: "all" | "any";
+    criteria: TextMetadataFilterCriterion[];
+}
+
+export interface TextMetadataFilterResponse {
+    inventory_id: number;
+    match_mode: "all" | "any";
+    item_ids: number[];
+    count: number;
 }
 
 export interface NumericMetadataFilterCriterion {
@@ -322,7 +350,7 @@ export interface FilterTemplateBase {
 
 export interface FilterTemplate extends FilterTemplateBase {
     id: number;
-    inventory_id: number;
+    inventory_id: number | null;
     is_shared: boolean;
     data_ins: string;
     data_mod: string;
@@ -330,15 +358,29 @@ export interface FilterTemplate extends FilterTemplateBase {
     user_mod: number | null;
 }
 
+export interface FilterTemplateScopeInventory {
+    id: number;
+    name: string;
+    type: string;
+}
+
+export interface FilterTemplateScopePreview {
+    scope_type: "global" | "all_inventories" | "all_checklists" | "specific" | "none";
+    summary: string;
+    inventories: FilterTemplateScopeInventory[];
+}
+
 export interface FilterTemplateListItem {
     id: number;
-    inventory_id: number;
+    inventory_id: number | null;
     name: string;
     description?: string | null;
     filter_type: FilterTemplateType;
+    criteria_count?: number | null;
     is_shared: boolean;
     data_ins: string;
     data_mod: string;
+    scope_preview?: FilterTemplateScopePreview | null;
 }
 
 export interface FilterTemplateCreate extends FilterTemplateBase {}
@@ -346,6 +388,7 @@ export interface FilterTemplateCreate extends FilterTemplateBase {}
 export interface FilterTemplateUpdate {
     name?: string;
     description?: string | null;
+    filter_type?: FilterTemplateType;
     criteria?: Record<string, unknown>;
     is_shared?: boolean;
 }

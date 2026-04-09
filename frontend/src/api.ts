@@ -19,6 +19,8 @@ import {
   ItemMetadataValueCreate,
   ItemMetadataValueUpdate,
   ItemMetadataBulkUpsertRequest,
+  TextMetadataFilterRequest,
+  TextMetadataFilterResponse,
   NumericMetadataFilterRequest,
   NumericMetadataFilterResponse,
   DateMetadataFilterRequest,
@@ -29,6 +31,7 @@ import {
   FilterTemplateCreate,
   FilterTemplateListItem,
   FilterTemplateUpdate,
+  FilterTemplateScopePreview,
 } from "./types";
 
 let api: ReturnType<typeof axios.create>;
@@ -420,6 +423,47 @@ export async function listBackups() {
   return res.data;
 }
 
+export async function getBackupCompatibilityMap(): Promise<{
+  revisions: string[];
+  revision_labels?: Record<string, string | null>;
+  matrix: Array<{
+    source_revision: string;
+    targets: Array<{
+      target_revision: string;
+      compatible: boolean;
+      strategy?: string;
+      reason?: string;
+    }>;
+  }>;
+  explicit_rules: Array<{
+    source_revision: string;
+    target_revision: string;
+    strategy?: string;
+    reason?: string;
+  }>;
+}> {
+  const res = await api.get('/backup/compatibility-map');
+  return res.data as {
+    revisions: string[];
+    revision_labels?: Record<string, string | null>;
+    matrix: Array<{
+      source_revision: string;
+      targets: Array<{
+        target_revision: string;
+        compatible: boolean;
+        strategy?: string;
+        reason?: string;
+      }>;
+    }>;
+    explicit_rules: Array<{
+      source_revision: string;
+      target_revision: string;
+      strategy?: string;
+      reason?: string;
+    }>;
+  };
+}
+
 // Creazione di un nuovo backup
 export async function createBackup() {
   const res = await api.post(`/backup/create`);
@@ -776,6 +820,13 @@ export async function bulkUpsertItemMetadataValues(
 }
 
 /* === METADATA ADVANCED FILTERS === */
+export async function filterItemsByTextMetadata(
+  payload: TextMetadataFilterRequest,
+): Promise<TextMetadataFilterResponse> {
+  const response = await api.post('/metadata/filters/text', payload);
+  return response.data as TextMetadataFilterResponse;
+}
+
 export async function filterItemsByNumericMetadata(
   payload: NumericMetadataFilterRequest,
 ): Promise<NumericMetadataFilterResponse> {
@@ -801,11 +852,13 @@ export async function filterItemsByBooleanMetadata(
 export async function getFilterTemplates(
   inventoryId: number,
   includeShared = true,
+  includeIncompatible = false,
 ): Promise<FilterTemplateListItem[]> {
   const response = await api.get('/filter-templates', {
     params: {
       inventory_id: inventoryId,
       include_shared: includeShared,
+      include_incompatible: includeIncompatible,
     },
   });
   return response.data as FilterTemplateListItem[];
@@ -817,13 +870,19 @@ export async function getFilterTemplate(templateId: number): Promise<FilterTempl
 }
 
 export async function createFilterTemplate(
-  inventoryId: number,
   payload: FilterTemplateCreate,
 ): Promise<FilterTemplate> {
-  const response = await api.post('/filter-templates', payload, {
-    params: { inventory_id: inventoryId },
-  });
+  const response = await api.post('/filter-templates', payload);
   return response.data as FilterTemplate;
+}
+
+export async function getFilterTemplateScopePreview(
+  definitionIds: number[],
+): Promise<FilterTemplateScopePreview> {
+  const response = await api.get('/filter-templates/scope-preview', {
+    params: { definition_ids: definitionIds.join(',') },
+  });
+  return response.data as FilterTemplateScopePreview;
 }
 
 export async function updateFilterTemplate(

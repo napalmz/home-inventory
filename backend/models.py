@@ -161,7 +161,7 @@ class Item(Base, LoggingData):
 class MetadataDefinition(Base, LoggingData):
     __tablename__ = "metadata_definitions"
     __table_args__ = (
-        CheckConstraint("field_type IN ('TEXT', 'NUMBER', 'BOOLEAN', 'DATE')", name="ck_metadata_definitions_field_type"),
+        CheckConstraint("field_type IN ('TEXT', 'NUMBER', 'BOOLEAN', 'DATE', 'LIST')", name="ck_metadata_definitions_field_type"),
         UniqueConstraint("key", name="uq_metadata_definitions_key"),
     )
 
@@ -170,6 +170,7 @@ class MetadataDefinition(Base, LoggingData):
     label = Column(String(128), nullable=False)
     description = Column(Text, nullable=True)
     field_type = Column(String(16), nullable=False)
+    list_options = Column(JSON, nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     is_required = Column(Boolean, nullable=False, default=False)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -312,15 +313,12 @@ class InventoryVersion(Base):
 class FilterTemplate(Base, LoggingData):
     __tablename__ = "filter_templates"
     __table_args__ = (
-        UniqueConstraint("inventory_id", "name", name="uq_filter_templates_inventory_name"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    inventory_id = Column(Integer, ForeignKey("inventories.id", ondelete="CASCADE"), nullable=False, index=True)
+    inventory_id = Column(Integer, nullable=True, index=True)
     name = Column(String(128), nullable=False)
     description = Column(Text, nullable=True)
     filter_type = Column(String(32), nullable=False)  # "numeric", "date", "text", "composite"
     criteria = Column(JSON, nullable=False)  # JSON: {"filter_type": ..., "criteria": [...], "match_mode": "all"|"any"}
     is_shared = Column(Boolean, nullable=False, default=False)
-    
-    inventory = relationship("Inventory")

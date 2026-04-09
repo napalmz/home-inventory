@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Literal, Optional, TYPE_CHECKING
 from decimal import Decimal
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import datetime, date
 from metadata_model import (
     InventoryContainerType,
@@ -283,14 +283,39 @@ class MetadataAssignmentResponse(BaseModel):
 ##############################################################
 # Metadati EAV - Definizioni
 
+class MetadataListOption(BaseModel):
+    value: str
+    label: str
+
+    @field_validator("value", "label")
+    @classmethod
+    def validate_non_empty(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Valore opzione non valido")
+        return normalized
+
+
 class MetadataDefinitionBase(BaseModel):
     key: str
     label: str
     description: Optional[str] = None
     field_type: MetadataFieldType
+    list_options: List[MetadataListOption] = Field(default_factory=list)
     sort_order: int = 0
     is_required: bool = False
     is_active: bool = True
+
+    @field_validator("list_options", mode="before")
+    @classmethod
+    def default_list_options(cls, value):
+        return [] if value is None else value
+
+    @model_validator(mode="after")
+    def validate_list_metadata(self):
+        if self.field_type == MetadataFieldType.LIST and not self.list_options:
+            raise ValueError("Per il tipo LIST è obbligatoria almeno un'opzione")
+        return self
 
 
 class MetadataDefinitionCreate(MetadataDefinitionBase):
@@ -301,6 +326,7 @@ class MetadataDefinitionUpdate(BaseModel):
     key: Optional[str] = None
     label: Optional[str] = None
     description: Optional[str] = None
+    list_options: Optional[List[MetadataListOption]] = None
     sort_order: Optional[int] = None
     is_required: Optional[bool] = None
     is_active: Optional[bool] = None
@@ -316,6 +342,7 @@ class MetadataDefinitionResponse(MetadataDefinitionBase, LoggingResponse):
 
 MetadataAssignmentCreate.model_rebuild()
 MetadataAssignmentResponse.model_rebuild()
+MetadataListOption.model_rebuild()
 MetadataDefinitionBase.model_rebuild()
 MetadataDefinitionCreate.model_rebuild()
 MetadataDefinitionUpdate.model_rebuild()
@@ -362,6 +389,7 @@ class ItemMetadataValueResponse(ItemMetadataTypedValue, LoggingResponse):
     definition_key: Optional[str] = None
     definition_label: Optional[str] = None
     field_type: Optional[MetadataFieldType] = None
+    display_value: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -383,6 +411,69 @@ ItemMetadataValueResponse.model_rebuild()
 ItemMetadataValueUpsert.model_rebuild()
 ItemMetadataBulkUpsertRequest.model_rebuild()
 ItemResponse.model_rebuild()
+
+
+##############################################################
+# Filtri testuali/lista avanzati su metadati
+class TextMetadataFilterCriterion(BaseModel):
+    definition_id: int
+    operator: MetadataFilterOperator
+    value_text: Optional[str] = None
+
+    @field_validator("value_text", mode="before")
+    @classmethod
+    def normalize_value_text(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @model_validator(mode="after")
+    def validate_text_operator_payload(self):
+        value_operators = {
+            MetadataFilterOperator.EQUALS,
+            MetadataFilterOperator.NOT_EQUALS,
+            MetadataFilterOperator.CONTAINS,
+            MetadataFilterOperator.NOT_CONTAINS,
+        }
+        null_operators = {
+            MetadataFilterOperator.IS_NULL,
+            MetadataFilterOperator.IS_NOT_NULL,
+        }
+
+        if self.operator in value_operators:
+            if self.value_text is None:
+                raise ValueError("Per questo operatore è obbligatorio value_text")
+            return self
+
+        if self.operator in null_operators:
+            return self
+
+        raise ValueError("Operatore non supportato per filtri testuali")
+
+
+class TextMetadataFilterRequest(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"] = "all"
+    criteria: List[TextMetadataFilterCriterion]
+
+    @model_validator(mode="after")
+    def validate_criteria(self):
+        if not self.criteria:
+            raise ValueError("Almeno un criterio testuale è obbligatorio")
+        return self
+
+
+class TextMetadataFilterResponse(BaseModel):
+    inventory_id: int
+    match_mode: Literal["all", "any"]
+    item_ids: List[int]
+    count: int
+
+
+TextMetadataFilterCriterion.model_rebuild()
+TextMetadataFilterRequest.model_rebuild()
+TextMetadataFilterResponse.model_rebuild()
 
 
 ##############################################################
@@ -460,6 +551,17 @@ class DateMetadataFilterCriterion(BaseModel):
     value_date: Optional[date] = None
     range_from: Optional[date] = None
     range_to: Optional[date] = None
+
+    @field_validator("value_date", "range_from", "range_to", mode="before")
+    @classmethod
+    def parse_dynamic_date_tokens(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"today", "oggi"}:
+                return date.today()
+            if normalized == "":
+                return None
+        return value
 
     @model_validator(mode="after")
     def validate_date_operator_payload(self):
@@ -577,7 +679,7 @@ BooleanMetadataFilterResponse.model_rebuild()
 class FilterTemplateCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    filter_type: Literal["numeric", "date", "text", "composite"]
+    filter_type: Literal["numeric", "date", "boolean", "text", "composite"]
     criteria: dict
     is_shared: bool = False
 
@@ -585,13 +687,14 @@ class FilterTemplateCreate(BaseModel):
 class FilterTemplateUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    filter_type: Optional[Literal["numeric", "date", "boolean", "text", "composite"]] = None
     criteria: Optional[dict] = None
     is_shared: Optional[bool] = None
 
 
 class FilterTemplateResponse(FilterTemplateCreate, LoggingResponse):
     id: int
-    inventory_id: int
+    inventory_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -599,10 +702,11 @@ class FilterTemplateResponse(FilterTemplateCreate, LoggingResponse):
 
 class FilterTemplateListResponse(BaseModel):
     id: int
-    inventory_id: int
+    inventory_id: Optional[int] = None
     name: str
     description: Optional[str] = None
     filter_type: str
+    criteria_count: Optional[int] = None
     is_shared: bool
     data_ins: datetime
     data_mod: datetime
@@ -611,7 +715,21 @@ class FilterTemplateListResponse(BaseModel):
         from_attributes = True
 
 
+class FilterTemplateScopeInventory(BaseModel):
+    id: int
+    name: str
+    type: str
+
+
+class FilterTemplateScopePreview(BaseModel):
+    scope_type: str  # "global" | "all_inventories" | "all_checklists" | "specific" | "none"
+    summary: str
+    inventories: List[FilterTemplateScopeInventory] = []
+
+
 FilterTemplateCreate.model_rebuild()
 FilterTemplateUpdate.model_rebuild()
 FilterTemplateResponse.model_rebuild()
 FilterTemplateListResponse.model_rebuild()
+FilterTemplateScopeInventory.model_rebuild()
+FilterTemplateScopePreview.model_rebuild()

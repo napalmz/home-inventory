@@ -10,6 +10,7 @@ class MetadataFieldType(str, Enum):
     NUMBER = "NUMBER"
     BOOLEAN = "BOOLEAN"
     DATE = "DATE"
+    LIST = "LIST"
 
 
 class MetadataDefinitionScope(str, Enum):
@@ -65,6 +66,8 @@ METADATA_FIELD_TYPE_SPECS: Final[dict[MetadataFieldType, MetadataFieldTypeSpec]]
             MetadataFilterOperator.NOT_EQUALS,
             MetadataFilterOperator.CONTAINS,
             MetadataFilterOperator.NOT_CONTAINS,
+            MetadataFilterOperator.IS_NULL,
+            MetadataFilterOperator.IS_NOT_NULL,
         ),
     ),
     MetadataFieldType.NUMBER: MetadataFieldTypeSpec(
@@ -99,6 +102,16 @@ METADATA_FIELD_TYPE_SPECS: Final[dict[MetadataFieldType, MetadataFieldTypeSpec]]
             MetadataFilterOperator.LESS_THAN,
             MetadataFilterOperator.LESS_THAN_OR_EQUAL,
             MetadataFilterOperator.BETWEEN,
+        ),
+    ),
+    MetadataFieldType.LIST: MetadataFieldTypeSpec(
+        value_column=METADATA_VALUE_TEXT_COLUMN,
+        supports_full_text=False,
+        supported_filter_operators=(
+            MetadataFilterOperator.EQUALS,
+            MetadataFilterOperator.NOT_EQUALS,
+            MetadataFilterOperator.IS_NULL,
+            MetadataFilterOperator.IS_NOT_NULL,
         ),
     ),
 }
