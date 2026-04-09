@@ -2,8 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from dependencies import get_db
-from models import User, Inventory, Item, SharedInventory, Group, SharedInventoryGroup, RoleEnum, InventoryVersion, ItemVersion
-from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemResponse, UserResponse, InventoryResponseWithItemCount, InventoryVersionResponse, VersionBulkDeleteRequest
+from models import (
+    User,
+    Inventory,
+    Item,
+    ItemMetadataValue,
+    SharedInventory,
+    Group,
+    SharedInventoryGroup,
+    RoleEnum,
+    InventoryVersion,
+    ItemVersion,
+)
+from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemMetadataValueResponse, ItemResponse, UserResponse, InventoryResponseWithItemCount, InventoryVersionResponse, VersionBulkDeleteRequest
 from routes.auth import get_current_user
 from typing import List
 import re
@@ -109,7 +120,15 @@ def list_inventories_base(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    inventories = db.query(Inventory).filter(Inventory.type == inventory_type).options(joinedload(Inventory.items)).all()
+    query = db.query(Inventory).filter(Inventory.type == inventory_type)
+    if filtro:
+        query = query.options(
+            joinedload(Inventory.items).joinedload(Item.metadata_values).joinedload(ItemMetadataValue.definition)
+        )
+    else:
+        query = query.options(joinedload(Inventory.items))
+
+    inventories = query.all()
     visible_inventories = [
         inv for inv in inventories if can_access_inventory(user, inv, action="view")
     ]
@@ -127,7 +146,28 @@ def list_inventories_base(
             for item in inv.items:
                 name_match = filtro_lower in (item.name or "").lower()
                 desc_match = filtro_lower in (item.description or "").lower() if item.description else False
-                if name_match or desc_match:
+                highlighted_metadata = []
+                for metadata_value in item.metadata_values:
+                    if (
+                        not metadata_value.definition
+                        or not metadata_value.definition.is_active
+                        or metadata_value.definition.field_type != "TEXT"
+                        or not metadata_value.value_text
+                    ):
+                        continue
+                    metadata_text = metadata_value.value_text
+                    definition_label = metadata_value.definition.label or metadata_value.definition.key
+                    metadata_text_match = filtro_lower in metadata_text.lower()
+                    metadata_label_match = filtro_lower in definition_label.lower() if definition_label else False
+                    if metadata_text_match or metadata_label_match:
+                        highlighted_metadata.append({
+                            "definition_label": highlight_match(definition_label, filtro) if metadata_label_match else definition_label,
+                            "value_text": highlight_match(metadata_text, filtro) if metadata_text_match else metadata_text,
+                        })
+
+                metadata_match = len(highlighted_metadata) > 0
+
+                if name_match or desc_match or metadata_match:
                     # Evidenzia la parte corrispondente nel nome e nella descrizione (case-insensitive)
                     name_highlight = (item.name or "")
                     desc_highlight = (item.description or "") if item.description else None
@@ -137,13 +177,32 @@ def list_inventories_base(
                         desc_highlight = highlight_match(desc_highlight, filtro)
                     matching_items.append({
                         **ItemResponse(
-                            **item.__dict__,
+                            id=item.id,
+                            name=item.name,
+                            description=item.description,
+                            quantity=item.quantity,
+                            inventory_id=item.inventory_id,
+                            data_ins=item.data_ins,
+                            data_mod=item.data_mod,
+                            user_ins=item.user_ins,
+                            user_mod=item.user_mod,
                             username_ins=item.user_ins_rel.username if item.user_ins_rel else None,
                             username_mod=item.user_mod_rel.username if item.user_mod_rel else None,
+                            metadata_values=[
+                                ItemMetadataValueResponse(
+                                    **value.__dict__,
+                                    definition_key=value.definition.key if value.definition else None,
+                                    definition_label=value.definition.label if value.definition else None,
+                                    field_type=value.definition.field_type if value.definition else None,
+                                )
+                                for value in item.metadata_values
+                            ],
+                            version_num=_current_item_version_num(db, item.id),
                         ).model_dump(),
                         "highlighted": {
                             "name": name_highlight,
-                            "description": desc_highlight
+                            "description": desc_highlight,
+                            "metadata_text": highlighted_metadata,
                         }
                     })
             if not matching_items:
@@ -227,7 +286,8 @@ def list_items_base(
 ):
     inventory = db.query(Inventory).options(
         joinedload(Inventory.items).joinedload(Item.user_ins_rel),
-        joinedload(Inventory.items).joinedload(Item.user_mod_rel)
+        joinedload(Inventory.items).joinedload(Item.user_mod_rel),
+        joinedload(Inventory.items).joinedload(Item.metadata_values).joinedload(ItemMetadataValue.definition),
     ).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
@@ -236,9 +296,26 @@ def list_items_base(
     #return inventory.items
     return [
         ItemResponse(
-            **item.__dict__,
+            id=item.id,
+            name=item.name,
+            description=item.description,
+            quantity=item.quantity,
+            inventory_id=item.inventory_id,
+            data_ins=item.data_ins,
+            data_mod=item.data_mod,
+            user_ins=item.user_ins,
+            user_mod=item.user_mod,
             username_ins=item.user_ins_rel.username if item.user_ins_rel else None,
             username_mod=item.user_mod_rel.username if item.user_mod_rel else None,
+            metadata_values=[
+                ItemMetadataValueResponse(
+                    **value.__dict__,
+                    definition_key=value.definition.key if value.definition else None,
+                    definition_label=value.definition.label if value.definition else None,
+                    field_type=value.definition.field_type if value.definition else None,
+                )
+                for value in item.metadata_values
+            ],
             version_num=_current_item_version_num(db, item.id),
         )
         for item in inventory.items

@@ -3,13 +3,18 @@ import { useRef, useEffect, useState } from 'react';
 import {
   getInventoryById, getInventoryItems,
   getChecklistById, getChecklistItems,
-  createItem, updateItem, deleteItem } from "../api";
-import { Inventory, Item, User } from "../types";
+  createItem, updateItem, deleteItem,
+  getMetadataDefinitions, listAllMetadataDefinitions, getItemMetadataValues,
+  getFilterTemplates, getFilterTemplate,
+  filterItemsByTextMetadata, filterItemsByNumericMetadata, filterItemsByDateMetadata, filterItemsByBooleanMetadata,
+  bulkUpsertItemMetadataValues, deleteItemMetadataValue } from "../api";
+import { Inventory, Item, User, MetadataDefinition, ItemMetadataValue, ItemMetadataValueUpsert, FilterTemplate, FilterTemplateListItem } from "../types";
 import { Dialog } from "@headlessui/react";
 import { useContext } from "react";
 import { AuthContext } from "../auth-context";
 import { useSwipeable } from 'react-swipeable';
 import { HistoryModal } from "../components/HistoryModal";
+import MetadataFilterManager from "../components/MetadataFilterManager";
 
 interface Props {
   item: Item;
@@ -25,6 +30,206 @@ interface Props {
   deleteItem: (id: number) => Promise<void>;
   setIsCloning: React.Dispatch<React.SetStateAction<boolean>>;
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
+}
+
+type MetadataDraftMap = Record<number, ItemMetadataValueUpsert>;
+
+function createEmptyMetadataDraft(fieldType: MetadataDefinition['field_type']): ItemMetadataValueUpsert {
+  if (fieldType === 'TEXT' || fieldType === 'LIST') {
+    return { definition_id: 0, value_text: null };
+  }
+  if (fieldType === 'NUMBER') {
+    return { definition_id: 0, value_number: null };
+  }
+  if (fieldType === 'BOOLEAN') {
+    return { definition_id: 0, value_boolean: null };
+  }
+  return { definition_id: 0, value_date: null };
+}
+
+function getTypedValueForDefinition(
+  definition: MetadataDefinition,
+  value?: ItemMetadataValue | ItemMetadataValueUpsert,
+): string {
+  if (!value) {
+    return '';
+  }
+  if (definition.field_type === 'TEXT' || definition.field_type === 'LIST') {
+    return value.value_text ?? '';
+  }
+  if (definition.field_type === 'NUMBER') {
+    return value.value_number != null ? String(value.value_number) : '';
+  }
+  if (definition.field_type === 'BOOLEAN') {
+    if (value.value_boolean === true) return 'true';
+    if (value.value_boolean === false) return 'false';
+    return '';
+  }
+  return value.value_date ?? '';
+}
+
+function normalizeMetadataDraft(
+  definition: MetadataDefinition,
+  draft?: ItemMetadataValueUpsert,
+): ItemMetadataValueUpsert | null {
+  if (!draft) {
+    return null;
+  }
+
+  if (definition.field_type === 'TEXT' || definition.field_type === 'LIST') {
+    const nextValue = draft.value_text?.trim() ?? '';
+    return nextValue ? { definition_id: definition.id, value_text: nextValue } : null;
+  }
+
+  if (definition.field_type === 'NUMBER') {
+    if (draft.value_number === null || draft.value_number === undefined || draft.value_number === '') {
+      return null;
+    }
+    return { definition_id: definition.id, value_number: draft.value_number };
+  }
+
+  if (definition.field_type === 'BOOLEAN') {
+    if (draft.value_boolean === null || draft.value_boolean === undefined) {
+      return null;
+    }
+    return { definition_id: definition.id, value_boolean: draft.value_boolean };
+  }
+
+  return draft.value_date ? { definition_id: definition.id, value_date: draft.value_date } : null;
+}
+
+function buildMetadataDraftMap(values: ItemMetadataValue[]): MetadataDraftMap {
+  return values.reduce<MetadataDraftMap>((accumulator, value) => {
+    accumulator[value.definition_id] = {
+      definition_id: value.definition_id,
+      value_text: value.value_text ?? null,
+      value_number: value.value_number ?? null,
+      value_boolean: value.value_boolean ?? null,
+      value_date: value.value_date ?? null,
+    };
+    return accumulator;
+  }, {});
+}
+
+function formatItemMetadataValue(value: ItemMetadataValue): string {
+  if (value.display_value) {
+    return value.display_value;
+  }
+  if (value.field_type === 'BOOLEAN') {
+    return value.value_boolean ? 'Sì' : 'No';
+  }
+  if (value.field_type === 'NUMBER') {
+    return value.value_number != null ? String(value.value_number) : '';
+  }
+  if (value.field_type === 'DATE') {
+    return value.value_date ? value.value_date : '';
+  }
+  return value.value_text ?? '';
+}
+
+function MetadataFieldsSection({
+  definitions,
+  drafts,
+  onChange,
+}: {
+  definitions: MetadataDefinition[];
+  drafts: MetadataDraftMap;
+  onChange: (definition: MetadataDefinition, value: string) => void;
+}) {
+  if (definitions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 rounded border border-gray-200 p-3 dark:border-gray-700">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+        Metadati
+      </h3>
+      <div className="space-y-3">
+        {definitions.map((definition) => {
+          const currentValue = getTypedValueForDefinition(definition, drafts[definition.id]);
+
+          return (
+            <div key={definition.id}>
+              <label className="mb-1 block text-sm font-medium">
+                {definition.label}
+                {definition.is_required ? ' *' : ''}
+              </label>
+              {definition.description && (
+                <div className="mb-1 text-xs text-gray-500 dark:text-gray-400">
+                  {definition.description}
+                </div>
+              )}
+              {definition.field_type === 'TEXT' && (
+                <input
+                  type="text"
+                  className="w-full border rounded p-1 dark:bg-gray-800"
+                  value={currentValue}
+                  onChange={(event) => onChange(definition, event.target.value)}
+                />
+              )}
+              {definition.field_type === 'LIST' && (
+                <select
+                  className="w-full border rounded p-1 dark:bg-gray-800"
+                  value={currentValue}
+                  onChange={(event) => onChange(definition, event.target.value)}
+                >
+                  <option value="">Vuoto</option>
+                  {(definition.list_options ?? []).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              )}
+              {definition.field_type === 'NUMBER' && (
+                <input
+                  type="number"
+                  step="0.0001"
+                  className="w-full border rounded p-1 dark:bg-gray-800"
+                  value={currentValue}
+                  onChange={(event) => onChange(definition, event.target.value)}
+                />
+              )}
+              {definition.field_type === 'DATE' && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      className="w-full border rounded p-1 dark:bg-gray-800"
+                      value={currentValue}
+                      onChange={(event) => onChange(definition, event.target.value)}
+                    />
+                    {currentValue && (
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={() => onChange(definition, '')}
+                      >
+                        Svuota
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {currentValue ? `Valore impostato: ${currentValue}` : 'Non impostata'}
+                  </div>
+                </div>
+              )}
+              {definition.field_type === 'BOOLEAN' && (
+                <select
+                  className="w-full border rounded p-1 dark:bg-gray-800"
+                  value={currentValue}
+                  onChange={(event) => onChange(definition, event.target.value)}
+                >
+                  <option value="">Non impostato</option>
+                  <option value="true">Sì</option>
+                  <option value="false">No</option>
+                </select>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function SwipeableItemRow({
@@ -65,7 +270,6 @@ export function SwipeableItemRow({
   const cloneItem = () => {
     const cloned = {
       ...item,
-      id: 0, // id fittizio, sarà gestito dal backend al salvataggio
       name: `${item.name} (copia)`
     };
     setItemBeingEdited(cloned);
@@ -174,6 +378,20 @@ export function SwipeableItemRow({
             {item.description && (
               <div className="text-sm text-gray-500 dark:text-gray-200">{item.description}</div>
             )}
+            {item.metadata_values && item.metadata_values.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {item.metadata_values
+                  .filter((value) => value.definition_label && formatItemMetadataValue(value))
+                  .map((value) => (
+                    <span
+                      key={value.id}
+                      className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      {value.definition_label}: {formatItemMetadataValue(value)}
+                    </span>
+                  ))}
+              </div>
+            )}
             <div className="text-xs text-gray-400">
               Ultima modifica: {item.username_mod} - {new Date(item.data_mod).toLocaleString()}
             </div>
@@ -181,7 +399,7 @@ export function SwipeableItemRow({
         </div>
         <div className="flex items-center gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
           <button
-            className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 whitespace-nowrap"
+            className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 whitespace-nowrap"
             onClick={(e) => {
               e.stopPropagation();
               setIsItemHistoryOpen(true);
@@ -327,6 +545,16 @@ export default function InventoryDetailPage() {
   const filtroParam = filterText;
   const [isCloning, setIsCloning] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [metadataDefinitions, setMetadataDefinitions] = useState<MetadataDefinition[]>([]);
+  const [allMetadataDefinitions, setAllMetadataDefinitions] = useState<MetadataDefinition[]>([]);
+  const [newItemMetadataDrafts, setNewItemMetadataDrafts] = useState<MetadataDraftMap>({});
+  const [editingMetadataDrafts, setEditingMetadataDrafts] = useState<MetadataDraftMap>({});
+  const [editingMetadataValues, setEditingMetadataValues] = useState<ItemMetadataValue[]>([]);
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataFilteredItemIds, setMetadataFilteredItemIds] = useState<number[] | null>(null);
+  const [metadataFilterSummary, setMetadataFilterSummary] = useState<string | null>(null);
+  const [filterTemplates, setFilterTemplates] = useState<FilterTemplateListItem[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
 
 useEffect(() => {
   const fetchData = async () => {
@@ -338,6 +566,13 @@ useEffect(() => {
     const inventoryData = await getById(Number(id));
     if (inventoryData) setInventory(inventoryData as Inventory);
 
+    const definitionsData = await getMetadataDefinitions(Number(id), true);
+    setMetadataDefinitions(definitionsData);
+    const allDefsData = await listAllMetadataDefinitions(true);
+    setAllMetadataDefinitions(allDefsData);
+    const templatesData = await getFilterTemplates(Number(id), true);
+    setFilterTemplates(templatesData);
+
     const itemsData = await getItems(Number(id));
     if (Array.isArray(itemsData)) setItems(itemsData as Item[]);
   };
@@ -345,15 +580,56 @@ useEffect(() => {
 }, [id, isInventory]);
 
   useEffect(() => {
+    if (!itemBeingEdited) {
+      setEditingMetadataValues([]);
+      setEditingMetadataDrafts({});
+      return;
+    }
+
+    const loadItemMetadata = async () => {
+      setMetadataLoading(true);
+      try {
+        const values = await getItemMetadataValues(itemBeingEdited.id);
+        setEditingMetadataValues(values);
+        setEditingMetadataDrafts(buildMetadataDraftMap(values));
+      } catch {
+        setEditingMetadataValues([]);
+        setEditingMetadataDrafts({});
+      } finally {
+        setMetadataLoading(false);
+      }
+    };
+
+    void loadItemMetadata();
+  }, [itemBeingEdited]);
+
+  useEffect(() => {
+    setNewItemMetadataDrafts({});
+  }, [inventory?.id]);
+
+  useEffect(() => {
+    if (selectedTemplateId === '') return;
+    const exists = filterTemplates.some((template) => template.id === selectedTemplateId);
+    if (!exists) {
+      setSelectedTemplateId('');
+    }
+  }, [filterTemplates, selectedTemplateId]);
+
+  useEffect(() => {
     localStorage.setItem("item_sortBy", sortBy);
     localStorage.setItem("item_sortOrder", sortOrder);
   }, [sortBy, sortOrder]);
 
   const sortedItems = [...items]
-    .filter(item =>
-      item.name.toLowerCase().includes(filterText.toLowerCase()) ||
-      item.description?.toLowerCase().includes(filterText.toLowerCase())
-    )
+    .filter((item) => {
+      const matchesMetadata = metadataFilteredItemIds === null || metadataFilteredItemIds.includes(item.id);
+      const normalizedFilter = filterText.toLowerCase();
+      const matchesText =
+        item.name.toLowerCase().includes(normalizedFilter) ||
+        item.description?.toLowerCase().includes(normalizedFilter);
+
+      return matchesMetadata && matchesText;
+    })
     .sort((a, b) => {
       // First, sort by checklist/inventory logic for completed/zero items
       if (isChecklist) {
@@ -425,6 +701,100 @@ useEffect(() => {
         }
       };
 
+    const applyTemplateToList = async (templateId: number) => {
+      try {
+        const template: FilterTemplate = await getFilterTemplate(templateId);
+        const root = template.criteria as Record<string, unknown>;
+        const filterType = (root?.filter_type as string) || template.filter_type;
+        const matchMode = (root?.match_mode as 'all' | 'any') || 'all';
+        const criteria = Array.isArray(root?.criteria) ? root.criteria : [];
+
+        if (!criteria.length) {
+          alert('Il template non contiene criteri validi.');
+          return;
+        }
+
+        const asSet = (ids: number[]) => new Set(ids);
+        const intersect = (a: Set<number>, b: Set<number>) => new Set([...a].filter((x) => b.has(x)));
+        const union = (a: Set<number>, b: Set<number>) => new Set([...a, ...b]);
+
+        const byType = {
+          text: criteria.filter((c) => {
+            const raw = c as Record<string, unknown>;
+            return raw.field_type === 'TEXT' || raw.field_type === 'LIST' || raw.value_text != null || filterType === 'text';
+          }),
+          numeric: criteria.filter((c) => {
+            const raw = c as Record<string, unknown>;
+            return raw.field_type === 'NUMBER' || raw.value_number != null || filterType === 'numeric';
+          }),
+          date: criteria.filter((c) => {
+            const raw = c as Record<string, unknown>;
+            return raw.field_type === 'DATE' || raw.value_date != null || filterType === 'date';
+          }),
+          boolean: criteria.filter((c) => {
+            const raw = c as Record<string, unknown>;
+            return raw.field_type === 'BOOLEAN' || raw.value_boolean != null || filterType === 'boolean';
+          }),
+        };
+
+        const resultSets: Set<number>[] = [];
+
+        if (byType.text.length > 0) {
+          const response = await filterItemsByTextMetadata({
+            inventory_id: Number(id),
+            match_mode: matchMode,
+            criteria: byType.text as never,
+          });
+          resultSets.push(asSet(response.item_ids));
+        }
+
+        if (byType.numeric.length > 0) {
+          const response = await filterItemsByNumericMetadata({
+            inventory_id: Number(id),
+            match_mode: matchMode,
+            criteria: byType.numeric as never,
+          });
+          resultSets.push(asSet(response.item_ids));
+        }
+
+        if (byType.date.length > 0) {
+          const response = await filterItemsByDateMetadata({
+            inventory_id: Number(id),
+            match_mode: matchMode,
+            criteria: byType.date as never,
+          });
+          resultSets.push(asSet(response.item_ids));
+        }
+
+        if (byType.boolean.length > 0) {
+          const response = await filterItemsByBooleanMetadata({
+            inventory_id: Number(id),
+            match_mode: matchMode,
+            criteria: byType.boolean as never,
+          });
+          resultSets.push(asSet(response.item_ids));
+        }
+
+        if (resultSets.length === 0) {
+          alert('Tipo template non supportato.');
+          return;
+        }
+
+        let finalSet = resultSets[0];
+        for (let i = 1; i < resultSets.length; i += 1) {
+          finalSet = matchMode === 'all' ? intersect(finalSet, resultSets[i]) : union(finalSet, resultSets[i]);
+        }
+
+        const itemIds = Array.from(finalSet.values()).sort((a, b) => a - b);
+        setMetadataFilteredItemIds(itemIds);
+        setMetadataFilterSummary(`Template "${template.name}" applicato (${itemIds.length} risultati)`);
+        return;
+
+      } catch {
+        alert('Errore durante l\'applicazione del template.');
+      }
+    };
+
   return (
     <div className="relative p-4">
       <div className="sticky top-0 bg-white dark:bg-gray-900 z-10 pb-2">
@@ -446,10 +816,11 @@ useEffect(() => {
               </h2>
               <button
                 onClick={() => setIsHistoryOpen(true)}
-                className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 whitespace-nowrap"
+                className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 whitespace-nowrap"
                 title="Visualizza cronologia modifiche"
               >
-                📋 Cronologia
+                <span className="inline md:hidden">📋</span>
+                <span className="hidden md:inline">Cronologia</span>
               </button>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
@@ -515,6 +886,32 @@ useEffect(() => {
                 </button>
               </div>
             </div>
+            {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
+              <div className="flex items-center gap-2 mb-4">
+                <label className="text-sm font-medium whitespace-nowrap">Template filtro:</label>
+                <select
+                  value={selectedTemplateId}
+                  onChange={async (e) => {
+                    const value = e.target.value;
+                    if (!value) {
+                      setSelectedTemplateId('');
+                      setMetadataFilteredItemIds(null);
+                      setMetadataFilterSummary(null);
+                      return;
+                    }
+                    const templateId = Number(value);
+                    setSelectedTemplateId(templateId);
+                    await applyTemplateToList(templateId);
+                  }}
+                  className="border rounded p-1 min-w-[220px]"
+                >
+                  <option value="">Nessun template</option>
+                  {filterTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {isEditMode && (
                 <div className="mb-2 ml-auto flex gap-2">
                 <button
@@ -532,6 +929,22 @@ useEffect(() => {
                 </div>
             )}
           </div>
+          {metadataFilterSummary && (
+            <div className="mb-3 flex items-center gap-2 rounded border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-100">
+              <span>{metadataFilterSummary}</span>
+              <button
+                className="ml-auto rounded bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700"
+                onClick={() => {
+                  setMetadataFilteredItemIds(null);
+                  setMetadataFilterSummary(null);
+                  setSelectedTemplateId('');
+                }}
+                type="button"
+              >
+                Rimuovi filtro
+              </button>
+            </div>
+          )}
           <ul className="mb-20">
             {sortedItems.map((item) => (
               <SwipeableItemRow
@@ -591,6 +1004,15 @@ useEffect(() => {
           </button>
         )}
         {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
+          <MetadataFilterManager
+            inventoryId={inventory?.id ?? Number(id)}
+            currentContainerType={isChecklist ? 'CHECKLIST' : 'INVENTORY'}
+            definitions={metadataDefinitions}
+            allDefinitions={allMetadataDefinitions}
+            onTemplatesChanged={setFilterTemplates}
+          />
+        )}
+        {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
           <button
             onClick={() => {
               const now = new Date();
@@ -647,7 +1069,7 @@ useEffect(() => {
       <Dialog open={isInsertMode} onClose={() => setisInsertMode(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-2xl">
             <Dialog.Title className="text-lg font-semibold mb-4">Nuovo oggetto</Dialog.Title>
             <form
               onSubmit={async (e) => {
@@ -660,12 +1082,24 @@ useEffect(() => {
                   inventory_id: inventory.id
                 });
                 if (newItem) {
+                  const metadataValues = metadataDefinitions
+                    .map((definition) => normalizeMetadataDraft(definition, newItemMetadataDrafts[definition.id]))
+                    .filter((value): value is ItemMetadataValueUpsert => value !== null);
+
+                  if (metadataValues.length > 0) {
+                    await bulkUpsertItemMetadataValues({
+                      item_id: newItem.id,
+                      values: metadataValues,
+                    });
+                  }
+
                   const getItems = isInventory ? getInventoryItems : getChecklistItems;
                   const refreshed = inventory && await getItems(inventory.id);
                   if (refreshed) setItems(refreshed);
                   setNewItemName("");
                   setNewItemDescription("");
                   setNewItemQuantity(isChecklist ? 0 : 1);
+                  setNewItemMetadataDrafts({});
                   setisInsertMode(false);
                 }
               }}
@@ -718,10 +1152,38 @@ useEffect(() => {
                   </label>
                 </div>
               )}
+              <MetadataFieldsSection
+                definitions={metadataDefinitions.filter((definition) => definition.is_active)}
+                drafts={newItemMetadataDrafts}
+                onChange={(definition, value) => {
+                  setNewItemMetadataDrafts((current) => {
+                    const nextDraft = createEmptyMetadataDraft(definition.field_type);
+                    nextDraft.definition_id = definition.id;
+
+                    if (definition.field_type === 'TEXT' || definition.field_type === 'LIST') {
+                      nextDraft.value_text = value || null;
+                    } else if (definition.field_type === 'NUMBER') {
+                      nextDraft.value_number = value === '' ? null : value;
+                    } else if (definition.field_type === 'BOOLEAN') {
+                      nextDraft.value_boolean = value === '' ? null : value === 'true';
+                    } else {
+                      nextDraft.value_date = value || null;
+                    }
+
+                    return {
+                      ...current,
+                      [definition.id]: nextDraft,
+                    };
+                  });
+                }}
+              />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setisInsertMode(false)}
+                  onClick={() => {
+                    setisInsertMode(false);
+                    setNewItemMetadataDrafts({});
+                  }}
                   className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
                 >
                   Chiudi
@@ -738,7 +1200,7 @@ useEffect(() => {
       <Dialog open={!!itemBeingEdited} onClose={() => setItemBeingEdited(null)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-md">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-2xl">
             <Dialog.Title className="text-lg font-semibold mb-4">Modifica oggetto</Dialog.Title>
             {itemBeingEdited && (
               <form
@@ -753,6 +1215,17 @@ useEffect(() => {
                     inventory_id: inventory.id,
                   });
                   if (newItem) {
+                    const metadataValues = metadataDefinitions
+                      .map((definition) => normalizeMetadataDraft(definition, editingMetadataDrafts[definition.id]))
+                      .filter((value): value is ItemMetadataValueUpsert => value !== null);
+
+                    if (metadataValues.length > 0) {
+                      await bulkUpsertItemMetadataValues({
+                        item_id: newItem.id,
+                        values: metadataValues,
+                      });
+                    }
+
                     const getItems = isInventory ? getInventoryItems : getChecklistItems;
                     const refreshed = inventory && await getItems(inventory.id);
                     if (refreshed) setItems(refreshed);
@@ -767,9 +1240,34 @@ useEffect(() => {
                     inventory_id: itemBeingEdited.inventory_id,
                   });
                   if (updated) {
-                    setItems((prev) =>
-                      prev.map((itm) => (itm.id === updated.id ? updated : itm))
+                    const existingValuesByDefinitionId = new Map(
+                      editingMetadataValues.map((value) => [value.definition_id, value]),
                     );
+
+                    const metadataValuesToUpsert = metadataDefinitions
+                      .map((definition) => normalizeMetadataDraft(definition, editingMetadataDrafts[definition.id]))
+                      .filter((value): value is ItemMetadataValueUpsert => value !== null);
+
+                    const metadataValueIdsToDelete = metadataDefinitions
+                      .filter((definition) => !normalizeMetadataDraft(definition, editingMetadataDrafts[definition.id]))
+                      .map((definition) => existingValuesByDefinitionId.get(definition.id)?.id)
+                      .filter((valueId): valueId is number => valueId !== undefined);
+
+                    if (metadataValueIdsToDelete.length > 0) {
+                      await Promise.all(metadataValueIdsToDelete.map((valueId) => deleteItemMetadataValue(valueId)));
+                    }
+
+                    if (metadataValuesToUpsert.length > 0) {
+                      await bulkUpsertItemMetadataValues({
+                        item_id: updated.id,
+                        values: metadataValuesToUpsert,
+                      });
+                    }
+
+                    // Refresh the full list so metadata badges are up to date
+                    const getItemsFn = isInventory ? getInventoryItems : getChecklistItems;
+                    const refreshed = inventory && await getItemsFn(inventory.id);
+                    if (refreshed) setItems(refreshed as Item[]);
                     setItemBeingEdited(null);
                   }
                 }
@@ -855,10 +1353,44 @@ useEffect(() => {
                     </label>
                   </div>
                 )}
+                {metadataLoading ? (
+                  <div className="mt-4 text-sm text-gray-500 dark:text-gray-300">Caricamento metadati...</div>
+                ) : (
+                  <MetadataFieldsSection
+                    definitions={metadataDefinitions.filter((definition) => definition.is_active)}
+                    drafts={editingMetadataDrafts}
+                    onChange={(definition, value) => {
+                      setEditingMetadataDrafts((current) => {
+                        const nextDraft = createEmptyMetadataDraft(definition.field_type);
+                        nextDraft.definition_id = definition.id;
+
+                        if (definition.field_type === 'TEXT' || definition.field_type === 'LIST') {
+                          nextDraft.value_text = value || null;
+                        } else if (definition.field_type === 'NUMBER') {
+                          nextDraft.value_number = value === '' ? null : value;
+                        } else if (definition.field_type === 'BOOLEAN') {
+                          nextDraft.value_boolean = value === '' ? null : value === 'true';
+                        } else {
+                          nextDraft.value_date = value || null;
+                        }
+
+                        return {
+                          ...current,
+                          [definition.id]: nextDraft,
+                        };
+                      });
+                    }}
+                  />
+                )}
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => { setItemBeingEdited(null); setIsCloning(false); }}
+                    onClick={() => {
+                      setItemBeingEdited(null);
+                      setIsCloning(false);
+                      setEditingMetadataDrafts({});
+                      setEditingMetadataValues([]);
+                    }}
                     className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
                   >
                     Chiudi

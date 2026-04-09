@@ -94,6 +94,17 @@ export default function AuditLogPage() {
     return String(value);
   };
 
+  const formatTypedMetadataValue = (typed: unknown): string => {
+    if (typed === null || typed === undefined) return "vuoto";
+    if (typeof typed !== "object") return String(typed);
+    const t = typed as Record<string, unknown>;
+    if (t.value_text !== undefined && t.value_text !== null) return String(t.value_text);
+    if (t.value_number !== undefined && t.value_number !== null) return String(t.value_number);
+    if (t.value_boolean !== undefined && t.value_boolean !== null) return t.value_boolean ? "sì" : "no";
+    if (t.value_date !== undefined && t.value_date !== null) return String(t.value_date);
+    return "vuoto";
+  };
+
   const renderDiff = (log: ItemVersion | InventoryVersion) => {
     if (log.operation === "CREATE") {
       return <span className="text-green-700 dark:text-green-400">Record creato</span>;
@@ -106,33 +117,48 @@ export default function AuditLogPage() {
     }
 
     try {
-      const parsed = JSON.parse(log.diff) as Record<string, { from: unknown; to: unknown }>;
+      const parsed = JSON.parse(log.diff) as Record<string, unknown>;
       const entries = Object.entries(parsed);
       if (entries.length === 0) {
         return <span className="text-gray-500">Nessuna modifica rilevata</span>;
       }
 
-      return (
-        <div className="space-y-1">
-          {entries.map(([field, values]) => (
+      const rows: React.ReactNode[] = [];
+      for (const [field, values] of entries) {
+        if (field === "metadata" && Array.isArray(values)) {
+          for (const change of values) {
+            const c = change as Record<string, unknown>;
+            const label = (c.definition_label as string | undefined) ?? (c.definition_key as string | undefined) ?? "Metadato";
+            rows.push(
+              <div key={`meta-${String(c.definition_id)}`}>
+                <span className="font-semibold">{label}:</span>{" "}
+                <span>{`${formatTypedMetadataValue(c.from)} -> ${formatTypedMetadataValue(c.to)}`}</span>
+              </div>
+            );
+          }
+        } else {
+          const v = values as { from: unknown; to: unknown } | null | undefined;
+          rows.push(
             <div key={field}>
               {field === "quantity" && "inventory_type" in log && log.inventory_type === "CHECKLIST" ? (
                 <>
                   <span className="font-semibold">Status:</span>{" "}
-                  {renderChecklistStatus(values?.from)}
+                  {renderChecklistStatus(v?.from)}
                   <span>{" -> "}</span>
-                  {renderChecklistStatus(values?.to)}
+                  {renderChecklistStatus(v?.to)}
                 </>
               ) : (
                 <>
                   <span className="font-semibold">{fieldLabel(field)}:</span>{" "}
-                  <span>{`${formatValue(values?.from)} -> ${formatValue(values?.to)}`}</span>
+                  <span>{`${formatValue(v?.from)} -> ${formatValue(v?.to)}`}</span>
                 </>
               )}
             </div>
-          ))}
-        </div>
-      );
+          );
+        }
+      }
+
+      return <div className="space-y-1">{rows}</div>;
     } catch {
       return <span className="text-gray-500">Formato diff non valido</span>;
     }

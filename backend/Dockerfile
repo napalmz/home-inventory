@@ -22,8 +22,9 @@ WORKDIR /app
 # Copia i file necessari
 COPY requirements.txt .
 
-# Installa le dipendenze
-RUN pip install --no-cache-dir -r requirements.txt \
+# Aggiorna toolchain Python e installa dipendenze con versioni sicure
+RUN pip install --no-cache-dir --upgrade "pip>=25.3" "wheel>=0.46.2" \
+    && pip install --no-cache-dir -r requirements.txt \
     && rm -rf /root/.cache
 
 # Copia il codice dell'app

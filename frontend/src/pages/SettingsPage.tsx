@@ -3,6 +3,7 @@ import GeneralSettings from "./settings/GeneralSettings";
 import UserManagementPage from "./settings/UserManagementPage";
 //import RoleManagementPage from "./settings/RoleManagementPage";
 import GroupManagementPage from "./settings/GroupManagementPage";
+import MetadataDefinitionsPage from "./settings/MetadataDefinitionsPage";
 //import InfoPage from "./settings/InfoPage";
 import BackupManagementPage from "./settings/BackupManagementPage";
 import AuditLogPage from "./settings/AuditLogPage";
@@ -12,6 +13,7 @@ const tabs = [
   { name: "Utenti", component: <UserManagementPage /> },
   //{ name: "Ruoli", component: <RoleManagementPage /> },
   { name: "Gruppi", component: <GroupManagementPage /> },
+  { name: "Metadati", component: <MetadataDefinitionsPage /> },
   { name: "Backup", component: <BackupManagementPage /> },
   { name: "Audit", component: <AuditLogPage /> },
   //{ name: "Info", component: <InfoPage /> },

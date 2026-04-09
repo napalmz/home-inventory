@@ -11,6 +11,7 @@ import threading
 import logging
 import json
 import re
+from functools import lru_cache
 from dependencies import get_db, role_required
 from models import RoleEnum
 from dotenv import load_dotenv
@@ -29,6 +30,47 @@ BACKUP_DIR = Path("./backups")
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 BACKUP_META_PREFIX = "-- HI_BACKUP_META: "
+
+# Matrice di compatibilita DB (source_revision -> target_revision)
+# Va mantenuta nel tempo per esplicitare restore cross-version consentiti.
+DB_COMPATIBILITY_MATRIX: dict[tuple[str, str], dict] = {
+    (
+        "4ef54a6a9ff5",
+        "d4e5f6a7b8c9",
+    ): {
+        "strategy": "forward_core_data",
+        "reason": "Backup precedente all'introduzione audit/metadati: ripristino dati core consentito.",
+    },
+    (
+        "b1c2d3e4f5a6",
+        "d4e5f6a7b8c9",
+    ): {
+        "strategy": "forward_core_data",
+        "reason": "Backup con audit ma senza metadati: ripristino dati core consentito.",
+    },
+    (
+        "c3d4e5f6a7b8",
+        "d4e5f6a7b8c9",
+    ): {
+        "strategy": "forward_core_data",
+        "reason": "Backup pre-metadata: metadati facoltativi, restore consentito su schema piu recente.",
+    },
+}
+
+CORE_RESTORE_TABLES = {
+    "shared_inventories",
+    "shared_inventory_groups",
+    "item_versions",
+    "inventory_versions",
+    "item_metadata_values",
+    "metadata_definition_assignments",
+    "metadata_definitions",
+    "filter_templates",
+    "items",
+    "inventories",
+    "user_group_association",
+    "groups",
+}
 
 
 class RestoreRequest(BaseModel):
@@ -51,6 +93,172 @@ def _backup_meta_path(file_path: Path) -> Path:
 def _get_alembic_version(db: Session) -> str | None:
     row = db.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).fetchone()
     return row[0] if row else None
+
+
+@lru_cache(maxsize=1)
+def _migration_parent_map() -> dict[str, str | None]:
+    versions_dir = Path(__file__).resolve().parents[1] / "migrations" / "versions"
+    parent_map: dict[str, str | None] = {}
+    revision_re = re.compile(
+        r"^revision(?:\s*:\s*[^=]+)?\s*=\s*['\"]([^'\"]+)['\"]",
+        re.MULTILINE,
+    )
+    down_re = re.compile(
+        r"^down_revision(?:\s*:\s*[^=]+)?\s*=\s*(.+)$",
+        re.MULTILINE,
+    )
+
+    for file in versions_dir.glob("*.py"):
+        raw = file.read_text(encoding="utf-8")
+        revision_match = revision_re.search(raw)
+        down_match = down_re.search(raw)
+        if not revision_match:
+            continue
+        revision = revision_match.group(1)
+        down_revision = None
+        if down_match:
+            down_raw = down_match.group(1).strip()
+            if down_raw != "None":
+                quoted_list = re.findall(r"['\"]([^'\"]+)['\"]", down_raw)
+                if quoted_list:
+                    down_revision = quoted_list[0]
+        parent_map[revision] = down_revision
+    return parent_map
+
+
+def _is_ancestor_revision(ancestor: str, descendant: str) -> bool:
+    parent_map = _migration_parent_map()
+    current = descendant
+    while current:
+        if current == ancestor:
+            return True
+        current = parent_map.get(current)
+    return False
+
+
+@lru_cache(maxsize=1)
+def _migration_description_map() -> dict[str, str]:
+    versions_dir = Path(__file__).resolve().parents[1] / "migrations" / "versions"
+    descriptions: dict[str, str] = {}
+    revision_re = re.compile(
+        r"^revision(?:\s*:\s*[^=]+)?\s*=\s*['\"]([^'\"]+)['\"]",
+        re.MULTILINE,
+    )
+    docstring_re = re.compile(r'"""(.*?)"""', re.DOTALL)
+
+    for file in versions_dir.glob("*.py"):
+        raw = file.read_text(encoding="utf-8")
+        revision_match = revision_re.search(raw)
+        if not revision_match:
+            continue
+        revision = revision_match.group(1)
+
+        description = None
+        doc_match = docstring_re.search(raw)
+        if doc_match:
+            for line in doc_match.group(1).splitlines():
+                clean = line.strip()
+                if clean:
+                    description = clean
+                    break
+
+        if not description:
+            stem = file.stem
+            description = stem.split("_", 1)[1].replace("_", " ") if "_" in stem else stem
+
+        descriptions[revision] = description
+
+    return descriptions
+
+
+def _revision_display_label(revision: str | None) -> str | None:
+    if not revision:
+        return None
+    description = _migration_description_map().get(revision)
+    if not description:
+        return revision
+    return f"{description} ({revision})"
+
+
+def _list_all_revisions_in_repo() -> list[str]:
+    parent_map = _migration_parent_map()
+    if not parent_map:
+        return []
+
+    children_map: dict[str, list[str]] = {}
+    for revision, parent in parent_map.items():
+        if parent is None:
+            continue
+        children_map.setdefault(parent, []).append(revision)
+
+    roots = sorted([revision for revision, parent in parent_map.items() if parent is None])
+    ordered: list[str] = []
+    visited: set[str] = set()
+
+    def walk(node: str) -> None:
+        if node in visited:
+            return
+        visited.add(node)
+        ordered.append(node)
+        for child in sorted(children_map.get(node, [])):
+            walk(child)
+
+    for root in roots:
+        walk(root)
+
+    # Safety: include eventual orfani non raggiunti
+    for revision in sorted(parent_map.keys()):
+        if revision not in visited:
+            ordered.append(revision)
+
+    return ordered
+
+
+def _evaluate_restore_compatibility(backup_revision: str | None, current_revision: str | None) -> dict:
+    if not backup_revision or not current_revision:
+        return {
+            "compatible": False,
+            "strategy": "blocked",
+            "reason": "Versione alembic non disponibile",
+        }
+
+    if backup_revision == current_revision:
+        return {
+            "compatible": True,
+            "strategy": "same_revision",
+            "reason": "Revisioni identiche",
+        }
+
+    explicit_rule = DB_COMPATIBILITY_MATRIX.get((backup_revision, current_revision))
+    if explicit_rule:
+        return {
+            "compatible": True,
+            "strategy": explicit_rule.get("strategy", "matrix"),
+            "reason": explicit_rule.get("reason", "Compatibilita esplicita in matrice"),
+        }
+
+    if _is_ancestor_revision(backup_revision, current_revision):
+        return {
+            "compatible": True,
+            "strategy": "forward_ancestor",
+            "reason": "Backup proveniente da revisione precedente nella stessa catena migrazioni",
+        }
+
+    return {
+        "compatible": False,
+        "strategy": "blocked",
+        "reason": "Nessuna regola compatibile nella matrice/version chain",
+    }
+
+
+def _table_exists(db: Session, table_name: str) -> bool:
+    row = db.execute(text("SELECT to_regclass(:table_name)"), {"table_name": table_name}).fetchone()
+    return bool(row and row[0])
+
+
+def _safe_delete_table(db: Session, table_name: str) -> None:
+    if _table_exists(db, table_name):
+        db.execute(text(f"DELETE FROM {table_name}"))
 
 
 def _write_backup_metadata(file_path: Path, metadata: dict) -> None:
@@ -169,6 +377,7 @@ def list_backups(db: Session = Depends(get_db)):
     for file in sorted(BACKUP_DIR.glob("*.sql")):
         metadata = _read_backup_metadata(file)
         backup_revision = metadata.get("db_alembic_version") if metadata else None
+        compatibility = _evaluate_restore_compatibility(backup_revision, current_revision)
         backups.append({
             "filename": file.name,
             "size": file.stat().st_size,
@@ -176,10 +385,49 @@ def list_backups(db: Session = Depends(get_db)):
             "metadata": metadata,
             "has_metadata": metadata is not None,
             "db_alembic_version": backup_revision,
+            "db_alembic_version_label": _revision_display_label(backup_revision),
             "current_db_alembic_version": current_revision,
-            "restorable_on_current_db": bool(metadata and backup_revision and backup_revision == current_revision),
+            "current_db_alembic_version_label": _revision_display_label(current_revision),
+            "restorable_on_current_db": bool(metadata and compatibility.get("compatible")),
+            "restore_compatibility": compatibility,
         })
     return backups
+
+
+@router.get("/compatibility-map")
+def get_backup_compatibility_map():
+    revisions = _list_all_revisions_in_repo()
+    revision_labels = {revision: _revision_display_label(revision) for revision in revisions}
+    matrix = []
+
+    for source in revisions:
+        targets = []
+        for target in revisions:
+            compatibility = _evaluate_restore_compatibility(source, target)
+            targets.append(
+                {
+                    "target_revision": target,
+                    "compatible": compatibility.get("compatible", False),
+                    "strategy": compatibility.get("strategy"),
+                    "reason": compatibility.get("reason"),
+                }
+            )
+        matrix.append({"source_revision": source, "targets": targets})
+
+    return {
+        "revisions": revisions,
+        "revision_labels": revision_labels,
+        "matrix": matrix,
+        "explicit_rules": [
+            {
+                "source_revision": source,
+                "target_revision": target,
+                "strategy": rule.get("strategy"),
+                "reason": rule.get("reason"),
+            }
+            for (source, target), rule in sorted(DB_COMPATIBILITY_MATRIX.items())
+        ],
+    }
 
 @router.get("/download/{filename}")
 def download_backup(filename: str):
@@ -279,12 +527,15 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
     finally:
         current_db.close()
 
-    if metadata.get("db_alembic_version") != current_revision:
+    backup_revision = metadata.get("db_alembic_version")
+    compatibility = _evaluate_restore_compatibility(backup_revision, current_revision)
+
+    if not compatibility.get("compatible"):
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Backup non ripristinabile su questo DB: versione backup={metadata.get('db_alembic_version')} "
-                f"versione corrente={current_revision}"
+                f"Backup non ripristinabile su questo DB: versione backup={backup_revision} "
+                f"versione corrente={current_revision}. Motivo: {compatibility.get('reason')}"
             ),
         )
 
@@ -292,18 +543,7 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
         env = os.environ.copy()
         env["PGPASSWORD"] = os.getenv("POSTGRES_PASSWORD", "admin")
 
-        business_tables = {
-            "shared_inventories",
-            "shared_inventory_groups",
-            "item_versions",
-            "inventory_versions",
-            "items",
-            "inventories",
-            "user_group_association",
-            "groups",
-        }
-
-        include_tables = set(business_tables)
+        include_tables = set(CORE_RESTORE_TABLES)
         include_tables.add("users")
         if payload.mode == "advanced" and payload.overwrite_users_roles:
             include_tables.add("roles")
@@ -322,23 +562,33 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
                 # Esegui il comando di restore in un thread separato
                 logger.info(f"Pulizia tabelle prima del restore...")
                 db = SessionLocal()
-                db.execute(text("DELETE FROM shared_inventories"))
-                db.execute(text("DELETE FROM shared_inventory_groups"))
-                db.execute(text("DELETE FROM item_versions"))
-                db.execute(text("DELETE FROM inventory_versions"))
-                db.execute(text("DELETE FROM items"))
-                db.execute(text("DELETE FROM inventories"))
-                db.execute(text("DELETE FROM user_group_association"))
-                db.execute(text("DELETE FROM groups"))
+
+                # Ordine child -> parent per minimizzare problemi FK
+                for table_name in [
+                    "shared_inventories",
+                    "shared_inventory_groups",
+                    "item_metadata_values",
+                    "metadata_definition_assignments",
+                    "filter_templates",
+                    "item_versions",
+                    "inventory_versions",
+                    "items",
+                    "metadata_definitions",
+                    "user_group_association",
+                    "groups",
+                    "inventories",
+                ]:
+                    _safe_delete_table(db, table_name)
 
                 if payload.mode == "advanced" and payload.overwrite_users_roles and payload.overwrite_admin:
-                    db.execute(text("DELETE FROM users"))
-                    db.execute(text("DELETE FROM roles"))
+                    _safe_delete_table(db, "users")
+                    _safe_delete_table(db, "roles")
                 else:
-                    db.execute(text("DELETE FROM users WHERE username != 'admin'"))
+                    if _table_exists(db, "users"):
+                        db.execute(text("DELETE FROM users WHERE username != 'admin'"))
 
                 if payload.mode == "advanced" and payload.overwrite_settings:
-                    db.execute(text("DELETE FROM settings"))
+                    _safe_delete_table(db, "settings")
 
                 db.commit()
                 logger.info(f"Pulizia completata. Avvio restore da {filename}")
@@ -367,7 +617,11 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore nel restore: {str(e)}")
 
-    return {"message": "Restore avviato in background", "mode": payload.mode}
+    return {
+        "message": "Restore avviato in background",
+        "mode": payload.mode,
+        "compatibility": compatibility,
+    }
 
 @router.post("/upload")
 def upload_backup(file: UploadFile = File(...)):

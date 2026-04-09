@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   listBackups,
+  getBackupCompatibilityMap,
   createBackup,
   downloadBackup,
   deleteBackup,
@@ -20,8 +21,15 @@ export default function BackupManagementPage() {
     modified: string;
     has_metadata?: boolean;
     db_alembic_version?: string | null;
+    db_alembic_version_label?: string | null;
     current_db_alembic_version?: string | null;
+    current_db_alembic_version_label?: string | null;
     restorable_on_current_db?: boolean;
+    restore_compatibility?: {
+      compatible?: boolean;
+      strategy?: string;
+      reason?: string;
+    };
     metadata?: {
       format?: string;
       created_at?: string;
@@ -41,6 +49,25 @@ export default function BackupManagementPage() {
     retention: number;
   } | null>(null);
   const [lastRun, setLastRun] = useState<string | null>(null);
+  const [compatibilityMap, setCompatibilityMap] = useState<{
+    revisions: string[];
+    revision_labels?: Record<string, string | null>;
+    matrix: Array<{
+      source_revision: string;
+      targets: Array<{
+        target_revision: string;
+        compatible: boolean;
+        strategy?: string;
+        reason?: string;
+      }>;
+    }>;
+    explicit_rules: Array<{
+      source_revision: string;
+      target_revision: string;
+      strategy?: string;
+      reason?: string;
+    }>;
+  } | null>(null);
 
   const [filterText, setFilterText] = useState("");
   const [backupTypeFilter, setBackupTypeFilter] = useState<"all" | "manual" | "auto">("all");
@@ -55,12 +82,39 @@ export default function BackupManagementPage() {
       db_alembic_version?: string;
     } | null;
     db_alembic_version?: string | null;
+    db_alembic_version_label?: string | null;
     current_db_alembic_version?: string | null;
+    current_db_alembic_version_label?: string | null;
     restorable_on_current_db?: boolean;
+    restore_compatibility?: {
+      compatible?: boolean;
+      strategy?: string;
+      reason?: string;
+    };
   } | null>(null);
+
+  const revisionDisplay = (revision?: string | null): string => {
+    if (!revision) return "n/d";
+    const label = compatibilityMap?.revision_labels?.[revision];
+    return label || revision;
+  };
 
   useEffect(() => {
     fetchBackups();
+  }, []);
+
+  useEffect(() => {
+    const fetchCompatibilityMap = async () => {
+      try {
+        const data = await getBackupCompatibilityMap();
+        setCompatibilityMap(data);
+      } catch (error) {
+        console.error("Errore nel caricamento mappa compatibilita backup:", error);
+        setCompatibilityMap(null);
+      }
+    };
+
+    fetchCompatibilityMap();
   }, []);
 
   useEffect(() => {
@@ -118,8 +172,15 @@ export default function BackupManagementPage() {
             modified: string;
             has_metadata?: boolean;
             db_alembic_version?: string | null;
+            db_alembic_version_label?: string | null;
             current_db_alembic_version?: string | null;
+            current_db_alembic_version_label?: string | null;
             restorable_on_current_db?: boolean;
+            restore_compatibility?: {
+              compatible?: boolean;
+              strategy?: string;
+              reason?: string;
+            };
             metadata?: {
               format?: string;
               created_at?: string;
@@ -399,6 +460,73 @@ export default function BackupManagementPage() {
         Crea Backup
         {loading && <span className="ml-2 animate-spin">⏳</span>}
       </button>
+
+      <details className="border rounded p-3 bg-gray-50 dark:bg-gray-800" open={false}>
+        <summary className="cursor-pointer font-medium select-none">
+          Mappa compatibilita versioni DB
+        </summary>
+        <div className="mt-3 space-y-3">
+          {!compatibilityMap ? (
+            <p className="text-sm text-gray-600 dark:text-gray-300">Mappa non disponibile.</p>
+          ) : (
+            <>
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                Cella verde: restore consentito dalla revisione sorgente (riga) alla revisione target (colonna).
+              </p>
+              <div className="overflow-auto border rounded">
+                <table className="min-w-max text-xs">
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-gray-700">
+                      <th className="sticky left-0 bg-gray-100 dark:bg-gray-700 p-2 text-left">Da \ A</th>
+                      {compatibilityMap.revisions.map((revision) => (
+                        <th key={`head-${revision}`} className="p-2 text-left whitespace-nowrap">{revisionDisplay(revision)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compatibilityMap.matrix.map((row) => (
+                      <tr key={`row-${row.source_revision}`} className="border-t border-gray-200 dark:border-gray-700">
+                        <td className="sticky left-0 bg-white dark:bg-gray-900 p-2 font-semibold whitespace-nowrap">
+                          {revisionDisplay(row.source_revision)}
+                        </td>
+                        {row.targets.map((cell) => (
+                          <td
+                            key={`cell-${row.source_revision}-${cell.target_revision}`}
+                            className={`p-2 whitespace-nowrap ${
+                              cell.compatible
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                            }`}
+                            title={`${cell.strategy || "n/a"} - ${cell.reason || ""}`}
+                          >
+                            {cell.compatible ? "SI" : "NO"}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold">Regole esplicite</h4>
+                {compatibilityMap.explicit_rules.length === 0 ? (
+                  <p className="text-xs text-gray-600 dark:text-gray-300">Nessuna regola esplicita.</p>
+                ) : (
+                  <ul className="mt-1 text-xs space-y-1">
+                    {compatibilityMap.explicit_rules.map((rule, idx) => (
+                      <li key={`rule-${idx}`}>
+                        {rule.source_revision} → {rule.target_revision} ({rule.strategy || "n/a"}) - {rule.reason || ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </details>
+
       {message && (
         <div className={`fixed bottom-4 right-4 z-50 p-3 rounded shadow-lg text-white ${messageType === "success" ? "bg-green-500" : "bg-red-500"} transition-opacity duration-1000`}>
           {message}
@@ -511,11 +639,11 @@ export default function BackupManagementPage() {
                     </div>
                     <div>
                       <span className="font-semibold">Revisione backup:</span>{" "}
-                      {backup.db_alembic_version || "n/d"}
+                      {backup.db_alembic_version_label || revisionDisplay(backup.db_alembic_version)}
                     </div>
                     <div>
                       <span className="font-semibold">Revisione DB corrente:</span>{" "}
-                      {backup.current_db_alembic_version || "n/d"}
+                      {backup.current_db_alembic_version_label || revisionDisplay(backup.current_db_alembic_version)}
                     </div>
                     <div>
                       <span className="font-semibold">Ripristinabile:</span>{" "}
@@ -525,6 +653,18 @@ export default function BackupManagementPage() {
                         <span className="text-red-700 dark:text-red-400 font-semibold">NO</span>
                       )}
                     </div>
+                    {backup.restore_compatibility?.strategy && (
+                      <div>
+                        <span className="font-semibold">Strategia:</span>{" "}
+                        {backup.restore_compatibility.strategy}
+                      </div>
+                    )}
+                    {backup.restore_compatibility?.reason && (
+                      <div>
+                        <span className="font-semibold">Motivo:</span>{" "}
+                        {backup.restore_compatibility.reason}
+                      </div>
+                    )}
                     {backup.metadata?.created_at && (
                       <div>
                         <span className="font-semibold">Creato (meta):</span>{" "}
@@ -547,8 +687,11 @@ export default function BackupManagementPage() {
                         filename: backup.filename,
                         metadata: backup.metadata,
                         db_alembic_version: backup.db_alembic_version,
+                        db_alembic_version_label: backup.db_alembic_version_label,
                         current_db_alembic_version: backup.current_db_alembic_version,
+                        current_db_alembic_version_label: backup.current_db_alembic_version_label,
                         restorable_on_current_db: backup.restorable_on_current_db,
+                        restore_compatibility: backup.restore_compatibility,
                       })
                     }
                     className="px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -601,10 +744,10 @@ export default function BackupManagementPage() {
                 <span className="font-semibold">Formato:</span> {restoreTarget.metadata?.format || "n/d"}
               </p>
               <p>
-                <span className="font-semibold">Revisione backup:</span> {restoreTarget.db_alembic_version || "n/d"}
+                <span className="font-semibold">Revisione backup:</span> {restoreTarget.db_alembic_version_label || revisionDisplay(restoreTarget.db_alembic_version)}
               </p>
               <p>
-                <span className="font-semibold">Revisione DB corrente:</span> {restoreTarget.current_db_alembic_version || "n/d"}
+                <span className="font-semibold">Revisione DB corrente:</span> {restoreTarget.current_db_alembic_version_label || revisionDisplay(restoreTarget.current_db_alembic_version)}
               </p>
               <p>
                 <span className="font-semibold">Creato (meta):</span>{" "}
@@ -618,17 +761,29 @@ export default function BackupManagementPage() {
                   <span className="text-red-700 dark:text-red-400 font-semibold">NO</span>
                 )}
               </p>
+              {restoreTarget.restore_compatibility?.strategy && (
+                <p>
+                  <span className="font-semibold">Strategia:</span> {restoreTarget.restore_compatibility.strategy}
+                </p>
+              )}
+              {restoreTarget.restore_compatibility?.reason && (
+                <p>
+                  <span className="font-semibold">Motivo:</span> {restoreTarget.restore_compatibility.reason}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 onClick={handleRestoreBaseFromModal}
+                disabled={!restoreTarget.restorable_on_current_db}
                 className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Base
               </button>
               <button
                 onClick={handleRestoreAdvancedFromModal}
+                disabled={!restoreTarget.restorable_on_current_db}
                 className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
               >
                 Avanzato
