@@ -3,7 +3,6 @@ import { ReactNode, useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
-import { User } from "../types"
 import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser } from 'react-icons/fi'
 
 interface SidebarLayoutProps {
@@ -12,16 +11,11 @@ interface SidebarLayoutProps {
 
 export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const [isOpen, setIsOpen] = useState(window.innerWidth >= 768)
-  const [user, setUser] = useState<User | null>(null)
   const [apiVersion, setApiVersion] = useState<string | null>(null)
 
   const auth = useAuth()
-
-  const { logout } = useAuth()
-
-  useEffect(() => {
-    setUser(auth.user ?? null)
-  }, [auth.user])
+  const { logout } = auth
+  const user = auth.user ?? null
 
   useEffect(() => {
     getApiVersion()
@@ -60,11 +54,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               onClick={() => {
                 logout()
                   .then(() => {
-                    setUser(null)
                     window.location.href = '/'
                   })
                   .catch(() => {
-                    setUser(null)
                     window.location.href = '/'
                   })
               }}

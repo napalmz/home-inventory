@@ -4,7 +4,7 @@ sqlalchemy
 psycopg2-binary
 python-dotenv
 passlib
-python-multipart
+python-multipart>=0.0.26
 PyJWT[crypto]
 cryptography>=46.0.6
 alembic
