@@ -174,7 +174,7 @@ function MetadataFieldsSection({
                   value={currentValue}
                   onChange={(event) => onChange(definition, event.target.value)}
                 >
-                  <option value="">Vuoto</option>
+                  <option value="">[Vuoto]</option>
                   {(definition.list_options ?? []).map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -624,9 +624,22 @@ useEffect(() => {
     .filter((item) => {
       const matchesMetadata = metadataFilteredItemIds === null || metadataFilteredItemIds.includes(item.id);
       const normalizedFilter = filterText.toLowerCase();
+      const metadataValues = item.metadata_values ?? [];
+      const matchesTextMetadata = metadataValues.some((value) => {
+        if (value.field_type !== 'TEXT' && value.field_type !== 'LIST') {
+          return false;
+        }
+
+        return [
+          value.display_value,
+          value.value_text,
+          formatItemMetadataValue(value),
+        ].some((candidate) => candidate?.toLowerCase().includes(normalizedFilter));
+      });
       const matchesText =
         item.name.toLowerCase().includes(normalizedFilter) ||
-        item.description?.toLowerCase().includes(normalizedFilter);
+        item.description?.toLowerCase().includes(normalizedFilter) ||
+        matchesTextMetadata;
 
       return matchesMetadata && matchesText;
     })
@@ -794,6 +807,14 @@ useEffect(() => {
         alert('Errore durante l\'applicazione del template.');
       }
     };
+
+  useEffect(() => {
+    if (selectedTemplateId === '' || !inventory) {
+      return;
+    }
+
+    void applyTemplateToList(selectedTemplateId);
+  }, [selectedTemplateId, inventory?.id, items]);
 
   return (
     <div className="relative p-4">

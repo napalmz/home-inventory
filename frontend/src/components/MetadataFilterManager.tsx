@@ -547,7 +547,7 @@ export default function MetadataFilterManager({
                               className="rounded border px-3 py-2 dark:bg-gray-800"
                               disabled={isNullOp || !selectedDefinition}
                             >
-                              <option value="">Vuoto</option>
+                              <option value="">[Vuoto]</option>
                               {(selectedDefinition?.list_options ?? []).map((option) => (
                                 <option key={option.value} value={option.value}>{option.label}</option>
                               ))}

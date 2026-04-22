@@ -16,7 +16,7 @@ from models import (
 )
 from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemMetadataValueResponse, ItemResponse, UserResponse, InventoryResponseWithItemCount, InventoryVersionResponse, VersionBulkDeleteRequest
 from routes.auth import get_current_user
-from typing import List
+from typing import Any, List, cast
 import re
 import json
 from datetime import datetime, timezone
@@ -31,9 +31,11 @@ def can_access_inventory(user: User, inventory: Inventory, action: str = "view")
     if user.role.name == RoleEnum.admin.value:
         return True
 
+    owner_id = cast(int | None, inventory.owner_id)
+
     if action == "view":
         # Chiunque può vedere se è condiviso o è il proprietario
-        if inventory.owner_id == user.id:
+        if owner_id == user.id:
             return True
         if user.id in [s.user_id for s in inventory.shared_with_users]:
             return True
@@ -44,7 +46,7 @@ def can_access_inventory(user: User, inventory: Inventory, action: str = "view")
     elif action in ("edit", "delete"):
         # Moderatori possono modificare/eliminare solo se è proprio o condiviso con loro
         if user.role.name == RoleEnum.moderator.value:
-            if inventory.owner_id == user.id:
+            if owner_id == user.id:
                 return True
             if user.id in [s.user_id for s in inventory.shared_with_users]:
                 return True
@@ -58,7 +60,7 @@ def can_access_inventory(user: User, inventory: Inventory, action: str = "view")
 #############################################################################
 # Helper per versioning inventario
 #############################################################################
-def _snapshot_inventory(inv: Inventory) -> dict:
+def _snapshot_inventory(inv: Inventory) -> dict[str, Any]:
     return {
         "name": inv.name,
         "type": inv.type,
@@ -72,7 +74,7 @@ def _next_inventory_version_num(db: Session, inventory_id: int) -> int:
     return (last or 0) + 1
 
 def _write_inventory_version(
-    db: Session, inv: Inventory, operation: str, user: User, old_snapshot: dict = None
+    db: Session, inv: Inventory, operation: str, user: User, old_snapshot: dict[str, Any] | None = None
 ) -> None:
     diff: dict = {}
     if old_snapshot and operation == "UPDATE":
@@ -82,13 +84,14 @@ def _write_inventory_version(
             if old_val != new_val:
                 diff[key] = {"from": old_val, "to": new_val}
 
+    inventory_id = cast(int, inv.id)
     version = InventoryVersion(
-        inventory_id=inv.id,
+        inventory_id=inventory_id,
         name=inv.name,
         type=inv.type,
         owner_id=inv.owner_id,
         owner_username=inv.owner.username if inv.owner else None,
-        version_num=_next_inventory_version_num(db, inv.id),
+        version_num=_next_inventory_version_num(db, inventory_id),
         operation=operation,
         changed_by_id=user.id,
         changed_by_username=user.username,
@@ -137,6 +140,35 @@ def list_inventories_base(
         pattern = re.compile(re.escape(filtro), re.IGNORECASE)
         return pattern.sub(lambda m: f"**{m.group(0)}**", text)
 
+    def resolve_metadata_search_text(metadata_value: ItemMetadataValue) -> tuple[str, str] | None:
+        definition = metadata_value.definition
+        if definition is None:
+            return None
+
+        if not cast(bool, definition.is_active):
+            return None
+
+        field_type = cast(str, definition.field_type)
+        if field_type not in ("TEXT", "LIST"):
+            return None
+
+        raw_text = cast(str | None, metadata_value.value_text)
+        if not raw_text:
+            return None
+
+        display_text = raw_text
+        if field_type == "LIST":
+            for entry in cast(list[Any], definition.list_options or []):
+                if not isinstance(entry, dict):
+                    continue
+                entry_value = str(entry.get("value", "")).strip()
+                entry_label = str(entry.get("label", "")).strip()
+                if entry_value == raw_text:
+                    display_text = entry_label or raw_text
+                    break
+
+        return raw_text, display_text
+
     result = []
     filtro_lower = filtro.lower()
     for inv in visible_inventories:
@@ -148,21 +180,19 @@ def list_inventories_base(
                 desc_match = filtro_lower in (item.description or "").lower() if item.description else False
                 highlighted_metadata = []
                 for metadata_value in item.metadata_values:
-                    if (
-                        not metadata_value.definition
-                        or not metadata_value.definition.is_active
-                        or metadata_value.definition.field_type != "TEXT"
-                        or not metadata_value.value_text
-                    ):
+                    resolved_metadata_text = resolve_metadata_search_text(metadata_value)
+                    if not resolved_metadata_text:
                         continue
-                    metadata_text = metadata_value.value_text
+                    raw_metadata_text, display_metadata_text = resolved_metadata_text
                     definition_label = metadata_value.definition.label or metadata_value.definition.key
-                    metadata_text_match = filtro_lower in metadata_text.lower()
-                    metadata_label_match = filtro_lower in definition_label.lower() if definition_label else False
-                    if metadata_text_match or metadata_label_match:
+                    metadata_text_match = (
+                        filtro_lower in raw_metadata_text.lower()
+                        or filtro_lower in display_metadata_text.lower()
+                    )
+                    if metadata_text_match:
                         highlighted_metadata.append({
-                            "definition_label": highlight_match(definition_label, filtro) if metadata_label_match else definition_label,
-                            "value_text": highlight_match(metadata_text, filtro) if metadata_text_match else metadata_text,
+                            "definition_label": definition_label,
+                            "value_text": highlight_match(display_metadata_text, filtro) if metadata_text_match else display_metadata_text,
                         })
 
                 metadata_match = len(highlighted_metadata) > 0
@@ -250,7 +280,7 @@ def update_inventory_base(
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     old_snapshot = _snapshot_inventory(inventory)
-    inventory.name = update.name
+    setattr(inventory, "name", update.name)
     inventory.user_mod = user.id
     inventory.data_mod = datetime.now(timezone.utc)
     _write_inventory_version(db, inventory, "UPDATE", user, old_snapshot)
@@ -500,17 +530,18 @@ def list_access_details_base(
 
     # Utente proprietario
     owner = db.query(User).get(inventory.owner_id)
-    access_details.append({
-        "username": owner.username,
-        "access": "edit",
-        "via": "owner",
-        "group": None
-    })
+    if owner is not None:
+        access_details.append({
+            "username": owner.username,
+            "access": "edit",
+            "via": "owner",
+            "group": None
+        })
 
     # Amministratori
     admins = db.query(User).filter(User.role.has(name=RoleEnum.admin.value)).all()
     for admin in admins:
-        if admin.id != inventory.owner_id:
+        if cast(int | None, admin.id) != cast(int | None, inventory.owner_id):
             access_details.append({
                 "username": admin.username,
                 "access": "edit",
@@ -520,10 +551,12 @@ def list_access_details_base(
 
     # Utenti condivisione diretta
     for share in inventory.shared_with_users:
-        user = db.query(User).get(share.user_id)
-        access = "edit" if user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+        shared_user = db.query(User).get(share.user_id)
+        if shared_user is None or shared_user.role is None:
+            continue
+        access = "edit" if shared_user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
         access_details.append({
-            "username": user.username,
+            "username": shared_user.username,
             "access": access,
             "via": "share",
             "group": None
@@ -532,6 +565,8 @@ def list_access_details_base(
     # Utenti condivisione tramite gruppo
     for shared_group in inventory.shared_with_groups:
         group = db.query(Group).get(shared_group.group_id)
+        if group is None:
+            continue
         for assoc in group.user_associations:
             access = "edit" if assoc.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
             access_details.append({
@@ -561,7 +596,8 @@ def count_access_by_type_base(
 
     # Owner
     owner = db.query(User).get(inventory.owner_id)
-    access_by_user[owner.username] = "edit"
+    if owner is not None:
+        access_by_user[owner.username] = "edit"
 
     # Admin (aggiunti solo se non già presenti)
     admins = db.query(User).filter(User.role.has(name=RoleEnum.admin.value)).all()
@@ -571,13 +607,17 @@ def count_access_by_type_base(
 
     # Dirette
     for share in inventory.shared_with_users:
-        user = db.query(User).get(share.user_id)
-        access = "edit" if user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
-        access_by_user[user.username] = access
+        shared_user = db.query(User).get(share.user_id)
+        if shared_user is None or shared_user.role is None:
+            continue
+        access = "edit" if shared_user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
+        access_by_user[shared_user.username] = access
 
     # Gruppi
     for shared_group in inventory.shared_with_groups:
         group = db.query(Group).get(shared_group.group_id)
+        if group is None:
+            continue
         for assoc in group.user_associations:
             access = "edit" if assoc.user.role.name in (RoleEnum.admin.value, RoleEnum.moderator.value) else "view"
             # Se già presente come 'edit' non sovrascrivere
@@ -1117,14 +1157,14 @@ def rollback_inventory(
         InventoryVersion.inventory_id == inventory_id,
         InventoryVersion.version_num == version_num,
     ).first()
-    if not target or target.operation == "DELETE":
+    if target is None or cast(str, target.operation) == "DELETE":
         raise HTTPException(status_code=400, detail="Versione non valida per il rollback")
 
     inv = db.query(Inventory).filter_by(id=inventory_id, type="INVENTORY").first()
 
     # Ripristino di inventario cancellato
     if not inv:
-        if target.type != "INVENTORY":
+        if cast(str, target.type) != "INVENTORY":
             raise HTTPException(status_code=400, detail="Versione non compatibile")
         if user.role.name == "viewer":
             raise HTTPException(status_code=403, detail="Accesso negato")
@@ -1151,7 +1191,7 @@ def rollback_inventory(
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     old_snapshot = _snapshot_inventory(inv)
-    inv.name = target.name
+    setattr(inv, "name", cast(str, target.name))
     inv.user_mod = user.id
     inv.data_mod = datetime.now(timezone.utc)
     _write_inventory_version(db, inv, "UPDATE", user, old_snapshot)
@@ -1171,14 +1211,14 @@ def rollback_checklist(
         InventoryVersion.inventory_id == inventory_id,
         InventoryVersion.version_num == version_num,
     ).first()
-    if not target or target.operation == "DELETE":
+    if target is None or cast(str, target.operation) == "DELETE":
         raise HTTPException(status_code=400, detail="Versione non valida per il rollback")
 
     inv = db.query(Inventory).filter_by(id=inventory_id, type="CHECKLIST").first()
 
     # Ripristino di checklist cancellata
     if not inv:
-        if target.type != "CHECKLIST":
+        if cast(str, target.type) != "CHECKLIST":
             raise HTTPException(status_code=400, detail="Versione non compatibile")
         if user.role.name == "viewer":
             raise HTTPException(status_code=403, detail="Accesso negato")
@@ -1205,7 +1245,7 @@ def rollback_checklist(
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     old_snapshot = _snapshot_inventory(inv)
-    inv.name = target.name
+    setattr(inv, "name", cast(str, target.name))
     inv.user_mod = user.id
     inv.data_mod = datetime.now(timezone.utc)
     _write_inventory_version(db, inv, "UPDATE", user, old_snapshot)
