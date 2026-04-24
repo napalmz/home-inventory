@@ -1,5 +1,5 @@
 # Usa un'immagine di base con Python
-FROM python:3.11-slim
+FROM python:3.14.4-slim-bookworm
 
 # Imposta le variabili d'ambiente
 ENV PYTHONDONTWRITEBYTECODE=1
