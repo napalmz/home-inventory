@@ -9,6 +9,10 @@ http {
     listen 80;
     server_name _;
 
+    # Usa il resolver DNS interno di Docker per ri-risolvere il nome del backend
+    # ad ogni richiesta, evitando cache IP stale dopo restart del container
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
     location / {
       root /usr/share/nginx/html;
       index index.html;
@@ -16,7 +20,8 @@ http {
     }
 
     location /api/ {
-      proxy_pass ${BACKEND_BASE_URL}/;
+      set $backend_upstream ${BACKEND_BASE_URL};
+      proxy_pass $backend_upstream/;
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

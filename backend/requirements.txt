@@ -3,7 +3,8 @@ uvicorn
 sqlalchemy
 psycopg2-binary
 python-dotenv
-passlib
+passlib[bcrypt]
+bcrypt>=3.2.2,<4.0.0
 python-multipart>=0.0.26
 PyJWT[crypto]
 cryptography>=46.0.6
