@@ -261,6 +261,58 @@ def _safe_delete_table(db: Session, table_name: str) -> None:
         db.execute(text(f"DELETE FROM {table_name}"))
 
 
+def _sync_id_sequences(db: Session) -> None:
+    """Riallinea le sequence PostgreSQL delle colonne `id` al valore max presente.
+
+    Utile dopo restore da dump quando i setval del backup sono assenti/non aggiornati.
+    """
+    db.execute(
+        text(
+            """
+            DO $$
+            DECLARE
+                seq_record RECORD;
+                max_id BIGINT;
+            BEGIN
+                FOR seq_record IN
+                    SELECT
+                        n.nspname AS schema_name,
+                        c.relname AS table_name,
+                        a.attname AS column_name,
+                        pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), a.attname) AS sequence_name
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    JOIN pg_attribute a ON a.attrelid = c.oid
+                    WHERE c.relkind = 'r'
+                      AND n.nspname = 'public'
+                      AND a.attnum > 0
+                      AND NOT a.attisdropped
+                      AND a.attname = 'id'
+                LOOP
+                    IF seq_record.sequence_name IS NOT NULL THEN
+                        EXECUTE format(
+                            'SELECT COALESCE(MAX(%I), 0) FROM %I.%I',
+                            seq_record.column_name,
+                            seq_record.schema_name,
+                            seq_record.table_name
+                        ) INTO max_id;
+
+                        -- false => il prossimo nextval restituira esattamente max_id + 1
+                        EXECUTE format(
+                            'SELECT setval(%L, %s, false)',
+                            seq_record.sequence_name,
+                            max_id + 1
+                        );
+                    END IF;
+                END LOOP;
+            END
+            $$;
+            """
+        )
+    )
+    db.commit()
+
+
 def _write_backup_metadata(file_path: Path, metadata: dict) -> None:
     meta_path = _backup_meta_path(file_path)
     with open(meta_path, "w", encoding="utf-8") as f:
@@ -600,6 +652,9 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
                     "-d", os.getenv("POSTGRES_DB", "inventory"),
                     "-f", str(restore_sql_path)
                 ], check=True, env=env)
+
+                # Allinea tutte le sequence PK dopo il restore per evitare duplicate key.
+                _sync_id_sequences(db)
                 logger.info(f"Restore completato per il file: {filename}")
             except Exception as e:
                 logger.error(f"Errore durante il restore: {str(e)}")
