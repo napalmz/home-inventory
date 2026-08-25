@@ -2,7 +2,6 @@
 import { useAuth } from "../useAuth";
 import { Navigate } from "react-router-dom";
 import { User } from '../types';
-import { useEffect, useState } from "react";
 import Spinner from "../components/Spinner";
 
 interface ProtectedRouteProps {
@@ -12,19 +11,11 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user } = useAuth() as unknown as { user: User | null };
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (user !== null) {
-      setIsLoading(false);
+  if (user === null) {
+    const hasToken = Boolean(localStorage.getItem("access_token"));
+    if (hasToken) {
+      return <Spinner />;
     }
-  }, [user]);
-
-  if (isLoading) {
-    return <Spinner />;
-  }
-
-  if (!user) {
     return <Navigate to="/login" replace />;
   }
 

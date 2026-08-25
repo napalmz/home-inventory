@@ -89,15 +89,13 @@ function NewItemModal({ isOpen, onClose, onCreate, isInventory }: {
   )
 }
 
-// Modale modifica nome elemento (inventario o checklist)
-function EditNameModal({ isOpen, onClose, onSave, initialName }: {
+function EditNameModal({ isOpen, onClose, onSave, name, onNameChange }: {
   isOpen: boolean;
   onClose: () => void;
   onSave: (name: string) => void;
-  initialName: string;
+  name: string;
+  onNameChange: (value: string) => void;
 }) {
-  const [name, setName] = useState(initialName);
-  useEffect(() => { setName(initialName); }, [initialName, isOpen]);
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
@@ -109,7 +107,7 @@ function EditNameModal({ isOpen, onClose, onSave, initialName }: {
               type="text"
               className="w-full border px-3 py-2 mb-4 dark:bg-gray-800 dark:text-white"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => onNameChange(e.target.value)}
             />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={onClose} className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600">Chiudi</button>
@@ -186,12 +184,6 @@ export default function GenericListPage() {
     };
     fetchData();
   }, [searchQuery, isInventory]);
-
-  useEffect(() => {
-    if (itemBeingEdited) {
-        setEditedName(itemBeingEdited.name);
-    }
-  }, [itemBeingEdited]);
 
   const handleClick = (id: number) => {
     const query = searchQuery.trim();
@@ -460,7 +452,6 @@ export default function GenericListPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       openEditModal(inv);
-                      setIsEditModalOpen(true);
                     }}
                     className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
                   >
@@ -726,7 +717,8 @@ export default function GenericListPage() {
         isOpen={isEditModalOpen}
         onClose={() => { setIsEditModalOpen(false); setItemBeingEdited(null); }}
         onSave={handleEditSave}
-        initialName={editedName}
+        name={editedName}
+        onNameChange={setEditedName}
       />
     </div>
   );
