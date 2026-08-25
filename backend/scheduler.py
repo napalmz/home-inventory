@@ -13,6 +13,18 @@ logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
 
+
+def _setting_int(db, key: str, default: int) -> int:
+    setting = get_setting(db, key)
+    raw_value = setting.value if setting else None
+    if raw_value in (None, ""):
+        return default
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        logger.warning(f"Valore setting non valido per {key}: {raw_value}. Uso default {default}.")
+        return default
+
 def cleanup_old_backups(retention_count: int):
     backups = sorted(BACKUP_DIR.glob("auto_*.sql"), key=lambda x: x.stat().st_mtime)
     if len(backups) > retention_count:
@@ -31,8 +43,7 @@ def cleanup_old_audit_versions():
     """
     db = SessionLocal()
     try:
-        setting = get_setting(db, "AUDIT_RETENTION_DAYS")
-        retention_days = int(setting.value if setting else 90)
+        retention_days = _setting_int(db, "AUDIT_RETENTION_DAYS", 90)
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
 
         # Elimina ItemVersion orfani precedenti alla data cutoff
@@ -63,8 +74,7 @@ def scheduled_backup():
         set_setting(db, "BACKUP_LAST_RUN", datetime.now(timezone.utc))
         
         # Controllo della retention
-        setting = get_setting(db, "BACKUP_RETENTION")
-        retention = int(setting.value if setting else 10)
+        retention = _setting_int(db, "BACKUP_RETENTION", 10)
         cleanup_old_backups(retention)
         
         # Pulizia audit log
@@ -80,13 +90,10 @@ def start_scheduler():
     db = SessionLocal()
     try:
         setting = get_setting(db, "BACKUP_FREQUENCY")
-        frequency = (setting.value if setting else "none").lower()
-        setting = get_setting(db, "BACKUP_INTERVAL_DAYS")
-        interval_days = int(setting.value if setting else 0)
-        setting = get_setting(db, "BACKUP_INTERVAL_HOURS")
-        interval_hours = int(setting.value if setting else 0)
-        setting = get_setting(db, "BACKUP_INTERVAL_MINUTES")
-        interval_minutes = int(setting.value if setting else 0)
+        frequency = ((setting.value if setting else "none") or "none").lower()
+        interval_days = _setting_int(db, "BACKUP_INTERVAL_DAYS", 0)
+        interval_hours = _setting_int(db, "BACKUP_INTERVAL_HOURS", 0)
+        interval_minutes = _setting_int(db, "BACKUP_INTERVAL_MINUTES", 0)
 
         scheduler.remove_all_jobs()
 

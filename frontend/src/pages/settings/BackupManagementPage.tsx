@@ -773,20 +773,36 @@ export default function BackupManagementPage() {
               )}
             </div>
 
+            <div className="text-sm space-y-2 border rounded p-3 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+              <p className="font-semibold">Differenza tra ripristino Base e Avanzato</p>
+              <p>
+                <span className="font-semibold">Base:</span> ripristina i dati applicativi principali (inventari,
+                elementi, condivisioni, metadati, filtri) mantenendo utenti/ruoli e impostazioni correnti.
+              </p>
+              <p>
+                <span className="font-semibold">Avanzato:</span> stesso ripristino dei dati principali, con richieste
+                aggiuntive per decidere se sovrascrivere anche utenti/ruoli e impostazioni.
+              </p>
+              <p className="text-xs text-gray-700 dark:text-gray-300">
+                Nota: se scegli di sovrascrivere utenti/ruoli, devi confermare anche la sovrascrittura dell'utente
+                admin per mantenere la coerenza.
+              </p>
+            </div>
+
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 onClick={handleRestoreBaseFromModal}
                 disabled={!restoreTarget.restorable_on_current_db}
                 className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
-                Base
+                Base (dati core)
               </button>
               <button
                 onClick={handleRestoreAdvancedFromModal}
                 disabled={!restoreTarget.restorable_on_current_db}
                 className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
               >
-                Avanzato
+                Avanzato (con opzioni)
               </button>
               <button
                 onClick={() => setRestoreTarget(null)}
