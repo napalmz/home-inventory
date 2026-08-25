@@ -247,7 +247,7 @@ export interface ItemMetadataValueCreate extends ItemMetadataTypedValue {
     definition_id: number;
 }
 
-export interface ItemMetadataValueUpdate extends ItemMetadataTypedValue {}
+export type ItemMetadataValueUpdate = ItemMetadataTypedValue;
 
 export interface ItemMetadataValueUpsert extends ItemMetadataTypedValue {
     definition_id: number;
@@ -383,7 +383,7 @@ export interface FilterTemplateListItem {
     scope_preview?: FilterTemplateScopePreview | null;
 }
 
-export interface FilterTemplateCreate extends FilterTemplateBase {}
+export type FilterTemplateCreate = FilterTemplateBase;
 
 export interface FilterTemplateUpdate {
     name?: string;

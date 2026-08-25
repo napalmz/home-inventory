@@ -28,8 +28,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       };
       fetchUser();
-    } else {
-      setUser(null); // Nessun token trovato
     }
   }, []);
 

@@ -24,22 +24,34 @@ export default function GroupManagementPage() {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [allUsers, setAllUsers] = useState<{ id: number; username: string }[]>([]);
 
-  useEffect(() => {
-    fetchGroups();
-    fetchRoles();
-    getUsers().then(data => setAllUsers(data));
-  }, []);
-
-  const fetchGroups = async () => {
+  async function fetchGroups() {
     const data = await getAllGroups() as Group[];
-    //setGroups(data);
     setGroups(data.sort((a, b) => a.name.localeCompare(b.name)));
-  };
+  }
 
-  const fetchRoles = async () => {
-    const roles = await getAllRoles() as Role[];
-    setAllRoles(roles);
-  };
+  useEffect(() => {
+    let mounted = true;
+
+    const loadInitialData = async () => {
+      const [groupsData, rolesData, usersData] = await Promise.all([
+        getAllGroups() as Promise<Group[]>,
+        getAllRoles() as Promise<Role[]>,
+        getUsers() as Promise<{ id: number; username: string }[]>,
+      ]);
+
+      if (!mounted) return;
+
+      setGroups(groupsData.sort((a, b) => a.name.localeCompare(b.name)));
+      setAllRoles(rolesData);
+      setAllUsers(usersData);
+    };
+
+    void loadInitialData();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleCreate = async () => {
     if (!newGroupName.trim() || selectedRoleId == null) return;

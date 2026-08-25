@@ -313,6 +313,53 @@ def _sync_id_sequences(db: Session) -> None:
     db.commit()
 
 
+def _nullify_foreign_keys_to_users(db: Session) -> None:
+    """Imposta a NULL tutte le FK nullable che puntano a users.id.
+
+    Serve prima della cancellazione massiva utenti nel restore avanzato,
+    per evitare violazioni su colonne audit (es. roles.user_ins/user_mod).
+    """
+    db.execute(
+        text(
+            """
+            DO $$
+            DECLARE
+                fk_record RECORD;
+            BEGIN
+                FOR fk_record IN
+                    SELECT
+                        n.nspname AS schema_name,
+                        c.relname AS table_name,
+                        a.attname AS column_name,
+                        a.attnotnull AS is_not_null
+                    FROM pg_constraint con
+                    JOIN pg_class c ON c.oid = con.conrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    JOIN unnest(con.conkey) WITH ORDINALITY AS cols(attnum, ord) ON TRUE
+                    JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = cols.attnum
+                    WHERE con.contype = 'f'
+                      AND con.confrelid = 'public.users'::regclass
+                LOOP
+                    IF fk_record.is_not_null THEN
+                        CONTINUE;
+                    END IF;
+
+                    EXECUTE format(
+                        'UPDATE %I.%I SET %I = NULL WHERE %I IS NOT NULL',
+                        fk_record.schema_name,
+                        fk_record.table_name,
+                        fk_record.column_name,
+                        fk_record.column_name
+                    );
+                END LOOP;
+            END
+            $$;
+            """
+        )
+    )
+    db.commit()
+
+
 def _write_backup_metadata(file_path: Path, metadata: dict) -> None:
     meta_path = _backup_meta_path(file_path)
     with open(meta_path, "w", encoding="utf-8") as f:
@@ -633,6 +680,7 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
                     _safe_delete_table(db, table_name)
 
                 if payload.mode == "advanced" and payload.overwrite_users_roles and payload.overwrite_admin:
+                    _nullify_foreign_keys_to_users(db)
                     _safe_delete_table(db, "users")
                     _safe_delete_table(db, "roles")
                 else:
