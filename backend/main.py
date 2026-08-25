@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, Depends
 from contextlib import asynccontextmanager
 import logging
-from database import SessionLocal, init_db
+from database import SessionLocal
 from dependencies import init_roles_and_admin, get_db, initialize_settings, get_current_user
 from sqlalchemy.orm import Session
 from routes.auth import router as auth_router
@@ -23,17 +23,15 @@ from fastapi.responses import JSONResponse
 
 logging.basicConfig(level=logging.INFO)
 
-db = SessionLocal()
-init_db()
-init_roles_and_admin(db)
-db.close()
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db = next(get_db())
-    initialize_settings(db)
-    yield
-    db.close()
+    db = SessionLocal()
+    try:
+        init_roles_and_admin(db)
+        initialize_settings(db)
+        yield
+    finally:
+        db.close()
 
 root_path = os.getenv("FASTAPI_ROOT_PATH", "")
 api_version = os.getenv("API_VERSION", "unknown")

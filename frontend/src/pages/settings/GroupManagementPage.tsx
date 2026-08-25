@@ -33,17 +33,22 @@ export default function GroupManagementPage() {
     let mounted = true;
 
     const loadInitialData = async () => {
-      const [groupsData, rolesData, usersData] = await Promise.all([
-        getAllGroups() as Promise<Group[]>,
-        getAllRoles() as Promise<Role[]>,
-        getUsers() as Promise<{ id: number; username: string }[]>,
-      ]);
+      try {
+        const [groupsData, rolesData, usersData] = await Promise.all([
+          getAllGroups() as Promise<Group[]>,
+          getAllRoles() as Promise<Role[]>,
+          getUsers() as Promise<{ id: number; username: string }[]>,
+        ]);
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      setGroups(groupsData.sort((a, b) => a.name.localeCompare(b.name)));
-      setAllRoles(rolesData);
-      setAllUsers(usersData);
+        setGroups(groupsData.sort((a, b) => a.name.localeCompare(b.name)));
+        setAllRoles(rolesData);
+        setAllUsers(usersData);
+      } catch (error) {
+        if (!mounted) return;
+        console.error("Errore nel caricamento dati iniziali gruppi:", error);
+      }
     };
 
     void loadInitialData();
