@@ -1,6 +1,18 @@
 #!/bin/bash
 
-set -e  # Interrompe l'esecuzione in caso di errore
+set -euo pipefail  # Interrompe l'esecuzione in caso di errore
+
+usage() {
+  echo "Uso: $0 [release|dev]"
+  echo "  release (default): tagga backend/frontend con latest e con numero versione"
+  echo "  dev:               tagga backend/frontend con dev e con numero-versione-dev"
+}
+
+CHANNEL="${1:-release}"
+if [[ "$CHANNEL" != "release" && "$CHANNEL" != "dev" ]]; then
+  usage
+  exit 1
+fi
 
 # Ottiene le versioni per backend e frontend
 BACKEND_VERSION=$(grep '^API_VERSION=' backend/.env | cut -d '=' -f2)
@@ -17,6 +29,7 @@ fi
 
 echo "Ultima versione di Backend: $BACKEND_VERSION"
 echo "Ultima versione di Frontend: $FRONTEND_VERSION"
+echo "Canale build selezionato: $CHANNEL"
 
 # Esportiamo la versione come variabile globale per essere usata nei Dockerfile
 export BACKEND_VERSION=$BACKEND_VERSION
@@ -26,12 +39,22 @@ PLATFORMS="linux/amd64,linux/arm64"
 
 # Variabili per i tag
 BACKEND_TAG_BASE="napalmzrpi/home-inventory-backend"
-BACKEND_TAG_VERSION="$BACKEND_TAG_BASE:$BACKEND_VERSION"
-BACKEND_TAG_LATEST="$BACKEND_TAG_BASE:latest"
-
 FRONTEND_TAG_BASE="napalmzrpi/home-inventory-frontend"
-FRONTEND_TAG_VERSION="$FRONTEND_TAG_BASE:$FRONTEND_VERSION"
-FRONTEND_TAG_LATEST="$FRONTEND_TAG_BASE:latest"
+
+if [[ "$CHANNEL" == "release" ]]; then
+  BACKEND_TAG_VERSION="$BACKEND_TAG_BASE:$BACKEND_VERSION"
+  BACKEND_TAG_CHANNEL="$BACKEND_TAG_BASE:latest"
+  FRONTEND_TAG_VERSION="$FRONTEND_TAG_BASE:$FRONTEND_VERSION"
+  FRONTEND_TAG_CHANNEL="$FRONTEND_TAG_BASE:latest"
+else
+  BACKEND_TAG_VERSION="$BACKEND_TAG_BASE:${BACKEND_VERSION}-dev"
+  BACKEND_TAG_CHANNEL="$BACKEND_TAG_BASE:dev"
+  FRONTEND_TAG_VERSION="$FRONTEND_TAG_BASE:${FRONTEND_VERSION}-dev"
+  FRONTEND_TAG_CHANNEL="$FRONTEND_TAG_BASE:dev"
+fi
+
+echo "Tag backend: $BACKEND_TAG_VERSION e $BACKEND_TAG_CHANNEL"
+echo "Tag frontend: $FRONTEND_TAG_VERSION e $FRONTEND_TAG_CHANNEL"
 
 # Funzione per chiedere conferma
 ask_confirmation() {
@@ -53,7 +76,7 @@ if ask_confirmation "Vuoi costruire l'immagine per Backend?"; then
   cd backend || { echo "Directory backend non trovata"; exit 1; }
   docker buildx build --platform $PLATFORMS --build-arg BACKEND_VERSION=$BACKEND_VERSION \
     -t $BACKEND_TAG_VERSION \
-    -t $BACKEND_TAG_LATEST \
+    -t $BACKEND_TAG_CHANNEL \
     -f Dockerfile . --push
   BUILD_SERVER=true
   cd ../ || { echo "Directory principale non trovata"; exit 1; }
@@ -67,7 +90,7 @@ if ask_confirmation "Vuoi costruire l'immagine per Frontend?"; then
   cd frontend || { echo "Directory frontend non trovata"; exit 1; }
   docker buildx build --platform $PLATFORMS --build-arg FRONTEND_VERSION=$FRONTEND_VERSION \
     -t $FRONTEND_TAG_VERSION \
-    -t $FRONTEND_TAG_LATEST \
+    -t $FRONTEND_TAG_CHANNEL \
     -f Dockerfile . --push
   BUILD_AGENT=true
   cd ../ || { echo "Directory principale non trovata"; exit 1; }
