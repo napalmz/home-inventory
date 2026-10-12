@@ -14,6 +14,7 @@ from models import (
     InventoryVersion,
     ItemVersion,
 )
+from assignment_service import build_assignment_summary, pending_assigned_by_source
 from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemMetadataValueResponse, ItemBarcodeResponse, ItemResponse, UserResponse, InventoryResponseWithItemCount, InventoryVersionResponse, VersionBulkDeleteRequest
 from routes.auth import get_current_user
 from typing import Any, List, cast
@@ -307,6 +308,14 @@ def delete_inventory_base(
     db.commit()
     return {"detail": "Inventario eliminato"}
 
+def _list_item_assignment_fields(item: Item, assigned_map: dict[int, int]) -> dict:
+    if item.list_assignment is not None:
+        return {"assignment": build_assignment_summary(item.list_assignment)}
+    assigned = assigned_map.get(item.id, 0)
+    if assigned:
+        return {"assigned_qty": assigned, "net_qty": (item.quantity or 0) - assigned}
+    return {}
+
 #############################################################################
 # Recupero item dell'inventario
 def list_items_base(
@@ -320,12 +329,16 @@ def list_items_base(
         joinedload(Inventory.items).joinedload(Item.user_mod_rel),
         joinedload(Inventory.items).joinedload(Item.metadata_values).joinedload(ItemMetadataValue.definition),
         joinedload(Inventory.items).joinedload(Item.barcodes),
+        joinedload(Inventory.items).joinedload(Item.list_assignment),
     ).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
         raise HTTPException(status_code=403, detail="Accesso negato")
-    #return inventory.items
+    assigned_map = (
+        pending_assigned_by_source(db, [i.id for i in inventory.items])
+        if inventory.type != "CHECKLIST" else {}
+    )
     return [
         ItemResponse(
             id=item.id,
@@ -350,6 +363,7 @@ def list_items_base(
                 for value in item.metadata_values
             ],
             version_num=_current_item_version_num(db, item.id),
+            **_list_item_assignment_fields(item, assigned_map),
         )
         for item in inventory.items
     ]

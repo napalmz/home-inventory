@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from models import User, Item, Inventory, ItemVersion, ItemBarcode
+from assignment_service import apply_check_change, build_assignment_summary, pending_assigned_by_source
 from dependencies import get_db
 from schemas import ItemCreate, ItemUpdate, ItemDelete, ItemMetadataValueResponse, ItemResponse, ItemVersionResponse, VersionBulkDeleteRequest, ItemBarcodeCreate, ItemBarcodeResponse
 from barcode_service import normalize_code
@@ -175,6 +176,16 @@ def _ensure_barcode_free(db: Session, code: str, inventory_id: int, exclude_item
             detail=f"Codice {code} gia' associato all'item '{other.name}' (id {other.id}) in questo inventario",
         )
 
+def _assignment_fields(db: Session, item: Item) -> dict:
+    if item.inventory is not None and item.inventory.type == "CHECKLIST":
+        if item.list_assignment is None:
+            return {}
+        return {"assignment": build_assignment_summary(item.list_assignment)}
+    assigned = pending_assigned_by_source(db, [cast(int, item.id)]).get(cast(int, item.id), 0)
+    if not assigned:
+        return {}
+    return {"assigned_qty": assigned, "net_qty": cast(int, item.quantity or 0) - assigned}
+
 def _build_item_response(db: Session, item: Item) -> ItemResponse:
     current_version = db.query(func.max(ItemVersion.version_num)).filter(
         ItemVersion.item_id == item.id
@@ -202,6 +213,7 @@ def _build_item_response(db: Session, item: Item) -> ItemResponse:
             for value in item.metadata_values
         ],
         version_num=current_version,
+        **_assignment_fields(db, item),
     )
 
 #############################################################################
@@ -245,7 +257,13 @@ def create_item(item: ItemCreate, db: Session = Depends(get_db), user=Depends(ge
 #############################################################################
 # Aggiornamento item
 @router.patch("/{item_id}", response_model=ItemResponse)
-def update_item(item_id: int, item_update: ItemUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def update_item(
+    item_id: int,
+    item_update: ItemUpdate,
+    on_insufficient: str | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
     item = db.query(Item).get(item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item non trovato")
@@ -264,6 +282,13 @@ def update_item(item_id: int, item_update: ItemUpdate, db: Session = Depends(get
                 raise HTTPException(status_code=400, detail=f"{field} non può essere negativo")
         setattr(item, field, value)
     item.user_mod = user.id
+    if "quantity" in update_data:
+        apply_check_change(
+            db, item, cast(int, old_snapshot["quantity"]), cast(int, item.quantity), user, on_insufficient,
+            lambda u, src: can_access_item(u, src, action="edit"),
+            lambda d, i, op, u, snap, merge: _write_item_version(d, i, op, u, snap, merge),
+            _snapshot_item,
+        )
     _write_item_version(db, item, "UPDATE", user, old_snapshot)
     db.commit()
     db.refresh(item)

@@ -175,9 +175,44 @@ class BarcodeLookupResponse(BaseModel):
     matches: List[BarcodeMatch] = []
     product: Optional[BarcodeProduct] = None
 
+class AssignmentCreate(BaseModel):
+    list_item_id: int
+    source_item_id: int
+    qty: int = Field(default=1, ge=1)
+
+class AssignmentUpdate(BaseModel):
+    qty: int = Field(ge=1)
+
+class AssignmentResponse(BaseModel):
+    id: int
+    list_item_id: int
+    list_item_name: Optional[str] = None
+    list_id: Optional[int] = None
+    list_name: Optional[str] = None
+    list_checked: bool = False
+    source_item_id: int
+    source_name: Optional[str] = None
+    source_inventory_id: Optional[int] = None
+    source_inventory_name: Optional[str] = None
+    source_stock: Optional[int] = None
+    qty: int
+
+class ItemAssignmentSummary(BaseModel):
+    """Presente sulle righe di lista collegate a un item di inventario."""
+    id: int
+    source_item_id: int
+    source_name: Optional[str] = None
+    source_inventory_id: Optional[int] = None
+    source_inventory_name: Optional[str] = None
+    source_stock: Optional[int] = None
+    qty: int
+
 class ItemResponse(ItemBase, LoggingResponse):
     id: int
     barcodes: List[ItemBarcodeResponse] = []
+    assignment: Optional[ItemAssignmentSummary] = None
+    assigned_qty: int = 0
+    net_qty: Optional[int] = None
     username_ins: Optional[str] = None
     username_mod: Optional[str] = None
     metadata_values: List['ItemMetadataValueResponse'] = []
