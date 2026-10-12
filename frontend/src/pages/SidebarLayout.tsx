@@ -1,6 +1,7 @@
 import { version as frontendVersion } from '../../package.json';
 import { ReactNode, useState, useEffect } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import GlobalBarcodeScan from '../components/GlobalBarcodeScan'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
 import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser } from 'react-icons/fi'
@@ -16,6 +17,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const auth = useAuth()
   const { logout } = auth
   const user = auth.user ?? null
+  const { pathname } = useLocation()
+  // nelle pagine di dettaglio la scansione è già nella toolbar (tranne per i viewer)
+  const isDetailPage = /^\/(inventories|checklists)\/\d+/.test(pathname)
+  const showGlobalScan = !!user?.username && (!isDetailPage || user.role.name === 'viewer')
 
   useEffect(() => {
     getApiVersion()
@@ -153,6 +158,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
       {/* Contenuto */}
       <div className="flex-1 p-6 ml-0 w-full overflow-auto dark:bg-gray-900 dark:text-white">{children}</div>
+      {showGlobalScan && <GlobalBarcodeScan />}
     </div>
   )
 }

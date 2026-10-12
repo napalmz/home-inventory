@@ -581,6 +581,24 @@ useEffect(() => {
   fetchData();
 }, [id, isInventory]);
 
+  const openedItemParam = useRef<string | null>(null);
+  useEffect(() => {
+    const itemParam = new URLSearchParams(location.search).get('item');
+    if (!itemParam) {
+      openedItemParam.current = null;
+      return;
+    }
+    const key = `${id}:${itemParam}`;
+    if (openedItemParam.current === key) return;
+    const target = items.find((i) => i.id === Number(itemParam));
+    if (!target) return;
+    openedItemParam.current = key;
+    queueMicrotask(() => {
+      if (user?.role.name === 'viewer') setFilterText(target.name);
+      else setItemBeingEdited(target);
+    });
+  }, [items, location.search, id, user?.role.name]);
+
   useEffect(() => {
     if (!itemBeingEdited) {
       setEditingMetadataValues([]);
