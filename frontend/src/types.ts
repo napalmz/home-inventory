@@ -32,6 +32,31 @@ export interface ItemBarcode {
     format?: string | null;
 }
 
+export interface AssignmentSummary {
+    id: number;
+    source_item_id: number;
+    source_name: string | null;
+    source_inventory_id: number | null;
+    source_inventory_name: string | null;
+    source_stock: number | null;
+    qty: number;
+}
+
+export interface Assignment {
+    id: number;
+    list_item_id: number;
+    list_item_name: string | null;
+    list_id: number | null;
+    list_name: string | null;
+    list_checked: boolean;
+    source_item_id: number;
+    source_name: string | null;
+    source_inventory_id: number | null;
+    source_inventory_name: string | null;
+    source_stock: number | null;
+    qty: number;
+}
+
 export interface BarcodeMatch {
     item_id: number;
     name: string;
@@ -57,6 +82,9 @@ export interface BarcodeLookupResult {
 
 export interface InventoryItem {
     barcodes?: ItemBarcode[];
+    assignment?: AssignmentSummary | null;
+    assigned_qty?: number;
+    net_qty?: number | null;
     id: number;
     name: string;
     description: string;
@@ -86,6 +114,9 @@ export interface Checklist {
 
 export interface ChecklistItem {
     barcodes?: ItemBarcode[];
+    assignment?: AssignmentSummary | null;
+    assigned_qty?: number;
+    net_qty?: number | null;
     id: number;
     name: string;
     description: string;
@@ -103,6 +134,9 @@ export interface ChecklistItem {
 
 export interface Item {
     barcodes?: ItemBarcode[];
+    assignment?: AssignmentSummary | null;
+    assigned_qty?: number;
+    net_qty?: number | null;
     id: number;
     name: string;
     description: string;

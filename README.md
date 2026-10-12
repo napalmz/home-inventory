@@ -26,6 +26,13 @@ Default Login: admin/12345
 - Un codice sconosciuto permette di creare un nuovo item o associarlo a uno esistente; un codice è unico per inventario.
 - Anagrafica EAN esterna: Open Food/Beauty/Pet Food/Products Facts (gratuita, senza chiave), con cache locale. Disattivabile con `BARCODE_LOOKUP_ENABLED=false` (i codici vengono inviati a servizi terzi).
 
+## Assegnazioni lista → inventario
+
+- Da un item di inventario ("📋 Assegna") o da una lista ("📥 Da inventario") si collega una riga di lista a un item di inventario, con la quantità da prelevare.
+- Spuntando la riga lo stock dell'inventario scende della quantità assegnata. Se lo stock non basta, viene chiesto se azzerarlo o annullare la spunta.
+- Togliendo la spunta entro 45 secondi lo stock viene ripristinato; dopo, resta invariato e l'assegnazione torna "in essere" (utile per acquisti ricorrenti).
+- Negli inventari la riga mostra stock lordo e netto (lordo meno le assegnazioni non ancora spuntate).
+
 ## Authors
 
 - [@napalmz](https://www.github.com/napalmz)

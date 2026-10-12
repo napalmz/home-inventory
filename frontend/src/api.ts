@@ -10,6 +10,7 @@ import {
   ChecklistWithMatches,
   ItemVersion,
   ItemBarcode,
+  Assignment,
   BarcodeLookupResult,
   InventoryVersion,
   MetadataDefinition,
@@ -309,9 +310,31 @@ export async function updateItem(itemId: number, data: {
   description?: string;
   quantity: number;
   inventory_id: number;
-}): Promise<InventoryItem> {
-  const response = await api.patch(`/item/${itemId}`, data);
+}, onInsufficient?: 'zero'): Promise<InventoryItem> {
+  const response = await api.patch(`/item/${itemId}`, data, {
+    params: onInsufficient ? { on_insufficient: onInsufficient } : undefined,
+  });
   return response.data as InventoryItem;
+}
+
+/* ASSEGNAZIONI lista -> inventario */
+export async function createAssignment(listItemId: number, sourceItemId: number, qty: number): Promise<Assignment> {
+  const response = await api.post('/assignment/', { list_item_id: listItemId, source_item_id: sourceItemId, qty });
+  return response.data as Assignment;
+}
+
+export async function updateAssignment(id: number, qty: number): Promise<Assignment> {
+  const response = await api.patch(`/assignment/${id}`, { qty });
+  return response.data as Assignment;
+}
+
+export async function deleteAssignment(id: number): Promise<void> {
+  await api.delete(`/assignment/${id}`);
+}
+
+export async function getAssignmentsBySource(itemId: number): Promise<Assignment[]> {
+  const response = await api.get(`/assignment/by-source/${itemId}`);
+  return response.data as Assignment[];
 }
 
 /* CANCELLAZIONE ITEM */

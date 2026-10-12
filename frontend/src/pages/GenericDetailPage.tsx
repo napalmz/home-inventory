@@ -17,6 +17,7 @@ import { HistoryModal } from "../components/HistoryModal";
 import MetadataFilterManager from "../components/MetadataFilterManager";
 import { ITEMS_CHANGED_EVENT } from "../components/GlobalBarcodeScan";
 import ItemBarcodesEditor from "../components/ItemBarcodesEditor";
+import { AddFromInventoryDialog, AssignToListDialog, EditAssignmentDialog, SourceAssignmentsDialog } from "../components/AssignmentDialogs";
 
 interface Props {
   item: Item;
@@ -28,7 +29,7 @@ interface Props {
   selectedItems: number[];
   setSelectedItems: React.Dispatch<React.SetStateAction<number[]>>;
   setItemBeingEdited: (item: Item) => void;
-  updateItem: (id: number, item: Partial<Item>) => Promise<Item | null>;
+  updateItem: (id: number, item: Partial<Item>, onInsufficient?: 'zero') => Promise<Item | null>;
   deleteItem: (id: number) => Promise<void>;
   setIsCloning: React.Dispatch<React.SetStateAction<boolean>>;
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
@@ -241,6 +242,7 @@ export function SwipeableItemRow({
 }: Props) {
   const [action, setAction] = useState<'left' | 'right' | null>(null);
   const [isItemHistoryOpen, setIsItemHistoryOpen] = useState(false);
+  const [assignDialog, setAssignDialog] = useState<'assign' | 'sources' | 'edit' | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
   // Gestione click fuori per chiudere i pulsanti swipe
@@ -313,6 +315,31 @@ export function SwipeableItemRow({
       });
     }
     setAction(null);
+  };
+
+  const applyUpdate = (upd: Item | null) => {
+    if (upd) setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
+  };
+
+  const toggleChecked = async (checked: boolean) => {
+    const updated = { ...item, quantity: checked ? 1 : 0 };
+    try {
+      applyUpdate(await updateItem(item.id, updated));
+    } catch (err) {
+      const detail = (err as { response?: { status?: number; data?: { detail?: { code?: string; available?: number; requested?: number; source_name?: string } } } })?.response;
+      if (detail?.status === 409 && detail.data?.detail?.code === 'insufficient_stock') {
+        const d = detail.data.detail;
+        if (window.confirm(`Stock insufficiente per "${d.source_name}": disponibili ${d.available}, richiesti ${d.requested}.\n\nOK = azzera lo stock e spunta\nAnnulla = non spuntare`)) {
+          try {
+            applyUpdate(await updateItem(item.id, updated, 'zero'));
+          } catch {
+            alert('Operazione non riuscita');
+          }
+        }
+        return;
+      }
+      alert('Operazione non riuscita');
+    }
   };
 
   return (
@@ -388,6 +415,35 @@ export function SwipeableItemRow({
             {item.description && (
               <div className="text-sm text-gray-500 dark:text-gray-200">{item.description}</div>
             )}
+            {isChecklist && item.assignment && (
+              <button
+                type="button"
+                disabled={isViewer}
+                onClick={(e) => { e.stopPropagation(); setAssignDialog('edit'); }}
+                className={`mt-1 self-start rounded px-2 py-1 text-xs ${
+                  (item.assignment.source_stock ?? 0) < item.assignment.qty && item.quantity === 0
+                    ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                }`}
+              >
+                📦 ×{item.assignment.qty} · {item.assignment.source_inventory_name} · stock {item.assignment.source_stock ?? '?'}
+                {(item.assignment.source_stock ?? 0) < item.assignment.qty && item.quantity === 0 ? ' ⚠️' : ''}
+              </button>
+            )}
+            {isInventory && (item.assigned_qty ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setAssignDialog('sources'); }}
+                className={`mt-1 self-start rounded px-2 py-1 text-xs ${
+                  (item.net_qty ?? 0) < 0
+                    ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                }`}
+                title="Quantità assegnate a liste"
+              >
+                📋 {item.quantity} → {item.net_qty} netti
+              </button>
+            )}
             {item.metadata_values && item.metadata_values.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {item.metadata_values
@@ -419,6 +475,16 @@ export function SwipeableItemRow({
             <span className="inline md:hidden">🕓</span>
             <span className="hidden md:inline">Cronologia</span>
           </button>
+          {isInventory && !isViewer && !isEditMode && (
+            <button
+              className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 whitespace-nowrap"
+              onClick={(e) => { e.stopPropagation(); setAssignDialog('assign'); }}
+              title="Assegna a una lista"
+            >
+              <span className="inline md:hidden">📋</span>
+              <span className="hidden md:inline">📋 Assegna</span>
+            </button>
+          )}
           {isEditMode && !isViewer && (
             <>
               <button
@@ -451,12 +517,7 @@ export function SwipeableItemRow({
                 disabled={isViewer}
                 onChange={(e) => {
                   if (isViewer) return;
-                  const updated = { ...item, quantity: e.target.checked ? 1 : 0 };
-                  updateItem(item.id, updated).then((upd) => {
-                    if (upd) {
-                      setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
-                    }
-                  });
+                  toggleChecked(e.target.checked);
                 }}
                 className="w-7 h-7 accent-blue-600 focus:ring-2 rounded shadow-sm border-2 border-gray-400 dark:border-gray-600"
                 style={{ minWidth: '1.75rem', minHeight: '1.75rem' }}
@@ -501,6 +562,12 @@ export function SwipeableItemRow({
         </div>
       </li>
 
+      {assignDialog === 'assign' && <AssignToListDialog item={item} onClose={() => setAssignDialog(null)} />}
+      {assignDialog === 'sources' && <SourceAssignmentsDialog item={item} onClose={() => setAssignDialog(null)} />}
+      {assignDialog === 'edit' && item.assignment && (
+        <EditAssignmentDialog assignment={item.assignment} onClose={() => setAssignDialog(null)} />
+      )}
+
       <HistoryModal
         isOpen={isItemHistoryOpen}
         onClose={() => setIsItemHistoryOpen(false)}
@@ -528,6 +595,7 @@ export default function InventoryDetailPage() {
   const { id } = useParams();
   const location = useLocation();
   const [filterText, setFilterText] = useState(() => new URLSearchParams(location.search).get('filtro') || "");
+  const [isAddFromInventoryOpen, setIsAddFromInventoryOpen] = useState(false);
   const [barcodeFilter, setBarcodeFilter] = useState<'all' | 'with' | 'without'>('all');
   const basePath = location.pathname.split("/")[1] as "inventories" | "checklists";
   const isInventory = basePath === "inventories";
@@ -1035,13 +1103,13 @@ useEffect(() => {
                 selectedItems={selectedItems}
                 setSelectedItems={setSelectedItems}
                 setItemBeingEdited={setItemBeingEdited}
-                updateItem={async (id, itemArg) =>
+                updateItem={async (id, itemArg, onInsufficient) =>
                   await updateItem(id, {
                     name: itemArg.name ?? "",
                     description: itemArg.description,
                     quantity: itemArg.quantity ?? 0,
                     inventory_id: itemArg.inventory_id ?? inventory?.id ?? 0,
-                  })
+                  }, onInsufficient)
                 }
                 deleteItem={deleteItem}
                 setItems={setItems}
@@ -1078,6 +1146,16 @@ useEffect(() => {
           >
             <span className="inline md:hidden">🗑️ {( selectedItems.length )}</span>
             <span className="hidden md:inline">Elimina {( selectedItems.length )}</span>
+          </button>
+        )}
+        {isChecklist && user?.role.name !== 'viewer' && (
+          <button
+            onClick={() => setIsAddFromInventoryOpen(true)}
+            className="py-2 px-4 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700"
+            title="Aggiungi da inventario"
+          >
+            <span className="inline md:hidden">📥</span>
+            <span className="hidden md:inline">📥 Da inventario</span>
           </button>
         )}
         {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
@@ -1594,6 +1672,9 @@ useEffect(() => {
         entityId={inventory?.id || 0}
         entityName={inventory?.name || ""}
       />
+      {isAddFromInventoryOpen && inventory && (
+        <AddFromInventoryDialog listId={inventory.id} onClose={() => setIsAddFromInventoryOpen(false)} />
+      )}
     </div>
   );
 }
