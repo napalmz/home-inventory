@@ -13,6 +13,12 @@ from schemas import AssignmentCreate, AssignmentResponse, AssignmentUpdate
 router = APIRouter()
 
 
+def _ensure_qty_within_stock(qty: int, source: Item) -> None:
+    stock = int(source.quantity or 0)
+    if qty > stock:
+        raise HTTPException(status_code=400, detail=f"Quantita' superiore allo stock disponibile ({stock})")
+
+
 def _get_assignment(db: Session, assignment_id: int) -> ListAssignment:
     assignment = db.query(ListAssignment).get(assignment_id)
     if not assignment:
@@ -34,6 +40,7 @@ def create_assignment(payload: AssignmentCreate, db: Session = Depends(get_db), 
         raise HTTPException(status_code=403, detail="Accesso negato")
     if list_item.list_assignment is not None:
         raise HTTPException(status_code=409, detail="La riga e' gia' collegata a un inventario")
+    _ensure_qty_within_stock(payload.qty, source)
 
     assignment = ListAssignment(
         list_item_id=list_item.id, source_item_id=source.id, qty=payload.qty,
@@ -69,6 +76,7 @@ def update_assignment(assignment_id: int, payload: AssignmentUpdate, db: Session
     assignment = _get_assignment(db, assignment_id)
     if not can_access_item(user, assignment.list_item, action="edit"):
         raise HTTPException(status_code=403, detail="Accesso negato")
+    _ensure_qty_within_stock(payload.qty, assignment.source_item)
     assignment.qty = payload.qty
     assignment.user_mod = user.id
     db.commit()

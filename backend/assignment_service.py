@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable, Iterable
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from models import Item, ListAssignment, User
 from schemas import AssignmentResponse, ItemAssignmentSummary
@@ -15,7 +15,17 @@ def _utc_now_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def build_assignment_summary(assignment: ListAssignment) -> ItemAssignmentSummary:
+def _source_net(assignment: ListAssignment, pending: dict[int, int] | None) -> int | None:
+    source = assignment.source_item
+    if source is None:
+        return None
+    if pending is None:
+        db = object_session(assignment)
+        pending = pending_assigned_by_source(db, [source.id]) if db is not None else {}
+    return int(source.quantity or 0) - pending.get(source.id, 0)
+
+
+def build_assignment_summary(assignment: ListAssignment, pending: dict[int, int] | None = None) -> ItemAssignmentSummary:
     source = assignment.source_item
     inventory = source.inventory if source else None
     return ItemAssignmentSummary(
@@ -25,6 +35,7 @@ def build_assignment_summary(assignment: ListAssignment) -> ItemAssignmentSummar
         source_inventory_id=source.inventory_id if source else None,
         source_inventory_name=inventory.name if inventory else None,
         source_stock=source.quantity if source else None,
+        source_net_qty=_source_net(assignment, pending),
         qty=assignment.qty,
     )
 
@@ -46,6 +57,7 @@ def build_assignment_response(assignment: ListAssignment) -> AssignmentResponse:
         source_inventory_id=source.inventory_id if source else None,
         source_inventory_name=source_inventory.name if source_inventory else None,
         source_stock=source.quantity if source else None,
+        source_net_qty=_source_net(assignment, None),
         qty=assignment.qty,
     )
 

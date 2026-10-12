@@ -7,8 +7,8 @@ import {
   getMetadataDefinitions, listAllMetadataDefinitions, getItemMetadataValues,
   getFilterTemplates, getFilterTemplate,
   filterItemsByTextMetadata, filterItemsByNumericMetadata, filterItemsByDateMetadata, filterItemsByBooleanMetadata,
-  bulkUpsertItemMetadataValues, deleteItemMetadataValue } from "../api";
-import { Inventory, Item, User, MetadataDefinition, ItemMetadataValue, ItemMetadataValueUpsert, FilterTemplate, FilterTemplateListItem } from "../types";
+  bulkUpsertItemMetadataValues, deleteItemMetadataValue, createAssignment, deleteAssignment } from "../api";
+import { Inventory, InventoryItem, Item, User, MetadataDefinition, ItemMetadataValue, ItemMetadataValueUpsert, FilterTemplate, FilterTemplateListItem } from "../types";
 import { Dialog } from "@headlessui/react";
 import { useContext } from "react";
 import { AuthContext } from "../auth-context";
@@ -17,7 +17,7 @@ import { HistoryModal } from "../components/HistoryModal";
 import MetadataFilterManager from "../components/MetadataFilterManager";
 import { ITEMS_CHANGED_EVENT } from "../components/GlobalBarcodeScan";
 import ItemBarcodesEditor from "../components/ItemBarcodesEditor";
-import { AddFromInventoryDialog, AssignToListDialog, EditAssignmentDialog, SourceAssignmentsDialog } from "../components/AssignmentDialogs";
+import { AddFromInventoryDialog, AssignToListDialog, EditAssignmentDialog, ListLinkField, SourceAssignmentsDialog } from "../components/AssignmentDialogs";
 
 interface Props {
   item: Item;
@@ -421,13 +421,14 @@ export function SwipeableItemRow({
                 disabled={isViewer}
                 onClick={(e) => { e.stopPropagation(); setAssignDialog('edit'); }}
                 className={`mt-1 self-start rounded px-2 py-1 text-xs ${
-                  (item.assignment.source_stock ?? 0) < item.assignment.qty && item.quantity === 0
+                  item.quantity === 0 && ((item.assignment.source_stock ?? 0) < item.assignment.qty || (item.assignment.source_net_qty ?? 0) < 0)
                     ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
                     : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
                 }`}
               >
                 📦 ×{item.assignment.qty} · {item.assignment.source_inventory_name} · stock {item.assignment.source_stock ?? '?'}
-                {(item.assignment.source_stock ?? 0) < item.assignment.qty && item.quantity === 0 ? ' ⚠️' : ''}
+                {item.quantity === 0 && (item.assignment.source_net_qty ?? 0) < 0 ? ` · netto ${item.assignment.source_net_qty}` : ''}
+                {item.quantity === 0 && ((item.assignment.source_stock ?? 0) < item.assignment.qty || (item.assignment.source_net_qty ?? 0) < 0) ? ' ⚠️' : ''}
               </button>
             )}
             {isInventory && (item.assigned_qty ?? 0) > 0 && (
@@ -602,6 +603,7 @@ export default function InventoryDetailPage() {
   const isChecklist = basePath === "checklists";
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [isInsertMode, setisInsertMode] = useState(false);
+  const [newItemLink, setNewItemLink] = useState<{ item: InventoryItem; qty: number } | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [newItemName, setNewItemName] = useState("");
   const [newItemDescription, setNewItemDescription] = useState("");
@@ -1237,6 +1239,13 @@ useEffect(() => {
                   inventory_id: inventory.id
                 });
                 if (newItem) {
+                  if (isChecklist && newItemLink) {
+                    try {
+                      await createAssignment(newItem.id, newItemLink.item.id, newItemLink.qty);
+                    } catch (err) {
+                      window.alert(err instanceof Error ? err.message : "Collegamento non riuscito");
+                    }
+                  }
                   const metadataValues = metadataDefinitions
                     .map((definition) => normalizeMetadataDraft(definition, newItemMetadataDrafts[definition.id]))
                     .filter((value): value is ItemMetadataValueUpsert => value !== null);
@@ -1255,6 +1264,7 @@ useEffect(() => {
                   setNewItemDescription("");
                   setNewItemQuantity(isChecklist ? 0 : 1);
                   setNewItemMetadataDrafts({});
+                  setNewItemLink(null);
                   setisInsertMode(false);
                 }
               }}
@@ -1267,6 +1277,16 @@ useEffect(() => {
                 <label className="block text-sm font-medium">Descrizione</label>
                 <input type="text" className="w-full border rounded p-1" value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} />
               </div>
+              {isChecklist && user?.role.name !== "viewer" && (
+                <ListLinkField
+                  current={newItemLink ? { name: newItemLink.item.name, qty: newItemLink.qty } : null}
+                  onPick={async (picked, qty) => {
+                    setNewItemLink({ item: picked, qty });
+                    if (!newItemName.trim()) setNewItemName(picked.name);
+                  }}
+                  onClear={() => setNewItemLink(null)}
+                />
+              )}
               {isInventory && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium">Quantità</label>
@@ -1507,6 +1527,24 @@ useEffect(() => {
                       Elemento completato
                     </label>
                   </div>
+                )}
+                {isChecklist && !isCloning && user?.role.name !== "viewer" && (
+                  <ListLinkField
+                    current={itemBeingEdited.assignment
+                      ? { name: itemBeingEdited.assignment.source_name ?? "", inventoryName: itemBeingEdited.assignment.source_inventory_name, qty: itemBeingEdited.assignment.qty }
+                      : null}
+                    onPick={async (picked, qty) => {
+                      const created = await createAssignment(itemBeingEdited.id, picked.id, qty);
+                      setItemBeingEdited((prev) => (prev ? { ...prev, assignment: created } : prev));
+                      setItems((current) => current.map((it) => (it.id === itemBeingEdited.id ? { ...it, assignment: created } : it)));
+                    }}
+                    onClear={async () => {
+                      if (!itemBeingEdited.assignment) return;
+                      await deleteAssignment(itemBeingEdited.assignment.id);
+                      setItemBeingEdited((prev) => (prev ? { ...prev, assignment: null } : prev));
+                      setItems((current) => current.map((it) => (it.id === itemBeingEdited.id ? { ...it, assignment: null } : it)));
+                    }}
+                  />
                 )}
                 {!isCloning && (
                   <ItemBarcodesEditor

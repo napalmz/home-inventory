@@ -39,6 +39,7 @@ export interface AssignmentSummary {
     source_inventory_id: number | null;
     source_inventory_name: string | null;
     source_stock: number | null;
+    source_net_qty: number | null;
     qty: number;
 }
 
@@ -54,6 +55,7 @@ export interface Assignment {
     source_inventory_id: number | null;
     source_inventory_name: string | null;
     source_stock: number | null;
+    source_net_qty: number | null;
     qty: number;
 }
 

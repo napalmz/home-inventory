@@ -72,7 +72,8 @@ def test_uncheck_after_window_keeps_stock(ctx):
 
 
 def test_insufficient_stock_asks_then_zeroes(ctx):
-    src, row, _ = _make(ctx, stock=2, qty=5)
+    src, row, _ = _make(ctx, stock=5, qty=5)
+    ctx["client"].patch(f"/item/{src['id']}", json={"name": "Latte", "description": None, "quantity": 2, "inventory_id": ctx["inv_a"]})
     resp = _set(ctx, row, 1)
     assert resp.status_code == 409
     assert resp.json()["detail"]["code"] == "insufficient_stock"
@@ -99,3 +100,19 @@ def test_validation_and_cleanup(ctx):
     ctx["db"].expire_all()
     assert ctx["db"].query(ListAssignment).count() == 0
     assert "assigned_qty" not in _stock(ctx, src) or _stock(ctx, src)["assigned_qty"] == 0
+
+
+def test_qty_limited_to_stock_and_source_net(ctx):
+    src, row, _ = _make(ctx, stock=4, qty=3)
+    client = ctx["client"]
+    aid = ctx["db"].query(ListAssignment).one().id
+    assert client.patch(f"/assignment/{aid}", json={"qty": 5}).status_code == 400
+    from models import Inventory
+    other = client.post("/item/", json={"name": "Latte", "quantity": 0, "inventory_id": row["inventory_id"]}).json()
+    too_many = client.post("/assignment/", json={"list_item_id": other["id"], "source_item_id": src["id"], "qty": 5})
+    assert too_many.status_code == 400
+    second = client.post("/assignment/", json={"list_item_id": other["id"], "source_item_id": src["id"], "qty": 3})
+    assert second.status_code == 201
+    assert second.json()["source_net_qty"] == -2  # 4 - (3+3): negativo teorico
+    rows = client.get(f"/checklist/item/{row['inventory_id']}/").json()
+    assert all(r["assignment"]["source_net_qty"] == -2 for r in rows)

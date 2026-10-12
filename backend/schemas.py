@@ -195,6 +195,7 @@ class AssignmentResponse(BaseModel):
     source_inventory_id: Optional[int] = None
     source_inventory_name: Optional[str] = None
     source_stock: Optional[int] = None
+    source_net_qty: Optional[int] = None
     qty: int
 
 class ItemAssignmentSummary(BaseModel):
@@ -205,6 +206,7 @@ class ItemAssignmentSummary(BaseModel):
     source_inventory_id: Optional[int] = None
     source_inventory_name: Optional[str] = None
     source_stock: Optional[int] = None
+    source_net_qty: Optional[int] = None
     qty: int
 
 class ItemResponse(ItemBase, LoggingResponse):

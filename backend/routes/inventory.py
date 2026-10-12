@@ -310,7 +310,7 @@ def delete_inventory_base(
 
 def _list_item_assignment_fields(item: Item, assigned_map: dict[int, int]) -> dict:
     if item.list_assignment is not None:
-        return {"assignment": build_assignment_summary(item.list_assignment)}
+        return {"assignment": build_assignment_summary(item.list_assignment, assigned_map)}
     assigned = assigned_map.get(item.id, 0)
     if assigned:
         return {"assigned_qty": assigned, "net_qty": (item.quantity or 0) - assigned}
@@ -335,10 +335,12 @@ def list_items_base(
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
         raise HTTPException(status_code=403, detail="Accesso negato")
-    assigned_map = (
-        pending_assigned_by_source(db, [i.id for i in inventory.items])
-        if inventory.type != "CHECKLIST" else {}
-    )
+    if inventory.type == "CHECKLIST":
+        assigned_map = pending_assigned_by_source(
+            db, [i.list_assignment.source_item_id for i in inventory.items if i.list_assignment is not None]
+        )
+    else:
+        assigned_map = pending_assigned_by_source(db, [i.id for i in inventory.items])
     return [
         ItemResponse(
             id=item.id,
