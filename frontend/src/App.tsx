@@ -9,6 +9,7 @@ import ProfilePage       from './pages/ProfilePage'
 import SettingsPage      from './pages/SettingsPage'
 import GenericListPage   from './pages/GenericListPage'
 import GenericDetailPage from './pages/GenericDetailPage'
+import EnvBadge          from './components/EnvBadge'
 import { getApiVersion } from "./api";
 import { version as frontendVersion } from '../package.json';
 
@@ -51,6 +52,7 @@ function App() {
 
   return (
     <Router>
+      <EnvBadge />
       <Routes>
         <Route element={<SidebarLayout><Outlet /></SidebarLayout>}>
           <Route path="/" element={<WelcomePage />} />

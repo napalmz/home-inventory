@@ -7,10 +7,16 @@
 #}
 #EOF
 
-# Se APP_ENV_LABEL è valorizzata (es. DEV) la antepone al titolo della pagina
+# Se APP_ENV_LABEL è valorizzata (es. DEV) la antepone al titolo e la espone al banner dell'app
 if [ -n "${APP_ENV_LABEL}" ]; then
-  LABEL=$(printf '%s' "${APP_ENV_LABEL}" | sed -e 's/[&|\\]/\\&/g' -e 's/</\&lt;/g')
-  sed -i "s|<title>|<title>[${LABEL}] |" /usr/share/nginx/html/index.html
+  # escape HTML, poi escape per sed (\\ & |)
+  LABEL=$(printf '%s' "${APP_ENV_LABEL}" \
+    | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' \
+    | sed -e 's/[\\&|]/\\&/g')
+  sed -i \
+    -e "s|<title>|<title>[${LABEL}] |" \
+    -e "s|<meta name=\"env-label\" content=\"\" />|<meta name=\"env-label\" content=\"${LABEL}\" />|" \
+    /usr/share/nginx/html/index.html
 fi
 
 echo "Configuring nginx proxy..."
