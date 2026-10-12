@@ -900,8 +900,8 @@ useEffect(() => {
 
       {inventory ? (
         <div>
-          <div className="sticky top-16 z-10 bg-white dark:bg-gray-900 mb-4 flex flex-wrap gap-2 items-center px-1 py-2 border-b">
-            <label className="text-sm font-medium">Ordina per:</label>
+          <div className="sm:sticky sm:top-16 z-10 bg-white dark:bg-gray-900 mb-3 flex flex-wrap gap-2 items-center px-1 py-2 border-b">
+            <label className="hidden sm:inline text-sm font-medium">Ordina per:</label>
             <select
               value={sortBy}
               onChange={(e) => {
@@ -909,7 +909,7 @@ useEffect(() => {
                 localStorage.setItem('item_sortBy', value);
                 setSortBy(value);
               }}
-              className="border rounded p-1"
+              className="border rounded p-1 flex-1 min-w-0 sm:flex-none"
             >
               <option value="date">Data modifica</option>
               <option value="name">Nome</option>
@@ -926,7 +926,7 @@ useEffect(() => {
             >
               {sortOrder === 'asc' ? '⬆️' : '⬇️'}
             </button>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 mb-4">
+            <div className="w-full sm:w-auto">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -938,12 +938,12 @@ useEffect(() => {
                       setFilterText('');
                     }
                   }}
-                  className="border rounded p-1 w-full sm:w-auto"
+                  className="border rounded p-1 min-w-0 flex-1 sm:flex-none sm:w-auto"
                 />
                 <select
                   value={barcodeFilter}
                   onChange={(e) => setBarcodeFilter(e.target.value as 'all' | 'with' | 'without')}
-                  className="border rounded p-1"
+                  className="border rounded p-1 w-28 sm:w-auto"
                   title="Filtra per barcode"
                 >
                   <option value="all">🏷️ Tutti</option>
@@ -956,7 +956,7 @@ useEffect(() => {
                     setBarcodeFilter('all');
                     window.history.replaceState(null, '', location.pathname);
                   }}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
+                  className="px-2 py-1 sm:px-4 sm:py-2 bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
                 >
                   <span className="inline sm:hidden">❌</span>
                   <span className="hidden sm:inline">Cancella filtro</span>
@@ -964,8 +964,8 @@ useEffect(() => {
               </div>
             </div>
             {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
-              <div className="flex items-center gap-2 mb-4">
-                <label className="text-sm font-medium whitespace-nowrap">Template filtro:</label>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="hidden sm:inline text-sm font-medium whitespace-nowrap">Template filtro:</label>
                 <select
                   value={selectedTemplateId}
                   onChange={async (e) => {
@@ -980,9 +980,9 @@ useEffect(() => {
                     setSelectedTemplateId(templateId);
                     await applyTemplateToList(templateId);
                   }}
-                  className="border rounded p-1 min-w-[220px]"
+                  className="border rounded p-1 flex-1 min-w-0 sm:flex-none sm:min-w-[220px]"
                 >
-                  <option value="">Nessun template</option>
+                  <option value="">Template filtro: nessuno</option>
                   {filterTemplates.map((template) => (
                     <option key={template.id} value={template.id}>{template.name}</option>
                   ))}
