@@ -30,7 +30,7 @@ Default Login: admin/12345
 
 - Da un item di inventario ("📋 Assegna") o da una lista ("📥 Da inventario") si collega una riga di lista a un item di inventario, con la quantità da prelevare.
 - Spuntando la riga lo stock dell'inventario scende della quantità assegnata. Se lo stock non basta, viene chiesto se azzerarlo o annullare la spunta.
-- Togliendo la spunta entro 45 secondi lo stock viene ripristinato; dopo, resta invariato e l'assegnazione torna "in essere" (utile per acquisti ricorrenti).
+- Togliendo la spunta entro 45 secondi lo stock viene ripristinato; dopo, resta invariato e l'assegnazione torna "in essere" (utile per acquisti ricorrenti). Se si rimette la spunta entro 45 secondi dalla rimozione tardiva, il toggle viene annullato senza un nuovo scarico dello stock.
 - Negli inventari la riga mostra stock lordo e netto (lordo meno le assegnazioni non ancora spuntate).
 
 ## Authors

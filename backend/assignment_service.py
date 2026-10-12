@@ -30,6 +30,7 @@ def build_assignment_summary(assignment: ListAssignment, pending: dict[int, int]
     inventory = source.inventory if source else None
     return ItemAssignmentSummary(
         id=assignment.id,
+        list_checked=bool(assignment.list_item and (assignment.list_item.quantity or 0) >= 1),
         source_item_id=assignment.source_item_id,
         source_name=source.name if source else None,
         source_inventory_id=source.inventory_id if source else None,
@@ -106,6 +107,16 @@ def apply_check_change(
         raise HTTPException(status_code=403, detail="Accesso negato all'inventario di origine")
 
     if is_checked:
+        recently_unchecked = (
+            assignment.applied_at is not None
+            and int(assignment.applied_qty or 0) == 0
+            and _utc_now_naive() - assignment.applied_at <= timedelta(seconds=UNDO_WINDOW_SECONDS)
+        )
+        if recently_unchecked:
+            assignment.applied_at = None
+            assignment.applied_qty = None
+            return
+
         requested = int(assignment.qty)
         available = int(source.quantity or 0)
         if available < requested:
@@ -142,5 +153,13 @@ def apply_check_change(
         source.quantity = int(source.quantity or 0) + applied_qty
         source.user_mod = user.id
         write_version(db, source, "UPDATE", user, old_snapshot, False)
-    assignment.applied_at = None
-    assignment.applied_qty = None
+        assignment.applied_at = None
+        assignment.applied_qty = None
+        return
+
+    if within_window:
+        assignment.applied_at = None
+        assignment.applied_qty = None
+    else:
+        assignment.applied_at = _utc_now_naive()
+        assignment.applied_qty = 0

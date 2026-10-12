@@ -17,7 +17,7 @@ import { HistoryModal } from "../components/HistoryModal";
 import MetadataFilterManager from "../components/MetadataFilterManager";
 import { ITEMS_CHANGED_EVENT } from "../components/GlobalBarcodeScan";
 import ItemBarcodesEditor from "../components/ItemBarcodesEditor";
-import { AddFromInventoryDialog, AssignToListDialog, EditAssignmentDialog, ListLinkField, SourceAssignmentsDialog } from "../components/AssignmentDialogs";
+import { AddFromInventoryDialog, AssignExistingListItemDialog, AssignToListDialog, EditAssignmentDialog, ListLinkField, SourceAssignmentsDialog } from "../components/AssignmentDialogs";
 
 interface Props {
   item: Item;
@@ -242,7 +242,7 @@ export function SwipeableItemRow({
 }: Props) {
   const [action, setAction] = useState<'left' | 'right' | null>(null);
   const [isItemHistoryOpen, setIsItemHistoryOpen] = useState(false);
-  const [assignDialog, setAssignDialog] = useState<'assign' | 'sources' | 'edit' | null>(null);
+  const [assignDialog, setAssignDialog] = useState<'assign' | 'link' | 'sources' | 'edit' | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
 
   // Gestione click fuori per chiudere i pulsanti swipe
@@ -431,7 +431,16 @@ export function SwipeableItemRow({
                 {item.quantity === 0 && ((item.assignment.source_stock ?? 0) < item.assignment.qty || (item.assignment.source_net_qty ?? 0) < 0) ? ' ⚠️' : ''}
               </button>
             )}
-            {isInventory && (item.assigned_qty ?? 0) > 0 && (
+            {isChecklist && !item.assignment && !isViewer && !isEditMode && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setAssignDialog('link'); }}
+                className="mt-1 self-start rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+              >
+                📥 Assegna
+              </button>
+            )}
+            {isInventory && ((item.assignment_count ?? 0) > 0 || (item.assigned_qty ?? 0) > 0) && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setAssignDialog('sources'); }}
@@ -565,8 +574,11 @@ export function SwipeableItemRow({
 
       {assignDialog === 'assign' && <AssignToListDialog item={item} onClose={() => setAssignDialog(null)} />}
       {assignDialog === 'sources' && <SourceAssignmentsDialog item={item} onClose={() => setAssignDialog(null)} />}
+      {assignDialog === 'link' && (
+        <AssignExistingListItemDialog item={item} onClose={() => setAssignDialog(null)} />
+      )}
       {assignDialog === 'edit' && item.assignment && (
-        <EditAssignmentDialog assignment={item.assignment} onClose={() => setAssignDialog(null)} />
+        <EditAssignmentDialog assignment={item.assignment} listItemId={item.id} onClose={() => setAssignDialog(null)} />
       )}
 
       <HistoryModal
@@ -1543,6 +1555,13 @@ useEffect(() => {
                       await deleteAssignment(itemBeingEdited.assignment.id);
                       setItemBeingEdited((prev) => (prev ? { ...prev, assignment: null } : prev));
                       setItems((current) => current.map((it) => (it.id === itemBeingEdited.id ? { ...it, assignment: null } : it)));
+                      window.dispatchEvent(new Event(ITEMS_CHANGED_EVENT));
+                    }}
+                    onClearAndDelete={async () => {
+                      await deleteItem(itemBeingEdited.id);
+                      setItems((current) => current.filter((it) => it.id !== itemBeingEdited.id));
+                      setItemBeingEdited(null);
+                      window.dispatchEvent(new Event(ITEMS_CHANGED_EVENT));
                     }}
                   />
                 )}

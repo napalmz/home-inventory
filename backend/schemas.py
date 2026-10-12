@@ -201,6 +201,7 @@ class AssignmentResponse(BaseModel):
 class ItemAssignmentSummary(BaseModel):
     """Presente sulle righe di lista collegate a un item di inventario."""
     id: int
+    list_checked: bool = False
     source_item_id: int
     source_name: Optional[str] = None
     source_inventory_id: Optional[int] = None
@@ -213,6 +214,7 @@ class ItemResponse(ItemBase, LoggingResponse):
     id: int
     barcodes: List[ItemBarcodeResponse] = []
     assignment: Optional[ItemAssignmentSummary] = None
+    assignment_count: int = 0
     assigned_qty: int = 0
     net_qty: Optional[int] = None
     username_ins: Optional[str] = None

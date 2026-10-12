@@ -182,9 +182,14 @@ def _assignment_fields(db: Session, item: Item) -> dict:
             return {}
         return {"assignment": build_assignment_summary(item.list_assignment)}
     assigned = pending_assigned_by_source(db, [cast(int, item.id)]).get(cast(int, item.id), 0)
-    if not assigned:
+    assignment_count = len(item.source_assignments)
+    if not assigned and not assignment_count:
         return {}
-    return {"assigned_qty": assigned, "net_qty": cast(int, item.quantity or 0) - assigned}
+    return {
+        "assignment_count": assignment_count,
+        "assigned_qty": assigned,
+        "net_qty": cast(int, item.quantity or 0) - assigned,
+    }
 
 def _build_item_response(db: Session, item: Item) -> ItemResponse:
     current_version = db.query(func.max(ItemVersion.version_num)).filter(

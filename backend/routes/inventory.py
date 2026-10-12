@@ -311,9 +311,14 @@ def delete_inventory_base(
 def _list_item_assignment_fields(item: Item, assigned_map: dict[int, int]) -> dict:
     if item.list_assignment is not None:
         return {"assignment": build_assignment_summary(item.list_assignment, assigned_map)}
+    assignment_count = len(item.source_assignments)
     assigned = assigned_map.get(item.id, 0)
-    if assigned:
-        return {"assigned_qty": assigned, "net_qty": (item.quantity or 0) - assigned}
+    if assignment_count or assigned:
+        return {
+            "assignment_count": assignment_count,
+            "assigned_qty": assigned,
+            "net_qty": (item.quantity or 0) - assigned,
+        }
     return {}
 
 #############################################################################
