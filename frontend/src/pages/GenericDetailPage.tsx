@@ -528,6 +528,7 @@ export default function InventoryDetailPage() {
   const { id } = useParams();
   const location = useLocation();
   const [filterText, setFilterText] = useState(() => new URLSearchParams(location.search).get('filtro') || "");
+  const [barcodeFilter, setBarcodeFilter] = useState<'all' | 'with' | 'without'>('all');
   const basePath = location.pathname.split("/")[1] as "inventories" | "checklists";
   const isInventory = basePath === "inventories";
   const isChecklist = basePath === "checklists";
@@ -681,7 +682,11 @@ useEffect(() => {
         (item.barcodes ?? []).some((barcode) => barcode.code.toLowerCase().includes(normalizedFilter)) ||
         matchesTextMetadata;
 
-      return matchesMetadata && matchesText;
+      const hasBarcodes = (item.barcodes?.length ?? 0) > 0;
+      const matchesBarcodeFilter =
+        barcodeFilter === 'all' || (barcodeFilter === 'with' ? hasBarcodes : !hasBarcodes);
+
+      return matchesMetadata && matchesText && matchesBarcodeFilter;
     })
     .sort((a, b) => {
       // First, sort by checklist/inventory logic for completed/zero items
@@ -935,9 +940,20 @@ useEffect(() => {
                   }}
                   className="border rounded p-1 w-full sm:w-auto"
                 />
+                <select
+                  value={barcodeFilter}
+                  onChange={(e) => setBarcodeFilter(e.target.value as 'all' | 'with' | 'without')}
+                  className="border rounded p-1"
+                  title="Filtra per barcode"
+                >
+                  <option value="all">🏷️ Tutti</option>
+                  <option value="with">🏷️ Con barcode</option>
+                  <option value="without">🏷️ Senza barcode</option>
+                </select>
                 <button
                   onClick={() => {
                     setFilterText('');
+                    setBarcodeFilter('all');
                     window.history.replaceState(null, '', location.pathname);
                   }}
                   className="px-4 py-2 bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
