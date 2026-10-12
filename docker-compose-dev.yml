@@ -46,6 +46,7 @@ services:
     environment:
       TZ: Europe/Rome
       BACKEND_BASE_URL: http://backend:8000
+      APP_ENV_LABEL: DEV
     ports:
       - "3000:80"
     depends_on:
