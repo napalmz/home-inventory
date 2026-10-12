@@ -36,6 +36,10 @@ export default function ItemBarcodesEditor({ itemId, barcodes, onChange }: Props
     }
   };
 
+  const confirmRemove = (barcode: ItemBarcode) => {
+    if (window.confirm(`Rimuovere il codice ${barcode.code} da questo item?`)) void remove(barcode);
+  };
+
   const remove = async (barcode: ItemBarcode) => {
     setBusy(true);
     setError(null);
@@ -58,7 +62,7 @@ export default function ItemBarcodesEditor({ itemId, barcodes, onChange }: Props
           <li key={barcode.id} className="flex items-center gap-2 text-sm">
             <span className="font-mono break-all flex-1">{barcode.code}</span>
             {barcode.format && <span className="text-xs text-gray-500">{barcode.format}</span>}
-            <button type="button" disabled={busy} onClick={() => void remove(barcode)} className="px-2 text-red-600 hover:text-red-800" title="Rimuovi">🗑️</button>
+            <button type="button" disabled={busy} onClick={() => confirmRemove(barcode)} className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50" title="Rimuovi" aria-label="Rimuovi codice">🗑️</button>
           </li>
         ))}
       </ul>

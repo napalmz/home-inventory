@@ -376,6 +376,14 @@ export function SwipeableItemRow({
               <span className="text-xs font-mono bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">
                 v{item.version_num}
               </span>
+              {(item.barcodes?.length ?? 0) > 0 && (
+                <span
+                  className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 px-2 py-1 rounded whitespace-nowrap"
+                  title={item.barcodes?.map((b) => b.code).join('\n')}
+                >
+                  🏷️ {item.barcodes?.length}
+                </span>
+              )}
             </div>
             {item.description && (
               <div className="text-sm text-gray-500 dark:text-gray-200">{item.description}</div>
