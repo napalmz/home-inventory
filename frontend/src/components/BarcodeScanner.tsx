@@ -20,6 +20,21 @@ type NativeDetectorCtor = {
 type Point = { x: number; y: number };
 const HIGHLIGHT_MS = 700;
 
+const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
+  facingMode: { ideal: 'environment' },
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+};
+
+type CameraCaps = { torch: boolean; zoom: { min: number; max: number; step: number } | null };
+type ExtendedCaps = MediaTrackCapabilities & {
+  torch?: boolean;
+  zoom?: { min: number; max: number; step: number };
+  focusMode?: string[];
+};
+const applyAdvanced = (track: MediaStreamTrack, c: Record<string, unknown>) =>
+  track.applyConstraints({ advanced: [c as MediaTrackConstraintSet] });
+
 const NATIVE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'qr_code', 'data_matrix'];
 
 export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
@@ -32,6 +47,40 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
   const [videoReady, setVideoReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
+  const [caps, setCaps] = useState<CameraCaps | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [zoom, setZoom] = useState(1);
+
+  const currentTrack = () =>
+    (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks()[0] ?? null;
+
+  // Legge le capacità della fotocamera (flash, zoom) e attiva la messa a fuoco continua se disponibile
+  const readCaps = () => {
+    const track = currentTrack();
+    if (!track?.getCapabilities) return;
+    const c = track.getCapabilities() as ExtendedCaps;
+    if (c.focusMode?.includes('continuous')) applyAdvanced(track, { focusMode: 'continuous' }).catch(() => {});
+    setTorchOn(false);
+    setZoom(c.zoom?.min ?? 1);
+    setCaps({ torch: !!c.torch, zoom: c.zoom ?? null });
+  };
+
+  const toggleTorch = async () => {
+    const track = currentTrack();
+    if (!track) return;
+    try {
+      await applyAdvanced(track, { torch: !torchOn });
+      setTorchOn(!torchOn);
+    } catch {
+      setCaps((prev) => (prev ? { ...prev, torch: false } : prev));
+    }
+  };
+
+  const changeZoom = (value: number) => {
+    const track = currentTrack();
+    setZoom(value);
+    if (track) applyAdvanced(track, { zoom: value }).catch(() => {});
+  };
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -107,7 +156,7 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
       const supported = (await Ctor.getSupportedFormats?.()) ?? NATIVE_FORMATS;
       const detector = new Ctor({ formats: NATIVE_FORMATS.filter((f) => supported.includes(f)) });
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: VIDEO_CONSTRAINTS,
         audio: false,
       });
       if (cancelled) {
@@ -135,7 +184,7 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
     const startZxing = async () => {
       const reader = new BrowserMultiFormatReader();
       const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        { video: VIDEO_CONSTRAINTS, audio: false },
         videoEl,
         (result) => {
           if (result) {
@@ -161,6 +210,8 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
   }, [open, videoReady, onDetected]);
 
   const closeAndReset = () => {
+    setCaps(null);
+    setTorchOn(false);
     setError(null);
     setManualCode('');
     onClose();
@@ -191,6 +242,7 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
                 className="absolute inset-0 w-full h-full object-cover"
                 muted
                 playsInline
+                onPlaying={readCaps}
               />
               <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
               {/* guida di allineamento: riquadro + linea centrale */}
@@ -199,6 +251,35 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
                   <div className="absolute left-2 right-2 top-1/2 h-0.5 -translate-y-1/2 bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)]" />
                 </div>
               </div>
+              {caps && (caps.torch || caps.zoom) && (
+                <div className="absolute top-2 inset-x-2 flex items-center gap-2">
+                  {caps.torch && (
+                    <button
+                      type="button"
+                      onClick={() => void toggleTorch()}
+                      aria-pressed={torchOn}
+                      aria-label="Flash"
+                      className={`w-10 h-10 shrink-0 rounded-full text-xl flex items-center justify-center ${
+                        torchOn ? 'bg-yellow-400 text-black' : 'bg-black/50 text-white'
+                      }`}
+                    >
+                      🔦
+                    </button>
+                  )}
+                  {caps.zoom && caps.zoom.max > caps.zoom.min && (
+                    <input
+                      type="range"
+                      aria-label="Zoom"
+                      className="flex-1"
+                      min={caps.zoom.min}
+                      max={Math.min(caps.zoom.max, 8)}
+                      step={caps.zoom.step || 0.1}
+                      value={zoom}
+                      onChange={(e) => changeZoom(Number(e.target.value))}
+                    />
+                  )}
+                </div>
+              )}
               <p className="absolute bottom-1 inset-x-0 text-center text-xs text-white/90 pointer-events-none">
                 Allinea il codice alla linea rossa
               </p>
