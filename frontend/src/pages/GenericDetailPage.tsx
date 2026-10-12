@@ -15,7 +15,7 @@ import { AuthContext } from "../auth-context";
 import { useSwipeable } from 'react-swipeable';
 import { HistoryModal } from "../components/HistoryModal";
 import MetadataFilterManager from "../components/MetadataFilterManager";
-import BarcodeScanFlow from "../components/BarcodeScanFlow";
+import { ITEMS_CHANGED_EVENT } from "../components/GlobalBarcodeScan";
 import ItemBarcodesEditor from "../components/ItemBarcodesEditor";
 
 interface Props {
@@ -581,6 +581,17 @@ useEffect(() => {
   fetchData();
 }, [id, isInventory]);
 
+  useEffect(() => {
+    const refresh = async () => {
+      if (!id) return;
+      const getItems = isInventory ? getInventoryItems : getChecklistItems;
+      const refreshed = await getItems(Number(id));
+      if (Array.isArray(refreshed)) setItems(refreshed as Item[]);
+    };
+    window.addEventListener(ITEMS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(ITEMS_CHANGED_EVENT, refresh);
+  }, [id, isInventory]);
+
   const openedItemParam = useRef<string | null>(null);
   useEffect(() => {
     const itemParam = new URLSearchParams(location.search).get('item');
@@ -588,7 +599,7 @@ useEffect(() => {
       openedItemParam.current = null;
       return;
     }
-    const key = `${id}:${itemParam}`;
+    const key = `${id}:${itemParam}:${location.key}`;
     if (openedItemParam.current === key) return;
     const target = items.find((i) => i.id === Number(itemParam));
     if (!target) return;
@@ -597,7 +608,7 @@ useEffect(() => {
       if (user?.role.name === 'viewer') setFilterText(target.name);
       else setItemBeingEdited(target);
     });
-  }, [items, location.search, id, user?.role.name]);
+  }, [items, location.search, location.key, id, user?.role.name]);
 
   useEffect(() => {
     if (!itemBeingEdited) {
@@ -1085,18 +1096,6 @@ useEffect(() => {
         )}
         {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
           <>
-            <BarcodeScanFlow
-              inventory={inventory}
-              items={items}
-              isChecklist={isChecklist}
-              keyboardEnabled={!isInsertMode && !itemBeingEdited && !isShareModalOpen}
-              onItemsChanged={async () => {
-                const getItems = isInventory ? getInventoryItems : getChecklistItems;
-                const refreshed = inventory && await getItems(inventory.id);
-                if (refreshed) setItems(refreshed as Item[]);
-              }}
-              onOpenItem={(item) => setItemBeingEdited(item)}
-            />
             <button
               onClick={() => {
                 setIsEditMode((prev) => !prev);
