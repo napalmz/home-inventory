@@ -156,6 +156,36 @@ class Item(Base, LoggingData):
     inventory_id = Column(Integer, ForeignKey("inventories.id"), nullable=False)
     inventory = relationship("Inventory", back_populates="items")
     metadata_values = relationship("ItemMetadataValue", back_populates="item", cascade="all, delete-orphan")
+    barcodes = relationship("ItemBarcode", back_populates="item", cascade="all, delete-orphan", order_by="ItemBarcode.id")
+
+################################################
+# Codici a barre / QR associati a un item (N per item)
+class ItemBarcode(Base, LoggingData):
+    __tablename__ = "item_barcodes"
+    __table_args__ = (
+        UniqueConstraint("item_id", "code", name="uq_item_barcodes_item_code"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
+    code = Column(String, nullable=False, index=True)
+    format = Column(String, nullable=True)  # es. ean_13, qr_code, code_128
+
+    item = relationship("Item", back_populates="barcodes")
+
+################################################
+# Cache anagrafica prodotti da fonte esterna (Open * Facts)
+class BarcodeProductCache(Base):
+    __tablename__ = "barcode_product_cache"
+
+    code = Column(String, primary_key=True)
+    found = Column(Boolean, nullable=False, default=False)
+    name = Column(String, nullable=True)
+    brand = Column(String, nullable=True)
+    quantity_label = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    source = Column(String, nullable=True)
+    fetched_at = Column(DateTime, nullable=False)
 
 ################################################
 class MetadataDefinition(Base, LoggingData):

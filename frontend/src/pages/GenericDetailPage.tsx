@@ -15,6 +15,8 @@ import { AuthContext } from "../auth-context";
 import { useSwipeable } from 'react-swipeable';
 import { HistoryModal } from "../components/HistoryModal";
 import MetadataFilterManager from "../components/MetadataFilterManager";
+import BarcodeScanFlow from "../components/BarcodeScanFlow";
+import ItemBarcodesEditor from "../components/ItemBarcodesEditor";
 
 interface Props {
   item: Item;
@@ -639,6 +641,7 @@ useEffect(() => {
       const matchesText =
         item.name.toLowerCase().includes(normalizedFilter) ||
         item.description?.toLowerCase().includes(normalizedFilter) ||
+        (item.barcodes ?? []).some((barcode) => barcode.code.toLowerCase().includes(normalizedFilter)) ||
         matchesTextMetadata;
 
       return matchesMetadata && matchesText;
@@ -1064,6 +1067,18 @@ useEffect(() => {
         )}
         {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
           <>
+            <BarcodeScanFlow
+              inventory={inventory}
+              items={items}
+              isChecklist={isChecklist}
+              keyboardEnabled={!isInsertMode && !itemBeingEdited && !isShareModalOpen}
+              onItemsChanged={async () => {
+                const getItems = isInventory ? getInventoryItems : getChecklistItems;
+                const refreshed = inventory && await getItems(inventory.id);
+                if (refreshed) setItems(refreshed as Item[]);
+              }}
+              onOpenItem={(item) => setItemBeingEdited(item)}
+            />
             <button
               onClick={() => {
                 setIsEditMode((prev) => !prev);
@@ -1373,6 +1388,18 @@ useEffect(() => {
                       Elemento completato
                     </label>
                   </div>
+                )}
+                {!isCloning && (
+                  <ItemBarcodesEditor
+                    itemId={itemBeingEdited.id}
+                    barcodes={itemBeingEdited.barcodes ?? []}
+                    onChange={(barcodes) => {
+                      setItemBeingEdited((prev) => (prev ? { ...prev, barcodes } : prev));
+                      setItems((current) =>
+                        current.map((item) => (item.id === itemBeingEdited.id ? { ...item, barcodes } : item)),
+                      );
+                    }}
+                  />
                 )}
                 {metadataLoading ? (
                   <div className="mt-4 text-sm text-gray-500 dark:text-gray-300">Caricamento metadati...</div>

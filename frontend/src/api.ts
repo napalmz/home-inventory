@@ -9,6 +9,8 @@ import {
   ChecklistItem,
   ChecklistWithMatches,
   ItemVersion,
+  ItemBarcode,
+  BarcodeLookupResult,
   InventoryVersion,
   MetadataDefinition,
   MetadataDefinitionCreate,
@@ -280,9 +282,25 @@ export async function createItem(data: {
   description?: string;
   quantity: number;
   inventory_id: number;
+  barcodes?: { code: string; format?: string | null }[];
 }): Promise<InventoryItem> {
   const response = await api.post('/item/', data);
   return response.data as InventoryItem;
+}
+
+/* BARCODE */
+export async function lookupBarcode(code: string, external = true): Promise<BarcodeLookupResult> {
+  const response = await api.get('/barcode/lookup', { params: { code, external } });
+  return response.data as BarcodeLookupResult;
+}
+
+export async function addItemBarcode(itemId: number, code: string, format?: string | null): Promise<ItemBarcode> {
+  const response = await api.post(`/item/${itemId}/barcodes`, { code, format: format ?? null });
+  return response.data as ItemBarcode;
+}
+
+export async function deleteItemBarcode(itemId: number, barcodeId: number): Promise<void> {
+  await api.delete(`/item/${itemId}/barcodes/${barcodeId}`);
 }
 
 /* MODIFICA ITEM */

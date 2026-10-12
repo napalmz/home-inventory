@@ -12,6 +12,8 @@
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@tailwindcss/vite": "^4.1.17",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "axios": "^1.15.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",

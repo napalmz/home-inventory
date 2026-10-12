@@ -132,7 +132,7 @@ class ItemBase(BaseModel):
     inventory_id: int
 
 class ItemCreate(ItemBase):
-    pass
+    barcodes: List['ItemBarcodeCreate'] = []
 
 class ItemUpdate(BaseModel):
     name: Optional[str]
@@ -143,8 +143,41 @@ class ItemUpdate(BaseModel):
 class ItemDelete(BaseModel):
     confirm: bool
 
+class ItemBarcodeResponse(BaseModel):
+    id: int
+    code: str
+    format: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class ItemBarcodeCreate(BaseModel):
+    code: str = Field(min_length=1, max_length=256)
+    format: Optional[str] = Field(default=None, max_length=32)
+
+class BarcodeMatch(BaseModel):
+    item_id: int
+    name: str
+    quantity: Optional[int] = None
+    inventory_id: int
+    inventory_name: Optional[str] = None
+    inventory_type: Optional[str] = None
+
+class BarcodeProduct(BaseModel):
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    quantity_label: Optional[str] = None
+    image_url: Optional[str] = None
+    source: Optional[str] = None
+
+class BarcodeLookupResponse(BaseModel):
+    code: str
+    matches: List[BarcodeMatch] = []
+    product: Optional[BarcodeProduct] = None
+
 class ItemResponse(ItemBase, LoggingResponse):
     id: int
+    barcodes: List[ItemBarcodeResponse] = []
     username_ins: Optional[str] = None
     username_mod: Optional[str] = None
     metadata_values: List['ItemMetadataValueResponse'] = []

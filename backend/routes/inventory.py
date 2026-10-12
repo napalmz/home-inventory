@@ -14,7 +14,7 @@ from models import (
     InventoryVersion,
     ItemVersion,
 )
-from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemMetadataValueResponse, ItemResponse, UserResponse, InventoryResponseWithItemCount, InventoryVersionResponse, VersionBulkDeleteRequest
+from schemas import InventoryCreate, InventoryResponse, InventoryUpdate, ItemMetadataValueResponse, ItemBarcodeResponse, ItemResponse, UserResponse, InventoryResponseWithItemCount, InventoryVersionResponse, VersionBulkDeleteRequest
 from routes.auth import get_current_user
 from typing import Any, List, cast
 import re
@@ -208,6 +208,7 @@ def list_inventories_base(
                     matching_items.append({
                         **ItemResponse(
                             id=item.id,
+                            barcodes=[ItemBarcodeResponse.model_validate(b) for b in item.barcodes],
                             name=item.name,
                             description=item.description,
                             quantity=item.quantity,
@@ -318,6 +319,7 @@ def list_items_base(
         joinedload(Inventory.items).joinedload(Item.user_ins_rel),
         joinedload(Inventory.items).joinedload(Item.user_mod_rel),
         joinedload(Inventory.items).joinedload(Item.metadata_values).joinedload(ItemMetadataValue.definition),
+        joinedload(Inventory.items).joinedload(Item.barcodes),
     ).filter_by(id=inventory_id, type=inventory_type).first()
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventario non trovato")
@@ -327,6 +329,7 @@ def list_items_base(
     return [
         ItemResponse(
             id=item.id,
+            barcodes=[ItemBarcodeResponse.model_validate(b) for b in item.barcodes],
             name=item.name,
             description=item.description,
             quantity=item.quantity,

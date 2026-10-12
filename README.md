@@ -19,6 +19,13 @@ Frontend: <http://localhost:3000>
 
 Default Login: admin/12345
 
+## Barcode / QR code
+
+- Più barcode (EAN/UPC/QR...) per ogni item, gestibili dalla modifica item.
+- Pulsante "Scansiona" nella pagina inventario/checklist: fotocamera (desktop/mobile) oppure lettore USB/Bluetooth (tastiera) o inserimento manuale. La fotocamera richiede HTTPS (o localhost).
+- Un codice sconosciuto permette di creare un nuovo item o associarlo a uno esistente; un codice è unico per inventario.
+- Anagrafica EAN esterna: Open Food/Beauty/Pet Food/Products Facts (gratuita, senza chiave), con cache locale. Disattivabile con `BARCODE_LOOKUP_ENABLED=false` (i codici vengono inviati a servizi terzi).
+
 ## Authors
 
 - [@napalmz](https://www.github.com/napalmz)

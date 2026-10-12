@@ -26,7 +26,37 @@ export interface Inventory {
     version_num: number;
 }
 
+export interface ItemBarcode {
+    id: number;
+    code: string;
+    format?: string | null;
+}
+
+export interface BarcodeMatch {
+    item_id: number;
+    name: string;
+    quantity: number | null;
+    inventory_id: number;
+    inventory_name: string | null;
+    inventory_type: string | null;
+}
+
+export interface BarcodeProduct {
+    name: string | null;
+    brand: string | null;
+    quantity_label: string | null;
+    image_url: string | null;
+    source: string | null;
+}
+
+export interface BarcodeLookupResult {
+    code: string;
+    matches: BarcodeMatch[];
+    product: BarcodeProduct | null;
+}
+
 export interface InventoryItem {
+    barcodes?: ItemBarcode[];
     id: number;
     name: string;
     description: string;
@@ -55,6 +85,7 @@ export interface Checklist {
 }
 
 export interface ChecklistItem {
+    barcodes?: ItemBarcode[];
     id: number;
     name: string;
     description: string;
@@ -71,6 +102,7 @@ export interface ChecklistItem {
 }
 
 export interface Item {
+    barcodes?: ItemBarcode[];
     id: number;
     name: string;
     description: string;
