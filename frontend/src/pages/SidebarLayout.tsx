@@ -4,7 +4,16 @@ import { Link, NavLink } from 'react-router-dom'
 import GlobalBarcodeScan from '../components/GlobalBarcodeScan'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
-import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser } from 'react-icons/fi'
+import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser, FiSun, FiMoon, FiMonitor } from 'react-icons/fi'
+
+type ThemeMode = 'light' | 'dark' | 'system'
+
+const THEME_STORAGE_KEY = 'theme-mode'
+
+function getStoredTheme(): ThemeMode {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY)
+  return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
+}
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -13,6 +22,7 @@ interface SidebarLayoutProps {
 export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const [isOpen, setIsOpen] = useState(window.innerWidth >= 768)
   const [apiVersion, setApiVersion] = useState<string | null>(null)
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredTheme)
 
   const auth = useAuth()
   const { logout } = auth
@@ -24,7 +34,36 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       .catch(() => setApiVersion(null))
   }, [])
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateTheme = () => {
+      const isDark = themeMode === 'dark' || (themeMode === 'system' && mediaQuery.matches)
+      document.documentElement.classList.toggle('dark', isDark)
+      document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+    }
+
+    localStorage.setItem(THEME_STORAGE_KEY, themeMode)
+    updateTheme()
+    if (themeMode === 'system') {
+      mediaQuery.addEventListener('change', updateTheme)
+      return () => mediaQuery.removeEventListener('change', updateTheme)
+    }
+  }, [themeMode])
+
   const toggleSidebar = () => setIsOpen(!isOpen)
+  const themeModes: ThemeMode[] = ['light', 'dark', 'system']
+  const themeLabels: Record<ThemeMode, string> = {
+    light: 'Chiaro',
+    dark: 'Scuro',
+    system: 'Sistema',
+  }
+  const themeIcons = {
+    light: FiSun,
+    dark: FiMoon,
+    system: FiMonitor,
+  }
+  const ThemeIcon = themeIcons[themeMode]
+  const nextTheme = themeLabels[themeModes[(themeModes.indexOf(themeMode) + 1) % themeModes.length]]
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -133,6 +172,18 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
             </NavLink>
           )}
         </nav>
+
+        <div className="mt-6 border-t border-gray-600 pt-4">
+          <button
+            type="button"
+            onClick={() => setThemeMode(themeModes[(themeModes.indexOf(themeMode) + 1) % themeModes.length])}
+            aria-label={`Tema ${themeLabels[themeMode]}. Passa a ${nextTheme}`}
+            title={`Tema: ${themeLabels[themeMode]} · clicca per ${nextTheme.toLowerCase()}`}
+            className="flex w-full items-center justify-center rounded-lg px-4 py-3 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+          >
+            <ThemeIcon className="text-xl" aria-hidden="true" />
+          </button>
+        </div>
 
         {/* Footer */}
         <div className="absolute bottom-4 left-4 right-4 text-xs text-gray-400">

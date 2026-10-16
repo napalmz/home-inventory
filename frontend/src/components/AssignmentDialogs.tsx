@@ -21,7 +21,7 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
     <Dialog open onClose={onClose} className="relative z-[70]">
       <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
       <div className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4">
-        <Dialog.Panel className="w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl bg-white dark:bg-gray-800 p-4 space-y-3">
+        <Dialog.Panel className="w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl bg-white p-4 space-y-3 dark:bg-gray-800 dark:text-gray-100">
           <Dialog.Title className="text-lg font-semibold">{title}</Dialog.Title>
           {children}
         </Dialog.Panel>
@@ -33,10 +33,10 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
 function QtyStepper({ value, onChange, max }: { value: number; onChange: (v: number) => void; max?: number }) {
   return (
     <div className="flex items-center justify-center gap-4">
-      <button type="button" className="h-11 w-11 rounded bg-gray-300 dark:bg-gray-600 text-xl"
+      <button type="button" className="h-11 w-11 rounded bg-gray-300 text-xl text-gray-900 dark:bg-gray-600 dark:text-gray-100"
         onClick={() => onChange(Math.max(1, value - 1))}>−</button>
       <span className="min-w-[2rem] text-center text-xl font-semibold">{value}</span>
-      <button type="button" className="h-11 w-11 rounded bg-gray-300 dark:bg-gray-600 text-xl disabled:opacity-40"
+      <button type="button" className="h-11 w-11 rounded bg-gray-300 text-xl text-gray-900 disabled:opacity-40 dark:bg-gray-600 dark:text-gray-100"
         disabled={max != null && value >= max}
         onClick={() => onChange(max != null ? Math.min(max, value + 1) : value + 1)}>+</button>
     </div>
@@ -48,7 +48,7 @@ function Actions({ onClose, onConfirm, label, busy, disabled }: {
 }) {
   return (
     <div className="flex gap-2 pt-1">
-      <button type="button" onClick={onClose} className="flex-1 rounded bg-gray-300 dark:bg-gray-600 py-3">
+      <button type="button" onClick={onClose} className="flex-1 rounded bg-gray-300 py-3 text-gray-900 dark:bg-gray-600 dark:text-gray-100">
         {onConfirm ? 'Annulla' : 'Chiudi'}
       </button>
       {onConfirm && (
@@ -104,12 +104,12 @@ export function AssignToListDialog({ item, onClose }: { item: Item; onClose: () 
   return (
     <Shell title={`Assegna "${item.name}" a una lista`} onClose={onClose}>
       <select value={listId ?? ''} onChange={(e) => setListId(e.target.value ? Number(e.target.value) : null)}
-        className="w-full border rounded p-3 dark:bg-gray-700">
+        className="w-full rounded border border-gray-300 bg-white p-3 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
         <option value="">Scegli la lista…</option>
         {lists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
       </select>
-      {lists.length === 0 && <p className="text-sm text-gray-500">Non hai ancora nessuna lista.</p>}
-      <p className="text-sm text-gray-500">Disponibile dopo le altre assegnazioni: {available}</p>
+      {lists.length === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">Non hai ancora nessuna lista.</p>}
+      <p className="text-sm text-gray-500 dark:text-gray-400">Disponibile dopo le altre assegnazioni: {available}</p>
       <QtyStepper value={qty} onChange={setQty} max={Math.max(1, available)} />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Actions onClose={onClose} onConfirm={submit} label="Assegna" busy={busy} disabled={listId == null || available < 1} />
@@ -171,12 +171,12 @@ export function InventoryPickerDialog({ onClose, onPick }: {
     const available = Math.max(0, picked.net_qty ?? picked.quantity);
     return (
       <Shell title={picked.name} onClose={onClose}>
-        <p className="text-sm text-gray-500">{pickedInventoryName}</p>
-        <p className="text-sm text-gray-500">Disponibile dopo le altre assegnazioni: {available}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{pickedInventoryName}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Disponibile dopo le altre assegnazioni: {available}</p>
         <QtyStepper value={qty} onChange={setQty} max={Math.max(1, available)} />
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex gap-2">
-          <button type="button" className="flex-1 rounded bg-gray-300 dark:bg-gray-600 py-3" onClick={() => setPicked(null)}>Indietro</button>
+          <button type="button" className="flex-1 rounded bg-gray-300 py-3 text-gray-900 dark:bg-gray-600 dark:text-gray-100" onClick={() => setPicked(null)}>Indietro</button>
           <button type="button" className="flex-1 rounded bg-blue-600 text-white py-3 disabled:opacity-50" onClick={submit} disabled={busy || available < 1}>
             {busy ? '...' : 'Conferma'}
           </button>
@@ -188,9 +188,9 @@ export function InventoryPickerDialog({ onClose, onPick }: {
   return (
     <Shell title="Scegli da inventario" onClose={onClose}>
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca item in tutti gli inventari…"
-        className="w-full border rounded p-3 dark:bg-gray-700" />
+        className="w-full rounded border border-gray-300 bg-white p-3 text-gray-900 placeholder:text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-400" />
       <select value={inventoryId ?? ''} onChange={(e) => setInventoryId(e.target.value ? Number(e.target.value) : null)}
-        className="w-full border rounded p-3 dark:bg-gray-700">
+        className="w-full rounded border border-gray-300 bg-white p-3 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
         <option value="">Tutti gli inventari</option>
         {inventories.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
       </select>
@@ -201,18 +201,18 @@ export function InventoryPickerDialog({ onClose, onPick }: {
               className="w-full flex justify-between items-center gap-2 py-3 text-left">
               <span className="min-w-0">
                 <span className="block truncate">{item.name}</span>
-                <span className="block truncate text-xs text-gray-500">{inventoryName}</span>
+                <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{inventoryName}</span>
               </span>
-              <span className="text-sm text-gray-500 whitespace-nowrap">{item.net_qty ?? item.quantity}</span>
+              <span className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.net_qty ?? item.quantity}</span>
             </button>
           </li>
         ))}
         {!loading && visible.length === 0 && (
-          <li className="py-3 text-sm text-gray-500">
+          <li className="py-3 text-sm text-gray-500 dark:text-gray-400">
             {inventories.length === 0 ? 'Nessun inventario disponibile' : 'Nessun item trovato'}
           </li>
         )}
-        {loading && <li className="py-3 text-sm text-gray-500">Caricamento inventari e item…</li>}
+        {loading && <li className="py-3 text-sm text-gray-500 dark:text-gray-400">Caricamento inventari e item…</li>}
       </ul>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Actions onClose={onClose} />
@@ -290,7 +290,7 @@ export function ListLinkField({ current, onPick, onClear, onClearAndDelete }: {
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <button type="button" disabled={busy} onClick={() => run(onClear)}
-              className="rounded border border-gray-400 px-2 py-2 text-sm disabled:opacity-50">
+              className="rounded border border-gray-400 px-2 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-500 dark:text-gray-100 dark:hover:bg-gray-700">
               Scollega, mantieni nella lista
             </button>
             {onClearAndDelete && (
@@ -303,7 +303,7 @@ export function ListLinkField({ current, onPick, onClear, onClearAndDelete }: {
           {error && <p className="text-sm text-red-600">{error}</p>}
         </>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className="w-full rounded bg-gray-200 dark:bg-gray-700 py-2">
+        <button type="button" onClick={() => setOpen(true)} className="w-full rounded bg-gray-200 py-2 text-gray-900 dark:bg-gray-700 dark:text-gray-100">
           📥 Collega a un item di inventario
         </button>
       )}
@@ -338,7 +338,7 @@ export function EditAssignmentDialog({ assignment, listItemId, onClose }: { assi
 
   return (
     <Shell title={assignment.source_name ?? 'Assegnazione'} onClose={onClose}>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
         📦 {assignment.source_inventory_name} · stock {assignment.source_stock ?? '?'}
         {assignment.source_net_qty != null && ` · netto ${assignment.source_net_qty}`}
       </p>
@@ -444,24 +444,24 @@ export function SourceAssignmentsDialog({ item, onClose }: { item: Item; onClose
           <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
             <span className="min-w-0 flex-1">
               <span className="block truncate">{r.list_name ?? 'Lista'}</span>
-              <span className="block truncate text-xs text-gray-500">{r.list_item_name ?? r.source_name}</span>
+              <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{r.list_item_name ?? r.source_name}</span>
               {r.list_checked && (
                 <span className="block text-xs text-emerald-700 dark:text-emerald-400">Spuntata · già scaricata</span>
               )}
             </span>
             <span className="flex items-center gap-2">
-              <button type="button" className="h-9 w-9 rounded bg-gray-300 dark:bg-gray-600 disabled:opacity-40"
+              <button type="button" className="h-9 w-9 rounded bg-gray-300 text-gray-900 disabled:opacity-40 dark:bg-gray-600 dark:text-gray-100"
                 disabled={r.qty <= 1} onClick={() => change(r, r.qty - 1)}>−</button>
               <span className="min-w-[1.5rem] text-center font-semibold">{r.qty}</span>
-              <button type="button" className="h-9 w-9 rounded bg-gray-300 dark:bg-gray-600 disabled:opacity-40"
+              <button type="button" className="h-9 w-9 rounded bg-gray-300 text-gray-900 disabled:opacity-40 dark:bg-gray-600 dark:text-gray-100"
                 disabled={r.qty >= r.qty + Math.max(0, r.source_net_qty ?? 0)}
                 onClick={() => change(r, r.qty + 1)}>+</button>
-              <button type="button" className="h-9 px-2 rounded border border-gray-400 text-xs" onClick={() => remove(r)} title="Scollega">Scollega</button>
+              <button type="button" className="h-9 rounded border border-gray-400 px-2 text-xs text-gray-800 hover:bg-gray-100 dark:border-gray-500 dark:text-gray-100 dark:hover:bg-gray-700" onClick={() => remove(r)} title="Scollega">Scollega</button>
               <button type="button" className="h-9 px-2 rounded bg-red-600 text-white text-xs" onClick={() => deleteListItem(r)} title="Cancella item dalla lista">🗑️</button>
             </span>
           </li>
         ))}
-        {rows && rows.length === 0 && <li className="py-2 text-sm text-gray-500">Nessuna assegnazione in essere</li>}
+        {rows && rows.length === 0 && <li className="py-2 text-sm text-gray-500 dark:text-gray-400">Nessuna assegnazione in essere</li>}
       </ul>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Actions onClose={onClose} />

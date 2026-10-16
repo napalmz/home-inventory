@@ -451,7 +451,8 @@ export function SwipeableItemRow({
                 }`}
                 title="Quantità assegnate a liste"
               >
-                📋 {item.quantity} → {item.net_qty} netti
+                📋 {item.assigned_qty ?? 0} assegnati → {item.net_qty ?? item.quantity} netti
+                {(item.assignment_count ?? 0) > (item.assigned_qty ?? 0) && ` · ${item.assignment_count} collegamenti`}
               </button>
             )}
             {item.metadata_values && item.metadata_values.length > 0 && (
@@ -544,6 +545,7 @@ export function SwipeableItemRow({
                   updateItem(item.id, updated).then((upd) => {
                     if (upd) {
                       setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
+                      window.dispatchEvent(new Event(ITEMS_CHANGED_EVENT));
                     }
                   });
                 }}
@@ -559,6 +561,7 @@ export function SwipeableItemRow({
                   updateItem(item.id, updated).then((upd) => {
                     if (upd) {
                       setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
+                      window.dispatchEvent(new Event(ITEMS_CHANGED_EVENT));
                     }
                   });
                 }}
