@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Canale di pubblicazione"
+        type: choice
+        options:
+          - dev
+          - release
+        default: dev
 
 permissions:
   contents: read
@@ -20,16 +29,19 @@ jobs:
       - name: Determine image tags
         id: meta
         shell: bash
+        env:
+          INPUT_CHANNEL: ${{ inputs.channel }}
         run: |
           backend_version="$(grep '^API_VERSION=' backend/.env | cut -d '=' -f2)"
           frontend_version="$(node -p "require('./frontend/package.json').version")"
 
-          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
-            suffix="-dev"
-            channel="dev"
-          else
+          # Release solo da tag v* o da avvio manuale con canale "release"
+          if [[ "$GITHUB_REF" == refs/tags/* || "$INPUT_CHANNEL" == "release" ]]; then
             suffix=""
             channel="latest"
+          else
+            suffix="-dev"
+            channel="dev"
           fi
 
           echo "backend_tag=${backend_version}${suffix}" >> "$GITHUB_OUTPUT"
