@@ -80,6 +80,7 @@ jobs:
           push: true
           build-args: |
             BACKEND_VERSION=${{ steps.meta.outputs.backend_tag }}
+            IMAGE_CHANNEL=${{ steps.meta.outputs.channel == 'dev' && 'dev' || 'release' }}
           tags: |
             napalmzrpi/home-inventory-backend:${{ steps.meta.outputs.backend_tag }}
             napalmzrpi/home-inventory-backend:${{ steps.meta.outputs.channel }}

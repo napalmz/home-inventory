@@ -59,6 +59,7 @@ Una volta al giorno (e poco dopo l'avvio) il backend invia un solo messaggio con
 | `id` | Identificativo casuale (UUID) generato in locale al primo invio, non collegato a utenti o macchine |
 | `version` | Versione del backend |
 | `inventories` | Numero di inventari (le checklist non contano) |
+| `channel` | Canale dell'immagine: `release`, `dev` o `unknown` (build locale) |
 | `last_activity` | Data dell'ultima modifica a inventari o articoli |
 
 La **nazione** non viene inviata dal backend: la ricava il server di ricezione (Cloudflare) dalla richiesta, e l'indirizzo IP non viene salvato. Non vengono mai inviati nomi di inventari o articoli, utenti, password o altri contenuti. Se il server non è raggiungibile, l'invio fallisce in silenzio senza influire sull'app.
@@ -162,6 +163,7 @@ Once a day (and shortly after startup) the backend sends a single message with:
 | `id` | Random identifier (UUID) generated locally on the first send, not linked to users or machines |
 | `version` | Backend version |
 | `inventories` | Number of inventories (checklists are not counted) |
+| `channel` | Image channel: `release`, `dev` or `unknown` (local build) |
 | `last_activity` | Date of the last change to inventories or items |
 
 The **country** is not sent by the backend: the receiving server (Cloudflare) derives it from the request, and the IP address is not stored. Inventory or item names, users, passwords and any other content are never sent. If the server is unreachable, sending fails silently and does not affect the app.

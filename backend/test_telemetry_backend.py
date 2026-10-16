@@ -84,7 +84,7 @@ def test_payload_contains_only_expected_fields(db, monkeypatch):
     monkeypatch.setenv("API_VERSION", "1.4.0")
     payload = telemetry_service.build_payload(db)
 
-    assert set(payload) == {"id", "version", "inventories", "last_activity"}
+    assert set(payload) == {"id", "version", "channel", "inventories", "last_activity"}
     assert payload["version"] == "1.4.0"
     assert payload["inventories"] == 2  # le checklist non contano
     assert payload["last_activity"] is not None
@@ -122,7 +122,7 @@ def test_send_posts_json(db, monkeypatch):
     assert telemetry_service.send_telemetry(db) is True
     assert captured["url"] == "https://example.test/ping"
     assert captured["method"] == "POST"
-    assert set(captured["body"]) == {"id", "version", "inventories", "last_activity"}
+    assert set(captured["body"]) == {"id", "version", "channel", "inventories", "last_activity"}
 
 
 def test_network_errors_are_swallowed(db, monkeypatch):
@@ -269,3 +269,12 @@ def test_about_stats_endpoint(monkeypatch, clean_about_cache):
     assert body["available"] is True
     assert body["active_installations"] == 12
     assert body["countries"][0] == {"country": "IT", "n": 9}
+
+
+def test_channel_defaults_and_validation(monkeypatch):
+    monkeypatch.delenv("IMAGE_CHANNEL", raising=False)
+    assert telemetry_service._channel() == "unknown"
+    monkeypatch.setenv("IMAGE_CHANNEL", "DEV")
+    assert telemetry_service._channel() == "dev"
+    monkeypatch.setenv("IMAGE_CHANNEL", "qualcosa")
+    assert telemetry_service._channel() == "unknown"

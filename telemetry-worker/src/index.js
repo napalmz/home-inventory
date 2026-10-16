@@ -66,11 +66,12 @@ async function handlePing(request, env) {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  const { id, version, inventories, last_activity: lastActivity } = body ?? {};
+  const { id, version, inventories, last_activity: lastActivity, channel = "unknown" } = body ?? {};
   if (typeof id !== "string" || !UUID_RE.test(id)) return new Response("Invalid id", { status: 400 });
   if (typeof version !== "string" || !VERSION_RE.test(version)) {
     return new Response("Invalid version", { status: 400 });
   }
+  if (!["release", "dev", "unknown"].includes(channel)) return new Response("Invalid channel", { status: 400 });
   if (!Number.isInteger(inventories) || inventories < 0 || inventories > MAX_INVENTORIES) {
     return new Response("Invalid inventories", { status: 400 });
   }
@@ -88,16 +89,17 @@ async function handlePing(request, env) {
   const now = new Date().toISOString();
 
   await env.DB.prepare(
-    `INSERT INTO installations (id, version, country, inventories, last_activity, first_seen, last_seen)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+    `INSERT INTO installations (id, version, country, inventories, last_activity, first_seen, last_seen, channel)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7)
      ON CONFLICT(id) DO UPDATE SET
        version = excluded.version,
+       channel = excluded.channel,
        country = excluded.country,
        inventories = excluded.inventories,
        last_activity = excluded.last_activity,
        last_seen = excluded.last_seen`,
   )
-    .bind(id.toLowerCase(), version, country, inventories, activity, now)
+    .bind(id.toLowerCase(), version, country, inventories, activity, now, channel)
     .run();
 
   return new Response(null, { status: 204 });
@@ -122,7 +124,7 @@ async function handleStats(request, env) {
   }
 
   const since = new Date(Date.now() - ACTIVE_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  const [total, active, byCountry, byVersion] = await Promise.all([
+  const [total, active, byCountry, byVersion, byChannel] = await Promise.all([
     env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(inventories), 0) AS inventories FROM installations").first(),
     env.DB.prepare("SELECT COUNT(*) AS n FROM installations WHERE last_seen >= ?1").bind(since).first(),
     env.DB.prepare(
@@ -135,6 +137,11 @@ async function handleStats(request, env) {
     )
       .bind(since)
       .all(),
+    env.DB.prepare(
+      "SELECT channel, COUNT(*) AS n FROM installations WHERE last_seen >= ?1 GROUP BY channel ORDER BY n DESC",
+    )
+      .bind(since)
+      .all(),
   ]);
 
   return json({
@@ -144,6 +151,7 @@ async function handleStats(request, env) {
     inventories_total: total.inventories,
     active_by_country: byCountry.results,
     active_by_version: byVersion.results,
+    active_by_channel: byChannel.results,
   });
 }
 

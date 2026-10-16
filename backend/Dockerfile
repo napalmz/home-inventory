@@ -42,6 +42,10 @@ EXPOSE 8000
 # Crea cartelle per i backup e imposta i permessi
 RUN mkdir -p /app/backups && chmod 777 /app/backups
 
+# Canale dell'immagine (release|dev), usato dalla telemetria opt-in
+ARG IMAGE_CHANNEL=release
+ENV IMAGE_CHANNEL=$IMAGE_CHANNEL
+
 # Comando per avviare l'API
 ENTRYPOINT ["/app/entrypoint.sh"]
 

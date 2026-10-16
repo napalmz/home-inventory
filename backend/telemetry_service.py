@@ -115,10 +115,16 @@ def _last_activity(db: Session) -> str | None:
     return max(latest).replace(tzinfo=timezone.utc).isoformat()
 
 
+def _channel() -> str:
+    channel = os.getenv("IMAGE_CHANNEL", "").strip().lower()
+    return channel if channel in ("release", "dev") else "unknown"
+
+
 def build_payload(db: Session) -> dict:
     return {
         "id": get_instance_id(db),
         "version": os.getenv("API_VERSION", "unknown"),
+        "channel": _channel(),
         "inventories": db.query(Inventory).filter(Inventory.type == "INVENTORY").count(),
         "last_activity": _last_activity(db),
     }

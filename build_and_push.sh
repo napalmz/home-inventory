@@ -84,7 +84,7 @@ ask_confirmation() {
 if ask_confirmation "Vuoi costruire l'immagine per Backend?"; then
   echo "Costruzione dell'immagine per Backend..."
   cd backend || { echo "Directory backend non trovata"; exit 1; }
-  docker buildx build --platform $PLATFORMS --build-arg BACKEND_VERSION=$BACKEND_VERSION \
+  docker buildx build --platform $PLATFORMS --build-arg BACKEND_VERSION=$BACKEND_VERSION --build-arg IMAGE_CHANNEL=$CHANNEL \
     -t $BACKEND_TAG_VERSION \
     -t $BACKEND_TAG_CHANNEL \
     -t $BACKEND_GHCR_TAG_VERSION \
