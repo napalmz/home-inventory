@@ -3,13 +3,11 @@ name: Publish Docker images
 on:
   push:
     branches: [main]
-    # Ignorato per i tag: un tag v* pubblica sempre
     paths:
       - "backend/**"
       - "frontend/**"
       - ".github/workflows/publish-images.yml"
       - "!**/*.md"
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       channel:
@@ -41,13 +39,13 @@ jobs:
           backend_version="$(grep '^API_VERSION=' backend/.env | cut -d '=' -f2)"
           frontend_version="$(node -p "require('./frontend/package.json').version")"
 
-          # Release solo da tag v* o da avvio manuale con canale "release"
-          if [[ "$GITHUB_REF" == refs/tags/* || "$INPUT_CHANNEL" == "release" ]]; then
-            suffix=""
-            channel="latest"
-          else
+          # Il push su main pubblica sempre la release; "dev" solo da avvio manuale
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$INPUT_CHANNEL" == "dev" ]]; then
             suffix="-dev"
             channel="dev"
+          else
+            suffix=""
+            channel="latest"
           fi
 
           echo "backend_tag=${backend_version}${suffix}" >> "$GITHUB_OUTPUT"
