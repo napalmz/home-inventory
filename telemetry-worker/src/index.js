@@ -17,7 +17,7 @@ const PUBLIC_CACHE = { "Cache-Control": "public, max-age=3600" };
 // Solo aggregati: nessun id, nessun dato per singola installazione.
 async function loadPublicStats(env) {
   const since = new Date(Date.now() - ACTIVE_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  const [active, byCountry, byVersion] = await Promise.all([
+  const [active, byCountry, byVersion, byChannel] = await Promise.all([
     env.DB.prepare("SELECT COUNT(*) AS n FROM installations WHERE last_seen >= ?1").bind(since).first(),
     env.DB.prepare(
       "SELECT country, COUNT(*) AS n FROM installations WHERE last_seen >= ?1 AND country != 'XX' GROUP BY country ORDER BY n DESC, country",
@@ -29,12 +29,18 @@ async function loadPublicStats(env) {
     )
       .bind(since)
       .all(),
+    env.DB.prepare(
+      "SELECT channel, COUNT(*) AS n FROM installations WHERE last_seen >= ?1 GROUP BY channel ORDER BY n DESC, channel",
+    )
+      .bind(since)
+      .all(),
   ]);
   return {
     active_installations: active.n,
     active_window_days: ACTIVE_DAYS,
     countries: byCountry.results,
     versions: byVersion.results,
+    channels: byChannel.results,
   };
 }
 
