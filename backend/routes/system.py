@@ -18,12 +18,17 @@ class VersionStat(BaseModel):
     version: str
     n: int
 
+class ChannelStat(BaseModel):
+    channel: str
+    n: int
+
 class AboutStatsResponse(BaseModel):
     available: bool
     active_installations: int | None = None
     active_window_days: int | None = None
     countries: list[CountryStat] = []
     versions: list[VersionStat] = []
+    channels: list[ChannelStat] = []
 
 ##################################################
 # Modello per la risposta della versione dell'API

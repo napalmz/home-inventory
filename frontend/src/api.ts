@@ -110,6 +110,7 @@ export interface AboutStats {
   active_window_days: number | null;
   countries: { country: string; n: number }[];
   versions: { version: string; n: number }[];
+  channels: { channel: string; n: number }[];
 }
 
 /* STATISTICHE AGGREGATE DELLA COMMUNITY (TAB ABOUT) */

@@ -66,7 +66,7 @@ La **nazione** non viene inviata dal backend: la ricava il server di ricezione (
 
 Il codice dell'endpoint di raccolta (Cloudflare Worker + D1) è in [telemetry-worker/](telemetry-worker/).
 
-La tab **About** nella barra laterale mostra le versioni dell'app e le statistiche aggregate della community (installazioni attive negli ultimi 30 giorni, nazioni e versioni in uso), lette dall'endpoint pubblico `/public-stats`. Si tratta di una semplice richiesta GET fatta dal backend, che non invia alcun dato dell'installazione e funziona anche con la telemetria disattivata. Per disattivare anche questa lettura imposta `ABOUT_STATS_ENABLED=false`.
+La tab **About** nella barra laterale mostra le versioni dell'app e le statistiche aggregate della community (installazioni attive negli ultimi 30 giorni, nazioni, versioni e canali release/dev in uso), lette dall'endpoint pubblico `/public-stats`. Si tratta di una semplice richiesta GET fatta dal backend, che non invia alcun dato dell'installazione e funziona anche con la telemetria disattivata. Per disattivare anche questa lettura imposta `ABOUT_STATS_ENABLED=false`.
 
 ### Pubblicazione immagini Docker
 
@@ -170,7 +170,7 @@ The **country** is not sent by the backend: the receiving server (Cloudflare) de
 
 The collection endpoint code (Cloudflare Worker + D1) is in [telemetry-worker/](telemetry-worker/).
 
-The **About** tab in the sidebar shows the app versions and aggregated community statistics (active installations in the last 30 days, countries and versions in use), read from the public `/public-stats` endpoint. This is a plain GET request made by the backend: it sends no installation data and works even when telemetry is disabled. To disable this read as well, set `ABOUT_STATS_ENABLED=false`.
+The **About** tab in the sidebar shows the app versions and aggregated community statistics (active installations in the last 30 days, countries, versions and release/dev channels in use), read from the public `/public-stats` endpoint. This is a plain GET request made by the backend: it sends no installation data and works even when telemetry is disabled. To disable this read as well, set `ABOUT_STATS_ENABLED=false`.
 
 ### Publishing Docker images
 

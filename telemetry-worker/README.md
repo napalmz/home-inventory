@@ -35,7 +35,7 @@ npx wrangler deploy
 |---|---|
 | `POST /ping` | Receives `id`, `version`, `inventories`, `last_activity`; validates them and updates one row per installation. The country comes from Cloudflare; the IP is never stored. |
 | `GET /stats` | Aggregated statistics (total/active installations, by country, by version). Requires `Authorization: Bearer <STATS_TOKEN>`; it does not exist until the secret is set. |
-| `GET /public-stats` | Public, aggregated and cached for 1 hour: active installations, countries and versions. No ids or per-installation data. Used by the app's About tab. |
+| `GET /public-stats` | Public, aggregated and cached for 1 hour: active installations, countries, versions and channels. No ids or per-installation data. Used by the app's About tab. |
 | `GET /badge/installations`, `/badge/countries`, `/badge/version` | Public [shields.io endpoint badges](https://shields.io/badges/endpoint-badge) for the GitHub README. |
 
 ```bash

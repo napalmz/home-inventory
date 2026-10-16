@@ -69,6 +69,19 @@ const AboutPage = () => {
               </div>
             )}
 
+            {stats.channels.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-1">Canali</h3>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
+                  {stats.channels.map((c) => (
+                    <li key={c.channel}>
+                      {c.channel}: {c.n}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {stats.versions.length > 0 && (
               <div>
                 <h3 className="font-semibold mb-1">Versioni in uso</h3>

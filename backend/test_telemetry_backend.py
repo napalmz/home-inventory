@@ -177,6 +177,7 @@ PUBLIC_STATS = {
     "active_window_days": 30,
     "countries": [{"country": "IT", "n": 9}, {"country": "DE", "n": 3}],
     "versions": [{"version": "1.4.0", "n": 10}, {"version": "1.3.1", "n": 2}],
+    "channels": [{"channel": "release", "n": 11}, {"channel": "dev", "n": 1}],
 }
 
 
@@ -262,12 +263,14 @@ def test_about_stats_endpoint(monkeypatch, clean_about_cache):
         "active_window_days": None,
         "countries": [],
         "versions": [],
+        "channels": [],
     }
 
     monkeypatch.setattr("routes.system.get_public_stats", lambda: PUBLIC_STATS)
     body = client.get("/system/about-stats").json()
     assert body["available"] is True
     assert body["active_installations"] == 12
+    assert body["channels"][1] == {"channel": "dev", "n": 1}
     assert body["countries"][0] == {"country": "IT", "n": 9}
 
 

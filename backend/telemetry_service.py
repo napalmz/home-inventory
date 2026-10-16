@@ -82,6 +82,8 @@ def get_public_stats() -> dict | None:
             "active_window_days": int(raw["active_window_days"]),
             "countries": [{"country": str(c["country"]), "n": int(c["n"])} for c in raw["countries"]],
             "versions": [{"version": str(v["version"]), "n": int(v["n"])} for v in raw["versions"]],
+            # assente nelle versioni precedenti del Worker
+            "channels": [{"channel": str(c["channel"]), "n": int(c["n"])} for c in raw.get("channels", [])],
         }
     except (urllib.error.URLError, TimeoutError, ValueError, OSError, KeyError, TypeError):
         logger.info("Statistiche pubbliche non disponibili.")
