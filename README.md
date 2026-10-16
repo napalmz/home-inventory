@@ -2,6 +2,12 @@
 
 [🇮🇹 Italiano](#-italiano) · [🇬🇧 English](#-english)
 
+<!-- Dopo il deploy del Worker (vedi telemetry-worker/README.md), sostituisci <WORKER_URL> e decommenta:
+![Active installations](https://img.shields.io/endpoint?url=https://<WORKER_URL>/badge/installations)
+![Countries](https://img.shields.io/endpoint?url=https://<WORKER_URL>/badge/countries)
+![Most used version](https://img.shields.io/endpoint?url=https://<WORKER_URL>/badge/version)
+-->
+
 ---
 
 ## 🇮🇹 Italiano
@@ -33,6 +39,35 @@ docker-compose up --build -d
 - Spuntando la riga, la quantità assegnata viene sottratta dalla giacenza. Se la giacenza non è sufficiente, puoi scegliere se azzerarla o annullare l'operazione.
 - Se deselezioni la riga entro 45 secondi, la giacenza viene ripristinata. Dopo 45 secondi, la giacenza non cambia e l'assegnazione torna attiva (utile per gli acquisti ricorrenti). Se riselezioni la riga entro 45 secondi dalla deselezione tardiva, l'operazione viene annullata senza sottrarre nuovamente la giacenza.
 - Negli inventari, ogni riga mostra la giacenza lorda e quella netta (giacenza lorda meno le assegnazioni non ancora spuntate).
+
+### Telemetria anonima (opt-in)
+
+La telemetria è **disattivata di default**: non viene inviato nulla finché non la attivi esplicitamente. Serve a stimare quante installazioni sono attive e con quali versioni.
+
+Per attivarla, imposta questa variabile d'ambiente del backend:
+
+```yaml
+TELEMETRY_ENABLED: "true"
+```
+
+I dati vengono inviati all'endpoint pubblico indicato in `DEFAULT_TELEMETRY_URL` in [telemetry_service.py](backend/telemetry_service.py). Chi ospita un proprio endpoint può sostituirlo con la variabile facoltativa `TELEMETRY_URL`.
+
+Per disattivarla, rimuovi `TELEMETRY_ENABLED` o impostala a `false`, poi riavvia il backend.
+
+Una volta al giorno (e poco dopo l'avvio) il backend invia un solo messaggio con:
+
+| Dato | Descrizione |
+|---|---|
+| `id` | Identificativo casuale (UUID) generato in locale al primo invio, non collegato a utenti o macchine |
+| `version` | Versione del backend |
+| `inventories` | Numero di inventari (le checklist non contano) |
+| `last_activity` | Data dell'ultima modifica a inventari o articoli |
+
+La **nazione** non viene inviata dal backend: la ricava il server di ricezione (Cloudflare) dalla richiesta, e l'indirizzo IP non viene salvato. Non vengono mai inviati nomi di inventari o articoli, utenti, password o altri contenuti. Se il server non è raggiungibile, l'invio fallisce in silenzio senza influire sull'app.
+
+Il codice dell'endpoint di raccolta (Cloudflare Worker + D1) è in [telemetry-worker/](telemetry-worker/).
+
+La tab **About** nella barra laterale mostra le versioni dell'app e le statistiche aggregate della community (installazioni attive negli ultimi 30 giorni, nazioni e versioni in uso), lette dall'endpoint pubblico `/public-stats`. Si tratta di una semplice richiesta GET fatta dal backend, che non invia alcun dato dell'installazione e funziona anche con la telemetria disattivata. Per disattivare anche questa lettura imposta `ABOUT_STATS_ENABLED=false`.
 
 ### Pubblicazione immagini Docker
 
@@ -107,6 +142,35 @@ docker-compose up --build -d
 - Checking the entry subtracts the assigned quantity from the stock. If there is not enough stock, you can choose to set it to zero or cancel the action.
 - Unchecking the entry within 45 seconds restores the stock. After 45 seconds, the stock remains unchanged and the assignment becomes active again (useful for recurring purchases). If you check the entry again within 45 seconds of a late uncheck, the action is cancelled without subtracting stock again.
 - Inventory entries show both gross and net stock (gross stock minus assignments that have not yet been checked off).
+
+### Anonymous telemetry (opt-in)
+
+Telemetry is **disabled by default**: nothing is sent until you explicitly enable it. It is used to estimate how many installations are active and which versions they run.
+
+To enable it, set this backend environment variable:
+
+```yaml
+TELEMETRY_ENABLED: "true"
+```
+
+Data is sent to the public endpoint defined by `DEFAULT_TELEMETRY_URL` in [telemetry_service.py](backend/telemetry_service.py). Anyone hosting their own endpoint can override it with the optional `TELEMETRY_URL` variable.
+
+To disable it, remove `TELEMETRY_ENABLED` or set it to `false`, then restart the backend.
+
+Once a day (and shortly after startup) the backend sends a single message with:
+
+| Field | Description |
+|---|---|
+| `id` | Random identifier (UUID) generated locally on the first send, not linked to users or machines |
+| `version` | Backend version |
+| `inventories` | Number of inventories (checklists are not counted) |
+| `last_activity` | Date of the last change to inventories or items |
+
+The **country** is not sent by the backend: the receiving server (Cloudflare) derives it from the request, and the IP address is not stored. Inventory or item names, users, passwords and any other content are never sent. If the server is unreachable, sending fails silently and does not affect the app.
+
+The collection endpoint code (Cloudflare Worker + D1) is in [telemetry-worker/](telemetry-worker/).
+
+The **About** tab in the sidebar shows the app versions and aggregated community statistics (active installations in the last 30 days, countries and versions in use), read from the public `/public-stats` endpoint. This is a plain GET request made by the backend: it sends no installation data and works even when telemetry is disabled. To disable this read as well, set `ABOUT_STATS_ENABLED=false`.
 
 ### Publishing Docker images
 

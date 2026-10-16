@@ -104,6 +104,20 @@ export async function getApiVersion(): Promise<{ version: string }> {
   return response.data;
 }
 
+export interface AboutStats {
+  available: boolean;
+  active_installations: number | null;
+  active_window_days: number | null;
+  countries: { country: string; n: number }[];
+  versions: { version: string; n: number }[];
+}
+
+/* STATISTICHE AGGREGATE DELLA COMMUNITY (TAB ABOUT) */
+export async function getAboutStats(): Promise<AboutStats> {
+  const response = await api.get<AboutStats>("/system/about-stats");
+  return response.data;
+}
+
 /* EFFETTUA LOGOUT */
 export async function logoutApi() {
   await api.post("/auth/logout")

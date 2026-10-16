@@ -4,7 +4,7 @@ import { Link, NavLink } from 'react-router-dom'
 import GlobalBarcodeScan from '../components/GlobalBarcodeScan'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
-import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser, FiSun, FiMoon, FiMonitor } from 'react-icons/fi'
+import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser, FiSun, FiMoon, FiMonitor, FiInfo } from 'react-icons/fi'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -171,6 +171,19 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               <span>Impostazioni</span>
             </NavLink>
           )}
+          <NavLink
+            to="/about"
+            onClick={() => window.innerWidth < 768 && toggleSidebar()}
+            className={({ isActive }) =>
+              `flex items-center gap-3 hover:text-blue-300 ` +
+              (isActive
+                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl px-4 py-3'
+                : 'px-4 py-3')
+            }
+          >
+            <FiInfo className="text-lg shrink-0" />
+            <span>About</span>
+          </NavLink>
         </nav>
 
         <div className="mt-6 border-t border-gray-600 pt-4">

@@ -7,6 +7,7 @@ import LoginPage         from './pages/LoginPage'
 import RegisterPage      from './pages/RegisterPage'
 import ProfilePage       from './pages/ProfilePage'
 import SettingsPage      from './pages/SettingsPage'
+import AboutPage         from './pages/AboutPage'
 import GenericListPage   from './pages/GenericListPage'
 import GenericDetailPage from './pages/GenericDetailPage'
 import EnvBadge          from './components/EnvBadge'
@@ -56,6 +57,7 @@ function App() {
       <Routes>
         <Route element={<SidebarLayout><Outlet /></SidebarLayout>}>
           <Route path="/" element={<WelcomePage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/inventories" element={
             <ProtectedRoute>
               <GenericListPage />{/* <InventoryListPage /> */}

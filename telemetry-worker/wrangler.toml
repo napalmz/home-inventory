@@ -1,0 +1,12 @@
+name = "home-inventory-telemetry"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "home-inventory-telemetry"
+# Sostituisci con l'ID restituito da: npx wrangler d1 create home-inventory-telemetry
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Opzionale: dominio personalizzato, per esempio telemetry.example.com
+# routes = [{ pattern = "telemetry.example.com", custom_domain = true }]

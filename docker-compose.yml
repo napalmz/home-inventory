@@ -26,6 +26,8 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: inventory
       FASTAPI_ROOT_PATH: /api
+      # Telemetria anonima opt-in (vedi README): decommenta per attivarla
+      # TELEMETRY_ENABLED: "true"
     volumes:
       - /home/napalmz/docker-conf/home-inventory/backups:/app/backups
     depends_on:
