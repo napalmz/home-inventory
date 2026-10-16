@@ -1,7 +1,8 @@
 # Usa un'immagine di base con Python
 FROM python:3.14.4-slim-bookworm
 
-LABEL org.opencontainers.image.source="https://github.com/napalmz/home-inventory"
+LABEL org.opencontainers.image.source="https://github.com/napalmz/home-inventory" \
+      org.opencontainers.image.description="Home Inventory backend: FastAPI API for the shared household inventory app."
 
 # Imposta le variabili d'ambiente
 ENV PYTHONDONTWRITEBYTECODE=1
