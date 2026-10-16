@@ -87,6 +87,10 @@ jobs:
             ghcr.io/napalmz/home-inventory-backend:${{ steps.meta.outputs.channel }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Home Inventory backend: FastAPI API for the shared household inventory app.
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.description=Home Inventory backend: FastAPI API for the shared household inventory app.
 
       - name: Build and push frontend
         uses: docker/build-push-action@v6
@@ -104,3 +108,7 @@ jobs:
             ghcr.io/napalmz/home-inventory-frontend:${{ steps.meta.outputs.channel }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Home Inventory frontend: React web app served by nginx for the shared household inventory app.
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.description=Home Inventory frontend: React web app served by nginx for the shared household inventory app.
