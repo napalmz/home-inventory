@@ -25,9 +25,9 @@ from models import Inventory, Item
 
 logger = logging.getLogger(__name__)
 
-# Endpoint pubblico di raccolta (es. https://<worker>.workers.dev/ping): da impostare dopo il deploy del Worker.
+# Endpoint pubblico di raccolta (Cloudflare Worker).
 # TELEMETRY_URL, se presente, ha la precedenza (endpoint personalizzato).
-DEFAULT_TELEMETRY_URL = ""
+DEFAULT_TELEMETRY_URL = "https://home-inventory-telemetry.nhws.workers.dev/ping"
 INSTANCE_ID_KEY = "TELEMETRY_INSTANCE_ID"
 HTTP_TIMEOUT_SECONDS = 5
 USER_AGENT = "home-inventory-telemetry/1.0 (https://github.com/napalmz/home-inventory)"

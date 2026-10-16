@@ -2,11 +2,9 @@
 
 [🇮🇹 Italiano](#-italiano) · [🇬🇧 English](#-english)
 
-<!-- Dopo il deploy del Worker (vedi telemetry-worker/README.md), sostituisci <WORKER_URL> e decommenta:
-![Active installations](https://img.shields.io/endpoint?url=https://<WORKER_URL>/badge/installations)
-![Countries](https://img.shields.io/endpoint?url=https://<WORKER_URL>/badge/countries)
-![Most used version](https://img.shields.io/endpoint?url=https://<WORKER_URL>/badge/version)
--->
+![Active installations](https://img.shields.io/endpoint?url=https://home-inventory-telemetry.nhws.workers.dev/badge/installations)
+![Countries](https://img.shields.io/endpoint?url=https://home-inventory-telemetry.nhws.workers.dev/badge/countries)
+![Most used version](https://img.shields.io/endpoint?url=https://home-inventory-telemetry.nhws.workers.dev/badge/version)
 
 ---
 
