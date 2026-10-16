@@ -3,6 +3,12 @@ name: Publish Docker images
 on:
   push:
     branches: [main]
+    # Ignorato per i tag: un tag v* pubblica sempre
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/publish-images.yml"
+      - "!**/*.md"
     tags: ["v*"]
   workflow_dispatch:
     inputs:
