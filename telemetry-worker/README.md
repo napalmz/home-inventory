@@ -11,6 +11,17 @@ cd telemetry-worker
 npx wrangler login
 npx wrangler d1 create home-inventory-telemetry   # copia database_id in wrangler.toml
 npx wrangler d1 execute home-inventory-telemetry --remote --file=schema.sql
+```
+
+**IT** — Se il database esiste già (creato prima del campo `channel`), applica la migrazione. **EN** — If the database already exists (created before the `channel` field), apply the migration:
+
+```bash
+npx wrangler d1 execute home-inventory-telemetry --remote --file=migrations/001_add_channel.sql
+```
+
+Deploy:
+
+```bash
 npx wrangler deploy
 ```
 

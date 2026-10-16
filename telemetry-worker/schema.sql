@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS installations (
   inventories   INTEGER NOT NULL,
   last_activity TEXT,
   first_seen    TEXT NOT NULL,
-  last_seen     TEXT NOT NULL
+  last_seen     TEXT NOT NULL,
+  channel       TEXT NOT NULL DEFAULT 'unknown'
 );
 
 CREATE INDEX IF NOT EXISTS idx_installations_last_seen ON installations (last_seen);
