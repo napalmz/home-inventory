@@ -1,6 +1,8 @@
 # Usa un'immagine di base con Python
 FROM python:3.14.4-slim-bookworm
 
+LABEL org.opencontainers.image.source="https://github.com/napalmz/home-inventory"
+
 # Imposta le variabili d'ambiente
 ENV PYTHONDONTWRITEBYTECODE=1
 
