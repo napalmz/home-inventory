@@ -44,9 +44,9 @@ Il workflow [publish-images.yml](.github/workflows/publish-images.yml) pubblica 
 
 | Evento | Tag pubblicati |
 |---|---|
-| Push su `main` | `dev` e `<versione>-dev` |
-| Push di un tag `v*` | `latest` e `<versione>` |
-| Avvio manuale (**Actions → Publish Docker images → Run workflow**) | canale scelto, da qualsiasi branch |
+| Push su `main` (solo se cambiano `backend/`, `frontend/` o il workflow; i file `.md` sono ignorati) | `latest` e `<versione>` |
+| Avvio manuale con canale `dev` (**Actions → Publish Docker images → Run workflow**, da qualsiasi branch) | `dev` e `<versione>-dev` |
+| Avvio manuale con canale `release` | `latest` e `<versione>` |
 
 Le versioni sono lette da `API_VERSION` in `backend/.env` e da `version` in `frontend/package.json`.
 
@@ -118,9 +118,9 @@ The [publish-images.yml](.github/workflows/publish-images.yml) workflow publishe
 
 | Event | Published tags |
 |---|---|
-| Push to `main` | `dev` and `<version>-dev` |
-| Push of a `v*` tag | `latest` and `<version>` |
-| Manual run (**Actions → Publish Docker images → Run workflow**) | selected channel, from any branch |
+| Push to `main` (only if `backend/`, `frontend/` or the workflow change; `.md` files are ignored) | `latest` and `<version>` |
+| Manual run with `dev` channel (**Actions → Publish Docker images → Run workflow**, from any branch) | `dev` and `<version>-dev` |
+| Manual run with `release` channel | `latest` and `<version>` |
 
 Versions are read from `API_VERSION` in `backend/.env` and `version` in `frontend/package.json`.
 
