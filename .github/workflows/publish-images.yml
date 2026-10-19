@@ -80,6 +80,8 @@ jobs:
           push: true
           build-args: |
             BACKEND_VERSION=${{ steps.meta.outputs.backend_tag }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
           tags: |
             napalmzrpi/home-inventory-backend:${{ steps.meta.outputs.backend_tag }}
             napalmzrpi/home-inventory-backend:${{ steps.meta.outputs.channel }}
@@ -101,6 +103,8 @@ jobs:
           push: true
           build-args: |
             FRONTEND_VERSION=${{ steps.meta.outputs.frontend_tag }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
           tags: |
             napalmzrpi/home-inventory-frontend:${{ steps.meta.outputs.frontend_tag }}
             napalmzrpi/home-inventory-frontend:${{ steps.meta.outputs.channel }}
