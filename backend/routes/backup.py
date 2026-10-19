@@ -88,6 +88,24 @@ class BackupBulkDeleteRequest(BaseModel):
     filenames: list[str]
 
 
+def _safe_backup_path(filename: str) -> Path:
+    """Valida e sanitizza il nome file di backup per prevenire vulnerabilità di Path Traversal."""
+    if not filename or filename.startswith(".") or "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Nome file non valido: tentato path traversal")
+    if not filename.endswith(".sql"):
+        raise HTTPException(status_code=400, detail="Formato file non valido. Solo file .sql ammessi")
+
+    backup_dir_resolved = BACKUP_DIR.resolve()
+    file_path = (BACKUP_DIR / filename).resolve()
+
+    try:
+        file_path.relative_to(backup_dir_resolved)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Percorso file non valido")
+
+    return file_path
+
+
 def _backup_meta_path(file_path: Path) -> Path:
     return file_path.parent / f"{file_path.name}.meta.json"
 
@@ -532,30 +550,27 @@ def get_backup_compatibility_map():
 
 @router.get("/download/{filename}")
 def download_backup(filename: str):
-    file_path = BACKUP_DIR / filename
+    file_path = _safe_backup_path(filename)
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File non trovato")
-    return FileResponse(path=file_path, filename=filename, media_type='application/octet-stream')
+    return FileResponse(path=file_path, filename=file_path.name, media_type='application/octet-stream')
 
 @router.delete("/delete/{filename}")
 def delete_backup(filename: str, confirm: bool = Body(...)):
     if not confirm:
         raise HTTPException(status_code=400, detail="Cancellazione non confermata")
 
-    if not filename.endswith(".sql"):
-        raise HTTPException(status_code=400, detail="Formato file non valido per cancellazione")
-
-    file_path = BACKUP_DIR / filename
+    file_path = _safe_backup_path(filename)
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File non trovato")
 
     try:
-        logger.info(f"Cancellazione avviata per il file: {filename}")
+        logger.info(f"Cancellazione avviata per il file: {file_path.name}")
         file_path.unlink()
         meta_path = _backup_meta_path(file_path)
         if meta_path.exists():
             meta_path.unlink()
-        logger.info(f"Cancellazione completata per il file: {filename}")
+        logger.info(f"Cancellazione completata per il file: {file_path.name}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore durante la cancellazione: {str(e)}")
 
@@ -574,11 +589,12 @@ def delete_backups_bulk(payload: BackupBulkDeleteRequest):
     invalid: list[str] = []
 
     for filename in payload.filenames:
-        if not filename.endswith(".sql"):
+        try:
+            file_path = _safe_backup_path(filename)
+        except HTTPException:
             invalid.append(filename)
             continue
 
-        file_path = BACKUP_DIR / filename
         if not file_path.exists():
             missing.append(filename)
             continue
@@ -605,10 +621,7 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
     if not payload.confirm:
         raise HTTPException(status_code=400, detail="Restore non confermato")
 
-    if not filename.endswith(".sql"):
-        raise HTTPException(status_code=400, detail="Formato file non valido per restore")
-
-    file_path = BACKUP_DIR / filename
+    file_path = _safe_backup_path(filename)
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File non trovato")
 
@@ -732,19 +745,19 @@ def restore_backup(filename: str, payload: RestoreRequest = Body(...)):
 
 @router.post("/upload")
 def upload_backup(file: UploadFile = File(...)):
-    if not file.filename or not file.filename.endswith(".sql"):
-        raise HTTPException(status_code=400, detail="Formato file non valido. Sono ammessi solo file .sql.")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Nome file non fornito.")
 
-    file_path = BACKUP_DIR / file.filename
+    file_path = _safe_backup_path(file.filename)
 
     try:
         with open(file_path, "wb") as buffer:
             buffer.write(file.file.read())
-        logger.info(f"File di backup caricato: {file.filename}")
+        logger.info(f"File di backup caricato: {file_path.name}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore durante il caricamento del file: {str(e)}")
 
-    return {"message": "Backup caricato correttamente", "filename": file.filename}
+    return {"message": "Backup caricato correttamente", "filename": file_path.name}
 
 @router.get("/schedule")
 def get_backup_schedule(db: Session = Depends(get_db)):
