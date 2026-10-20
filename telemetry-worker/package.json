@@ -2,6 +2,9 @@
   "name": "home-inventory-telemetry",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "wrangler build",
     "deploy": "wrangler deploy"
