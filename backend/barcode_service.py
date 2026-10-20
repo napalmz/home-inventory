@@ -22,6 +22,9 @@ LOOKUP_SOURCES = [
 # Libri (ISBN-13 978/979): Open Library. Per i farmaci non esiste un'API pubblica per codice
 # (AIFA pubblica solo open data scaricabili), quindi restano riconosciuti ma senza anagrafica dedicata.
 BOOK_SOURCE = ("openlibrary", "https://openlibrary.org")
+# Fallback per i libri non presenti su Open Library (es. editoria italiana). La chiave e' opzionale,
+# ma senza chiave la quota giornaliera condivisa di Google e' spesso esaurita (errore, mai cache negativa).
+GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
 USER_AGENT = "home-inventory/1.0 (https://github.com/napalmz/home-inventory)"
 HTTP_TIMEOUT_SECONDS = 4
 CACHE_TTL_FOUND = timedelta(days=30)
@@ -137,10 +140,41 @@ def _fetch_book(base_url: str, code: str) -> tuple[str, Optional[dict]]:
     }
 
 
+def _fetch_google_book(code: str) -> tuple[str, Optional[dict]]:
+    """Come _fetch_book, ma da Google Books."""
+    params = {"q": f"isbn:{code}", "maxResults": "1"}
+    api_key = os.getenv("GOOGLE_BOOKS_API_KEY", "").strip()
+    if api_key:
+        params["key"] = api_key
+    url = f"{GOOGLE_BOOKS_URL}?{urllib.parse.urlencode(params)}"
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        return ("missing", None) if exc.code == 404 else ("error", None)
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return "error", None
+    items = payload.get("items") if isinstance(payload, dict) else None
+    info = (items[0].get("volumeInfo") if items else None) or {}
+    if not info.get("title"):
+        return "missing", None
+    title = info["title"]
+    if info.get("subtitle"):
+        title = f"{title}: {info['subtitle']}"
+    thumb = (info.get("imageLinks") or {}).get("smallThumbnail")
+    return "found", {
+        "product_name": title,
+        "brands": " & ".join(info.get("authors") or []),
+        "quantity": info.get("publisher"),
+        "image_front_small_url": thumb.replace("http://", "https://", 1) if thumb else None,
+    }
+
+
 def _sources_for(code: str) -> list[tuple[str, Callable[[str], tuple[str, Optional[dict]]]]]:
     if is_isbn13(code):
         name, base_url = BOOK_SOURCE
-        return [(name, lambda c: _fetch_book(base_url, c))]
+        return [(name, lambda c: _fetch_book(base_url, c)), ("googlebooks", _fetch_google_book)]
     return [(name, lambda c, u=base_url: _fetch_product(u, c)) for name, base_url in LOOKUP_SOURCES]
 
 

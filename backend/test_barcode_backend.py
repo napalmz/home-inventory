@@ -267,3 +267,51 @@ def test_fetch_book_maps_open_library_payload(monkeypatch):
     }
     monkeypatch.setattr(barcode_service.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(b"{}"))
     assert barcode_service._fetch_book("https://openlibrary.org", "9780140328721") == ("missing", None)
+
+
+def test_book_lookup_falls_back_to_google_books(ctx, monkeypatch):
+    client = ctx["client"]
+    monkeypatch.setattr(barcode_service, "_fetch_book", lambda b, c: ("missing", None))
+    monkeypatch.setattr(
+        barcode_service, "_fetch_google_book",
+        lambda c: ("found", {"product_name": "Libro IT", "brands": "Autore", "quantity": "Editore"}),
+    )
+    data = client.get("/barcode/lookup", params={"code": "9788893094955"}).json()
+    assert data["product"]["name"] == "Libro IT"
+    assert data["product"]["source"] == "googlebooks"
+
+
+def test_book_lookup_google_error_is_not_negative_cached(ctx, monkeypatch):
+    client = ctx["client"]
+    monkeypatch.setattr(barcode_service, "_fetch_book", lambda b, c: ("missing", None))
+    monkeypatch.setattr(barcode_service, "_fetch_google_book", lambda c: ("error", None))
+    code = "9788893094955"
+    assert client.get("/barcode/lookup", params={"code": code}).json()["product"] is None
+    assert ctx["db"].get(BarcodeProductCache, code) is None
+
+
+def test_fetch_google_book_maps_payload(monkeypatch):
+    import io
+    import json
+
+    payload = {"items": [{"volumeInfo": {
+        "title": "Titolo", "subtitle": "sotto", "authors": ["A", "B"], "publisher": "Ed",
+        "imageLinks": {"smallThumbnail": "http://x/t.jpg"},
+    }}]}
+    seen = {}
+
+    def fake_urlopen(request, **kwargs):
+        seen["url"] = request.full_url
+        return io.BytesIO(json.dumps(payload).encode())
+
+    monkeypatch.setenv("GOOGLE_BOOKS_API_KEY", "k123")
+    monkeypatch.setattr(barcode_service.urllib.request, "urlopen", fake_urlopen)
+    outcome, book = barcode_service._fetch_google_book("9788893094955")
+    assert outcome == "found"
+    assert "isbn%3A9788893094955" in seen["url"] and "key=k123" in seen["url"]
+    assert book == {
+        "product_name": "Titolo: sotto", "brands": "A & B", "quantity": "Ed",
+        "image_front_small_url": "https://x/t.jpg",
+    }
+    monkeypatch.setattr(barcode_service.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(b"{}"))
+    assert barcode_service._fetch_google_book("9788893094955") == ("missing", None)
