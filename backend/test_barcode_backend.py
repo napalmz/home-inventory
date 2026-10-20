@@ -202,3 +202,68 @@ def test_external_lookup_skipped_for_non_gtin_and_when_disabled(ctx, monkeypatch
     assert client.get("/barcode/lookup", params={"code": "QR-XYZ"}).json()["product"] is None
     monkeypatch.setenv("BARCODE_LOOKUP_ENABLED", "false")
     assert client.get("/barcode/lookup", params={"code": "4006381333931"}).json()["product"] is None
+
+
+def test_isbn_normalization():
+    assert normalize_code("0-14-032872-6") == "9780140328721"
+    assert normalize_code("0140328726") == "9780140328721"
+    assert normalize_code("978-0-14-032872-1") == "9780140328721"
+    assert normalize_code("080442957X") == "9780804429573"
+    # 10 cifre con checksum ISBN errato: resta invariato
+    assert normalize_code("0140328727") == "0140328727"
+
+
+def test_pharma_codes():
+    gtin13 = "8033784590018"
+    assert is_valid_gtin(gtin13)
+    datamatrix = f"0{gtin13}" "17270630" "10LOT42" "\x1d" "21SERIAL123"
+    assert normalize_code("01" + datamatrix[:14] + datamatrix[14:]) == gtin13
+    assert normalize_code("]d2" + "01" + datamatrix[:14] + datamatrix[14:]) == gtin13
+    # il solo GTIN con AI 01, senza altri dati, non e' un DataMatrix e resta com'e'
+    assert normalize_code("01" + f"0{gtin13}") == "01" + f"0{gtin13}"
+    # AIC a 9 cifre invariato
+    assert normalize_code("024402051") == "024402051"
+
+
+def test_book_lookup_uses_open_library(ctx, monkeypatch):
+    client = ctx["client"]
+    calls = []
+
+    def fake_book(base_url, code):
+        calls.append(code)
+        return "found", {"product_name": "Fantastic Mr. Fox", "brands": "Roald Dahl", "quantity": "Puffin"}
+
+    def boom(*args):
+        raise AssertionError("Open * Facts non va interrogato per gli ISBN")
+
+    monkeypatch.setattr(barcode_service, "_fetch_book", fake_book)
+    monkeypatch.setattr(barcode_service, "_fetch_product", boom)
+    data = client.get("/barcode/lookup", params={"code": "0140328726"}).json()
+    assert data["code"] == "9780140328721"
+    assert data["product"]["name"] == "Fantastic Mr. Fox"
+    assert data["product"]["brand"] == "Roald Dahl"
+    assert data["product"]["source"] == "openlibrary"
+    assert calls == ["9780140328721"]
+
+
+def test_fetch_book_maps_open_library_payload(monkeypatch):
+    import io
+    import json
+
+    payload = {"ISBN:9780140328721": {
+        "title": "Fantastic Mr. Fox", "subtitle": "una storia",
+        "authors": [{"name": "Roald Dahl"}, {"name": "Q. Blake"}],
+        "publishers": [{"name": "Puffin"}], "cover": {"small": "http://x/s.jpg"},
+    }}
+    monkeypatch.setattr(
+        barcode_service.urllib.request, "urlopen",
+        lambda *a, **k: io.BytesIO(json.dumps(payload).encode()),
+    )
+    outcome, book = barcode_service._fetch_book("https://openlibrary.org", "9780140328721")
+    assert outcome == "found"
+    assert book == {
+        "product_name": "Fantastic Mr. Fox: una storia", "brands": "Roald Dahl & Q. Blake",
+        "quantity": "Puffin", "image_front_small_url": "http://x/s.jpg",
+    }
+    monkeypatch.setattr(barcode_service.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(b"{}"))
+    assert barcode_service._fetch_book("https://openlibrary.org", "9780140328721") == ("missing", None)

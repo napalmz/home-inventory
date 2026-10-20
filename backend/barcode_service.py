@@ -5,7 +5,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,9 @@ LOOKUP_SOURCES = [
     ("openpetfoodfacts", "https://world.openpetfoodfacts.org"),
     ("openproductsfacts", "https://world.openproductsfacts.org"),
 ]
+# Libri (ISBN-13 978/979): Open Library. Per i farmaci non esiste un'API pubblica per codice
+# (AIFA pubblica solo open data scaricabili), quindi restano riconosciuti ma senza anagrafica dedicata.
+BOOK_SOURCE = ("openlibrary", "https://openlibrary.org")
 USER_AGENT = "home-inventory/1.0 (https://github.com/napalmz/home-inventory)"
 HTTP_TIMEOUT_SECONDS = 4
 CACHE_TTL_FOUND = timedelta(days=30)
@@ -29,14 +32,45 @@ def lookup_enabled() -> bool:
     return os.getenv("BARCODE_LOOKUP_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
 
 
+# DataMatrix GS1 dei farmaci: "01" + GTIN-14 seguito da scadenza (17), lotto (10), seriale (21)...
+_GS1_GTIN_RE = re.compile(r"^(?:\]d2)?01(\d{14})(?=.)", re.DOTALL)
+
+
+def is_valid_isbn10(code: str) -> bool:
+    if not re.fullmatch(r"\d{9}[\dXx]", code):
+        return False
+    total = sum((10 - i) * (10 if c in "Xx" else int(c)) for i, c in enumerate(code))
+    return total % 11 == 0
+
+
+def isbn10_to_isbn13(code: str) -> str:
+    body = "978" + code[:9]
+    check = (10 - sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(body)) % 10) % 10
+    return body + str(check)
+
+
+def is_isbn13(code: str) -> bool:
+    return len(code) == 13 and code.startswith(("978", "979")) and is_valid_gtin(code)
+
+
 def normalize_code(raw: str) -> str:
     """Normalizza un codice scansionato.
 
     I codici numerici perdono spazi; gli UPC-A (12 cifre) diventano EAN-13 con zero
     iniziale, cosi' la stessa etichetta letta da scanner diversi coincide.
-    I codici non numerici (QR, Code128 alfanumerici) vengono solo ripuliti.
+    Gli ISBN-10 (anche con trattini) diventano ISBN-13; dal DataMatrix GS1 dei farmaci
+    si estrae il GTIN. I codici non numerici (QR, Code128 alfanumerici) vengono solo ripuliti.
     """
     code = (raw or "").strip()
+    gs1 = _GS1_GTIN_RE.match(code)
+    if gs1 and is_valid_gtin(gs1.group(1)):
+        gtin = gs1.group(1)
+        return gtin[1:] if gtin.startswith("0") else gtin
+    isbn = re.sub(r"[\s-]", "", code)
+    if is_valid_isbn10(isbn):
+        return isbn10_to_isbn13(isbn)
+    if re.fullmatch(r"97[89]\d{10}", isbn) and is_valid_gtin(isbn):
+        return isbn
     compact = re.sub(r"\s+", "", code)
     if compact.isdigit():
         return "0" + compact if len(compact) == 12 else compact
@@ -74,6 +108,42 @@ def _fetch_product(base_url: str, code: str) -> tuple[str, Optional[dict]]:
     return ("found", product) if product else ("missing", None)
 
 
+def _fetch_book(base_url: str, code: str) -> tuple[str, Optional[dict]]:
+    """Come _fetch_product, ma da Open Library; il risultato usa le chiavi di Open * Facts."""
+    key = f"ISBN:{code}"
+    url = f"{base_url}/api/books?bibkeys={urllib.parse.quote(key)}&format=json&jscmd=data"
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        return ("missing", None) if exc.code == 404 else ("error", None)
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return "error", None
+    book = payload.get(key) if isinstance(payload, dict) else None
+    if not book or not book.get("title"):
+        return "missing", None
+    title = book["title"]
+    if book.get("subtitle"):
+        title = f"{title}: {book['subtitle']}"
+    authors = " & ".join(a["name"] for a in book.get("authors", []) if a.get("name"))
+    publishers = book.get("publishers") or []
+    cover = book.get("cover") or {}
+    return "found", {
+        "product_name": title,
+        "brands": authors,
+        "quantity": publishers[0].get("name") if publishers else None,
+        "image_front_small_url": cover.get("small"),
+    }
+
+
+def _sources_for(code: str) -> list[tuple[str, Callable[[str], tuple[str, Optional[dict]]]]]:
+    if is_isbn13(code):
+        name, base_url = BOOK_SOURCE
+        return [(name, lambda c: _fetch_book(base_url, c))]
+    return [(name, lambda c, u=base_url: _fetch_product(u, c)) for name, base_url in LOOKUP_SOURCES]
+
+
 def lookup_product(db: Session, code: str) -> Optional[BarcodeProductCache]:
     """Restituisce la riga di cache (found=True) oppure None. Non solleva mai per errori di rete."""
     if not lookup_enabled() or not is_valid_gtin(code):
@@ -89,8 +159,8 @@ def lookup_product(db: Session, code: str) -> Optional[BarcodeProductCache]:
     found_product = None
     found_source = None
     all_missing = True
-    for source, base_url in LOOKUP_SOURCES:
-        outcome, product = _fetch_product(base_url, code)
+    for source, fetch in _sources_for(code):
+        outcome, product = fetch(code)
         if outcome == "found":
             found_product, found_source = product, source
             break
