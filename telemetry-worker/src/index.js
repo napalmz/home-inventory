@@ -96,7 +96,7 @@ async function handlePing(request, env) {
 
   await env.DB.prepare(
     `INSERT INTO installations (id, version, country, inventories, last_activity, first_seen, last_seen, channel)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
      ON CONFLICT(id) DO UPDATE SET
        version = excluded.version,
        channel = excluded.channel,
@@ -105,7 +105,7 @@ async function handlePing(request, env) {
        last_activity = excluded.last_activity,
        last_seen = excluded.last_seen`,
   )
-    .bind(id.toLowerCase(), version, country, inventories, activity, now, channel)
+    .bind(id.toLowerCase(), version, country, inventories, activity, now, now, channel)
     .run();
 
   return new Response(null, { status: 204 });
