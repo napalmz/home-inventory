@@ -6,7 +6,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "wrangler build",
+    "build": "node -c src/index.js",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
