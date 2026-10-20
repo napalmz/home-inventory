@@ -171,9 +171,10 @@ def assign_role(user_id: int, role_id: int, db: Session = Depends(get_db)):
     return schemas.UserResponse.model_validate(user)  # ✅ Converti SQLAlchemy → Pydantic
 
 # Blocco/sblocco utente
-@router.patch("/users/{user_id}/block", response_model=schemas.UserResponse)
+@router.patch("/users/{user_id}/block", response_model=dict)
 def block_user(user_id: int,
-               db: Session = Depends(get_db)
+               db: Session = Depends(get_db),
+               current_user: User = Depends(role_required(RoleEnum.admin))
 ):
     user = db.query(User).filter(User.id == user_id).first()
     
@@ -181,8 +182,7 @@ def block_user(user_id: int,
         raise HTTPException(status_code=404, detail="Utente non trovato")
 
     # ✅ Previene auto-blocco
-    admin = role_required(RoleEnum.admin)
-    if user.id == admin.id:
+    if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="Non puoi bloccare te stesso!")
 
     user.is_blocked = not user.is_blocked  # ✅ Inverte lo stato
@@ -190,7 +190,7 @@ def block_user(user_id: int,
     db.refresh(user)
     
     status_text = "bloccato" if user.is_blocked else "sbloccato"
-    return {"message": f"Utente {user.username} {status_text}", "user": user}
+    return {"message": f"Utente {user.username} {status_text}", "user": schemas.UserResponse.model_validate(user)}
 
 @router.get("/users/shareable/{inventory_id}", response_model=List[schemas.UserResponse])
 def get_shareable_users(inventory_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

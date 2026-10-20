@@ -81,6 +81,9 @@ def login(
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenziali non valide")
+
+    if user.is_blocked:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Utente bloccato. Accesso negato.")
     
     token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
@@ -131,7 +134,7 @@ def get_current_user_info(request: Request, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.username == username).first()
 
-    if not user:
+    if not user or user.is_blocked:
         return {
             "id": None,
             "username": None,
