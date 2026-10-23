@@ -281,3 +281,25 @@ def test_can_demote_admin_when_second_admin_exists():
     )
     assert response.status_code == 200
     assert response.json()["new_role"] == "viewer"
+def test_blocked_user_update_me_fails():
+    db = TestingSessionLocal()
+    viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
+    blocked_user = User(
+        username="blocked_user_update",
+        email="old@example.com",
+        hashed_password=hash_password("password123"),
+        role_id=viewer_role.id,
+        is_blocked=True
+    )
+    db.add(blocked_user)
+    db.commit()
+    db.close()
+
+    token = create_access_token({"sub": "blocked_user_update"})
+    response = client.put(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"email": "new@example.com"}
+    )
+    assert response.status_code == 403
+    assert "bloccato" in response.json()["detail"].lower()
