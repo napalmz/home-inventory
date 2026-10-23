@@ -170,3 +170,136 @@ def test_non_admin_cannot_block_user():
         headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 403
+
+def test_cannot_demote_last_admin_via_update_user():
+    login_res = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "adminpassword"}
+    )
+    token = login_res.json()["access_token"]
+
+    db = TestingSessionLocal()
+    admin_user = db.query(User).filter(User.username == "admin").first()
+    viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
+    admin_id = admin_user.id
+    viewer_role_id = viewer_role.id
+    db.close()
+
+    response = client.put(
+        f"/user/users/{admin_id}",
+        json={"username": "admin", "role_id": viewer_role_id},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
+    assert "ultimo utente admin attivo" in response.json()["detail"].lower()
+
+def test_cannot_block_last_admin_via_update_user():
+    login_res = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "adminpassword"}
+    )
+    token = login_res.json()["access_token"]
+
+    db = TestingSessionLocal()
+    admin_user = db.query(User).filter(User.username == "admin").first()
+    admin_role = db.query(Role).filter(Role.name == RoleEnum.admin.value).first()
+    admin_id = admin_user.id
+    admin_role_id = admin_role.id
+    db.close()
+
+    response = client.put(
+        f"/user/users/{admin_id}",
+        json={"username": "admin", "role_id": admin_role_id, "is_blocked": True},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
+    assert "ultimo utente admin attivo" in response.json()["detail"].lower()
+
+def test_cannot_demote_last_admin_via_admin_update_role():
+    login_res = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "adminpassword"}
+    )
+    token = login_res.json()["access_token"]
+
+    db = TestingSessionLocal()
+    admin_user = db.query(User).filter(User.username == "admin").first()
+    admin_id = admin_user.id
+    db.close()
+
+    response = client.put(
+        f"/admin/users/{admin_id}/role/?new_role=viewer",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
+    assert "ultimo utente admin attivo" in response.json()["detail"].lower()
+
+def test_cannot_demote_last_admin_via_assign_role():
+    login_res = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "adminpassword"}
+    )
+    token = login_res.json()["access_token"]
+
+    db = TestingSessionLocal()
+    admin_user = db.query(User).filter(User.username == "admin").first()
+    viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
+    admin_id = admin_user.id
+    viewer_role_id = viewer_role.id
+    db.close()
+
+    response = client.post(
+        f"/user/users/{admin_id}/role/{viewer_role_id}",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
+    assert "ultimo utente admin attivo" in response.json()["detail"].lower()
+
+def test_can_demote_admin_when_second_admin_exists():
+    db = TestingSessionLocal()
+    admin_role = db.query(Role).filter(Role.name == RoleEnum.admin.value).first()
+    second_admin = User(
+        username="admin2",
+        hashed_password=hash_password("password123"),
+        role_id=admin_role.id,
+        is_blocked=False
+    )
+    db.add(second_admin)
+    db.commit()
+    second_admin_id = second_admin.id
+    db.close()
+
+    login_res = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "adminpassword"}
+    )
+    token = login_res.json()["access_token"]
+
+    response = client.put(
+        f"/admin/users/{second_admin_id}/role/?new_role=viewer",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["new_role"] == "viewer"
+def test_blocked_user_update_me_fails():
+    db = TestingSessionLocal()
+    viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
+    blocked_user = User(
+        username="blocked_user_update",
+        email="old@example.com",
+        hashed_password=hash_password("password123"),
+        role_id=viewer_role.id,
+        is_blocked=True
+    )
+    db.add(blocked_user)
+    db.commit()
+    db.close()
+
+    token = create_access_token({"sub": "blocked_user_update"})
+    response = client.put(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"email": "new@example.com"}
+    )
+    assert response.status_code == 403
+    assert "bloccato" in response.json()["detail"].lower()

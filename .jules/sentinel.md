@@ -9,3 +9,8 @@
 **Vulnerability:** Blocked users (`is_blocked = True`) were issued valid JWT access tokens upon logging in via `/auth/login` and could query `/auth/me`. Additionally, `/user/users/{user_id}/block` called `role_required(RoleEnum.admin).id`, causing an `AttributeError` at runtime and preventing self-blocking validation.
 **Learning:** Checking `is_blocked` only inside a generic `get_current_user` dependency leaves unauthenticated or custom auth endpoints (`/login`, `/me`) vulnerable if they do not explicitly check user block status or use `get_current_user`.
 **Prevention:** Always check `user.is_blocked` during primary login authentication and profile queries, and use `Depends(role_required(RoleEnum.admin))` directly to obtain current user info in admin endpoints.
+
+## 2025-05-19 - Administrative Lockout via Unchecked Last-Admin Role Demotion or Blocking
+**Vulnerability:** User role update (`PUT /user/users/{user_id}`, `PUT /admin/users/{user_id}/role/`, `POST /user/users/{user_id}/role/{role_id}`) and user blocking endpoints allowed demoting or blocking the last active enabled administrator. This created a denial-of-administration scenario where 0 active admins remained.
+**Learning:** Endpoints that mutate user roles or status must check total system active admin count before permitting changes that revoke admin access.
+**Prevention:** Always validate that at least one active, unblocked admin user remains before executing role demotion, account blocking, or deletion operations.
