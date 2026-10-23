@@ -9,7 +9,7 @@ from dependencies import get_db, role_required
 
 load_dotenv()
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(role_required(RoleEnum.admin))])
 
 #################################################
 # Modello per la gestione delle impostazioni
@@ -19,7 +19,7 @@ class SettingUpdate(BaseModel):
 
 #################################################
 # Endpoint per impostare e leggere le impostazioni
-@router.post("/settings", dependencies=[Depends(role_required(RoleEnum.admin))])
+@router.post("/settings")
 def update_setting(data: SettingUpdate, db: Session = Depends(get_db)):
     crud_settings.set_setting(db, data.key, data.value)
     return {"message": f"Impostazione {data.key} aggiornata"}
@@ -29,12 +29,12 @@ def read_setting(key: str, db: Session = Depends(get_db)):
     setting = crud_settings.get_setting(db, key)
     return setting
 
-@router.get("/settings", dependencies=[Depends(role_required(RoleEnum.admin))])
+@router.get("/settings")
 def list_settings(db: Session = Depends(get_db)):
     settings = crud_settings.get_all_settings(db)
     return settings
 
-@router.delete("/settings/{key}", dependencies=[Depends(role_required(RoleEnum.admin))])
+@router.delete("/settings/{key}")
 def delete_setting(key: str, db: Session = Depends(get_db)):
     setting = crud_settings.get_setting(db, key)
     if setting.protected:
