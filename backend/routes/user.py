@@ -9,6 +9,20 @@ from typing import List
 
 router = APIRouter(dependencies=[Depends(role_required(RoleEnum.admin))])
 
+def ensure_not_last_active_admin(db: Session, user: User) -> None:
+    """Verifica che l'utente non sia l'ultimo amministratore attivo e abilitato nel sistema."""
+    if user.role and user.role.name == "admin" and not user.is_blocked:
+        active_admins = db.query(User).join(User.role).filter(
+            User.is_blocked == False,
+            Role.name == "admin",
+            User.id != user.id
+        ).count()
+        if active_admins == 0:
+            raise HTTPException(
+                status_code=403,
+                detail="Impossibile disabilitare o rimuovere il ruolo all'ultimo utente ADMIN attivo"
+            )
+
 #############################################################################
 # Creazione utente
 @router.post("/users/", response_model=schemas.UserResponse)
@@ -35,11 +49,15 @@ def update_user(user_id: int, update: schemas.UserUpdate, db: Session = Depends(
     if update.email is not None:
         user.email = update.email
     if update.is_blocked is not None:
+        if update.is_blocked:
+            ensure_not_last_active_admin(db, user)
         user.is_blocked = update.is_blocked
     if update.role_id is not None:
         role = db.query(Role).filter(Role.id == update.role_id).first()
         if not role:
             raise HTTPException(status_code=404, detail="Ruolo non trovato")
+        if role.name != "admin":
+            ensure_not_last_active_admin(db, user)
         user.role_id = update.role_id
 
     db.commit()
@@ -165,9 +183,17 @@ def remove_user_from_group(group_id: int, user_id: int, db: Session = Depends(ge
 # Assegnazione ruolo a utente
 @router.post("/users/{user_id}/role/{role_id}")
 def assign_role(user_id: int, role_id: int, db: Session = Depends(get_db)):
-    user = crud.assign_role_to_user(db, user_id, role_id)
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    role = db.query(Role).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Ruolo non trovato")
+    if role.name != "admin":
+        ensure_not_last_active_admin(db, user)
+    user.role_id = role.id
+    db.commit()
+    db.refresh(user)
     return schemas.UserResponse.model_validate(user)  # ✅ Converti SQLAlchemy → Pydantic
 
 # Blocco/sblocco utente
@@ -184,6 +210,9 @@ def block_user(user_id: int,
     # ✅ Previene auto-blocco
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="Non puoi bloccare te stesso!")
+
+    if not user.is_blocked:
+        ensure_not_last_active_admin(db, user)
 
     user.is_blocked = not user.is_blocked  # ✅ Inverte lo stato
     db.commit()
