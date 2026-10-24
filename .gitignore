@@ -7,3 +7,5 @@ __pycache__/
 .venv/
 .DS_Store
 backend/backups/
+dist/
+node_modules/
