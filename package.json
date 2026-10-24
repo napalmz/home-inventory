@@ -2,7 +2,13 @@
   "name": "home-inventory",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "node -c telemetry-worker/src/index.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
   }
 }
