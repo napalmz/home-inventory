@@ -454,7 +454,8 @@ def _build_filtered_restore_sql(
 @router.post("/create")
 def create_backup(db: Session = Depends(get_db), prefix: str = "manual"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    full_backup_path = BACKUP_DIR / f"{prefix}_backup_{timestamp}.sql"
+    filename = f"{prefix}_backup_{timestamp}.sql"
+    full_backup_path = _safe_backup_path(filename)
 
     try:
         env = os.environ.copy()
