@@ -28,3 +28,20 @@ def test_safe_backup_path_traversal_attempts():
         with pytest.raises(HTTPException) as exc_info:
             _safe_backup_path(fn)
         assert exc_info.value.status_code == 400
+
+
+def test_create_backup_prefix_path_traversal():
+    from routes.backup import create_backup
+
+    invalid_prefixes = [
+        "../../etc",
+        "../test",
+        "..\\test",
+        "sub/dir",
+        "/absolute/path",
+    ]
+
+    for prefix in invalid_prefixes:
+        with pytest.raises(HTTPException) as exc_info:
+            create_backup(db=None, prefix=prefix)
+        assert exc_info.value.status_code == 400
