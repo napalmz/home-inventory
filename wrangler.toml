@@ -3,9 +3,6 @@ main = "telemetry-worker/src/index.js"
 compatibility_date = "2024-11-01"
 workers_dev = true
 
-[build]
-command = "node -c telemetry-worker/src/index.js"
-
 [[d1_databases]]
 binding = "DB"
 database_name = "home-inventory-telemetry"
