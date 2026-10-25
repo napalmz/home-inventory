@@ -196,10 +196,3 @@ def update_own_user(update: UserSelfUpdate,
     db.commit()
     db.refresh(user)
     return user
-
-#############################################################################
-# Debug DB
-@router.get("/debug/db")
-def debug_db(db: Session = Depends(get_db)):
-    print(f"🔍 DEBUG: db ricevuto in endpoint -> {db}")  # ✅ Debug
-    return {"message": "DB ricevuto", "db_type": str(type(db))}
