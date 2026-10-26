@@ -14,3 +14,8 @@
 **Vulnerability:** User role update (`PUT /user/users/{user_id}`, `PUT /admin/users/{user_id}/role/`, `POST /user/users/{user_id}/role/{role_id}`) and user blocking endpoints allowed demoting or blocking the last active enabled administrator. This created a denial-of-administration scenario where 0 active admins remained.
 **Learning:** Endpoints that mutate user roles or status must check total system active admin count before permitting changes that revoke admin access.
 **Prevention:** Always validate that at least one active, unblocked admin user remains before executing role demotion, account blocking, or deletion operations.
+
+## 2025-05-20 - Broken Object Level Authorization (IDOR) in Filter Template Management
+**Vulnerability:** Unbound filter templates (`inventory_id = None`) could be retrieved by any authenticated user via `GET /filter-templates/{id}` or `GET /filter-templates` regardless of `is_shared` or owner status, exposing private filter criteria.
+**Learning:** Checking inventory-level access controls when `inventory_id` is present is insufficient if resources can also exist independently without an associated inventory container.
+**Prevention:** Always enforce both container-level permissions (if linked) and resource-level access control (`is_shared`, `user_ins == current_user`, or admin role) sequentially on read and list endpoints.
