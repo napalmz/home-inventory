@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from dependencies import get_db
@@ -217,7 +218,16 @@ def list_filter_templates(
         raise HTTPException(status_code=403, detail="Accesso negato")
 
     query = db.query(FilterTemplate)
-    if not include_shared:
+    if user.role.name != RoleEnum.admin.value:
+        if include_shared:
+            query = query.filter(
+                or_(FilterTemplate.is_shared.is_(True), FilterTemplate.user_ins == user.id)
+            )
+        else:
+            query = query.filter(
+                FilterTemplate.is_shared.is_(False), FilterTemplate.user_ins == user.id
+            )
+    elif not include_shared:
         query = query.filter(FilterTemplate.is_shared.is_(False))
     templates = query.order_by(FilterTemplate.data_mod.desc(), FilterTemplate.id.asc()).all()
 
@@ -278,11 +288,20 @@ def get_filter_template(
     user: User = Depends(get_current_user),
 ):
     template = _get_filter_template_or_404(db, template_id)
+
     if template.inventory_id:
         inventory = _get_inventory_or_404(db, template.inventory_id)
         if not can_access_inventory(user, inventory, action="view"):
             raise HTTPException(status_code=403, detail="Accesso negato")
-    return template
+
+    if (
+        user.role.name == RoleEnum.admin.value
+        or template.user_ins == user.id
+        or template.is_shared
+    ):
+        return template
+
+    raise HTTPException(status_code=403, detail="Accesso negato")
 
 
 @router.post("", response_model=FilterTemplateResponse, status_code=status.HTTP_201_CREATED)
