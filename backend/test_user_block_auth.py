@@ -40,20 +40,19 @@ def override_get_db():
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
-
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def setup_db():
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     init_roles_and_admin(db)
     db.close()
     yield
-    Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides.clear()
 
 client = TestClient(app)
 
-def test_blocked_user_login_fails():
+def test_blocked_user_login_fails(setup_db):
     db = TestingSessionLocal()
     viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
     user = User(
@@ -73,7 +72,7 @@ def test_blocked_user_login_fails():
     assert response.status_code == 403
     assert "bloccato" in response.json()["detail"].lower()
 
-def test_blocked_user_me_returns_empty():
+def test_blocked_user_me_returns_empty(setup_db):
     db = TestingSessionLocal()
     viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
     user = User(
@@ -96,7 +95,7 @@ def test_blocked_user_me_returns_empty():
     assert res_data["id"] is None
     assert res_data["username"] is None
 
-def test_admin_cannot_block_self():
+def test_admin_cannot_block_self(setup_db):
     login_res = client.post(
         "/auth/login",
         data={"username": "admin", "password": "adminpassword"}
@@ -116,7 +115,7 @@ def test_admin_cannot_block_self():
     assert response.status_code == 400
     assert "te stesso" in response.json()["detail"].lower()
 
-def test_admin_can_block_other_user():
+def test_admin_can_block_other_user(setup_db):
     db = TestingSessionLocal()
     viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
     other_user = User(
@@ -143,7 +142,7 @@ def test_admin_can_block_other_user():
     assert response.status_code == 200
     assert response.json()["user"]["is_blocked"] is True
 
-def test_non_admin_cannot_block_user():
+def test_non_admin_cannot_block_user(setup_db):
     db = TestingSessionLocal()
     viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
     normal_user = User(
@@ -171,7 +170,7 @@ def test_non_admin_cannot_block_user():
     )
     assert response.status_code == 403
 
-def test_cannot_demote_last_admin_via_update_user():
+def test_cannot_demote_last_admin_via_update_user(setup_db):
     login_res = client.post(
         "/auth/login",
         data={"username": "admin", "password": "adminpassword"}
@@ -193,7 +192,7 @@ def test_cannot_demote_last_admin_via_update_user():
     assert response.status_code == 403
     assert "ultimo utente admin attivo" in response.json()["detail"].lower()
 
-def test_cannot_block_last_admin_via_update_user():
+def test_cannot_block_last_admin_via_update_user(setup_db):
     login_res = client.post(
         "/auth/login",
         data={"username": "admin", "password": "adminpassword"}
@@ -215,7 +214,7 @@ def test_cannot_block_last_admin_via_update_user():
     assert response.status_code == 403
     assert "ultimo utente admin attivo" in response.json()["detail"].lower()
 
-def test_cannot_demote_last_admin_via_admin_update_role():
+def test_cannot_demote_last_admin_via_admin_update_role(setup_db):
     login_res = client.post(
         "/auth/login",
         data={"username": "admin", "password": "adminpassword"}
@@ -234,7 +233,7 @@ def test_cannot_demote_last_admin_via_admin_update_role():
     assert response.status_code == 403
     assert "ultimo utente admin attivo" in response.json()["detail"].lower()
 
-def test_cannot_demote_last_admin_via_assign_role():
+def test_cannot_demote_last_admin_via_assign_role(setup_db):
     login_res = client.post(
         "/auth/login",
         data={"username": "admin", "password": "adminpassword"}
@@ -255,7 +254,7 @@ def test_cannot_demote_last_admin_via_assign_role():
     assert response.status_code == 403
     assert "ultimo utente admin attivo" in response.json()["detail"].lower()
 
-def test_can_demote_admin_when_second_admin_exists():
+def test_can_demote_admin_when_second_admin_exists(setup_db):
     db = TestingSessionLocal()
     admin_role = db.query(Role).filter(Role.name == RoleEnum.admin.value).first()
     second_admin = User(
@@ -281,7 +280,8 @@ def test_can_demote_admin_when_second_admin_exists():
     )
     assert response.status_code == 200
     assert response.json()["new_role"] == "viewer"
-def test_blocked_user_update_me_fails():
+
+def test_blocked_user_update_me_fails(setup_db):
     db = TestingSessionLocal()
     viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
     blocked_user = User(
