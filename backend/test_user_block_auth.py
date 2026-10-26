@@ -73,6 +73,11 @@ def test_blocked_user_login_fails():
     assert response.status_code == 403
     assert "bloccato" in response.json()["detail"].lower()
 
+
+def test_debug_db_endpoint_removed():
+    response = client.get("/auth/debug/db")
+    assert response.status_code == 404
+
 def test_blocked_user_me_returns_empty():
     db = TestingSessionLocal()
     viewer_role = db.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
