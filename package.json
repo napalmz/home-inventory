@@ -10,6 +10,6 @@
     "build": "node -c telemetry-worker/src/index.js"
   },
   "devDependencies": {
-    "wrangler": "^3.99.0"
+    "wrangler": "^4.153.0"
   }
 }
