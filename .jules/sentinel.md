@@ -19,3 +19,8 @@
 **Vulnerability:** Unbound filter templates (`inventory_id = None`) could be retrieved by any authenticated user via `GET /filter-templates/{id}` or `GET /filter-templates` regardless of `is_shared` or owner status, exposing private filter criteria.
 **Learning:** Checking inventory-level access controls when `inventory_id` is present is insufficient if resources can also exist independently without an associated inventory container.
 **Prevention:** Always enforce both container-level permissions (if linked) and resource-level access control (`is_shared`, `user_ins == current_user`, or admin role) sequentially on read and list endpoints.
+
+## 2025-05-21 - Router-Level Over-Restriction and Missing IDOR Checks in Shareable Users Endpoint
+**Vulnerability:** `GET /user/users/shareable/{inventory_id}` was blocked for non-admin moderators due to `role_required(RoleEnum.admin)` attached at the `user.py` `APIRouter` constructor. In addition, the route handler lacked an object-level authorization check (`can_access_inventory`), exposing shareable user lists for arbitrary inventory IDs to any user who could access the route.
+**Learning:** Applying router-level role requirements (`dependencies=[Depends(role_required(...))]`) on mixed routers blocks sub-routes intended for multi-role functionality. Furthermore, context-dependent endpoints must explicitly enforce object-level authorization on target resources.
+**Prevention:** Isolate admin-only endpoints into dedicated subrouters, and ensure all endpoints operating on specific resources validate user permissions against those resources (`can_access_inventory`).
