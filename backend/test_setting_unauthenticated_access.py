@@ -89,3 +89,33 @@ def test_read_setting_admin_succeeds(db_session):
     )
     assert response.status_code == 200
     assert response.json()["key"] == "ENABLE_REGISTRATION"
+
+def test_read_nonexistent_setting_returns_404(db_session):
+    login_res = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "adminpassword"}
+    )
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+
+    response = client.get(
+        "/settings/settings/NON_EXISTENT_SETTING_KEY",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Impostazione non trovata"
+
+def test_delete_nonexistent_setting_returns_404(db_session):
+    login_res = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "adminpassword"}
+    )
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+
+    response = client.delete(
+        "/settings/settings/NON_EXISTENT_SETTING_KEY",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Impostazione non trovata"

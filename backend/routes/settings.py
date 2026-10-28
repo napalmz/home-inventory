@@ -27,6 +27,8 @@ def update_setting(data: SettingUpdate, db: Session = Depends(get_db)):
 @router.get("/settings/{key}")
 def read_setting(key: str, db: Session = Depends(get_db)):
     setting = crud_settings.get_setting(db, key)
+    if not setting:
+        raise HTTPException(status_code=404, detail="Impostazione non trovata")
     return setting
 
 @router.get("/settings")
@@ -37,6 +39,8 @@ def list_settings(db: Session = Depends(get_db)):
 @router.delete("/settings/{key}")
 def delete_setting(key: str, db: Session = Depends(get_db)):
     setting = crud_settings.get_setting(db, key)
+    if not setting:
+        raise HTTPException(status_code=404, detail="Impostazione non trovata")
     if setting.protected:
         raise HTTPException(status_code=403, detail="Impostazione protetta, non può essere cancellata")
     crud_settings.delete_setting(db, key)
