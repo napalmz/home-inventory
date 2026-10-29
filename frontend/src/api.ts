@@ -9,6 +9,9 @@ import {
   ChecklistItem,
   ChecklistWithMatches,
   ItemVersion,
+  ItemBarcode,
+  Assignment,
+  BarcodeLookupResult,
   InventoryVersion,
   MetadataDefinition,
   MetadataDefinitionCreate,
@@ -98,6 +101,21 @@ export async function getUsers(): Promise<User[]> {
 /* RECUPERO VERSIONE API */
 export async function getApiVersion(): Promise<{ version: string }> {
   const response = await api.get<{ version: string }>("/system/version");
+  return response.data;
+}
+
+export interface AboutStats {
+  available: boolean;
+  active_installations: number | null;
+  active_window_days: number | null;
+  countries: { country: string; n: number }[];
+  versions: { version: string; n: number }[];
+  channels: { channel: string; n: number }[];
+}
+
+/* STATISTICHE AGGREGATE DELLA COMMUNITY (TAB ABOUT) */
+export async function getAboutStats(): Promise<AboutStats> {
+  const response = await api.get<AboutStats>("/system/about-stats");
   return response.data;
 }
 
@@ -280,9 +298,25 @@ export async function createItem(data: {
   description?: string;
   quantity: number;
   inventory_id: number;
+  barcodes?: { code: string; format?: string | null }[];
 }): Promise<InventoryItem> {
   const response = await api.post('/item/', data);
   return response.data as InventoryItem;
+}
+
+/* BARCODE */
+export async function lookupBarcode(code: string, external = true): Promise<BarcodeLookupResult> {
+  const response = await api.get('/barcode/lookup', { params: { code, external } });
+  return response.data as BarcodeLookupResult;
+}
+
+export async function addItemBarcode(itemId: number, code: string, format?: string | null): Promise<ItemBarcode> {
+  const response = await api.post(`/item/${itemId}/barcodes`, { code, format: format ?? null });
+  return response.data as ItemBarcode;
+}
+
+export async function deleteItemBarcode(itemId: number, barcodeId: number): Promise<void> {
+  await api.delete(`/item/${itemId}/barcodes/${barcodeId}`);
 }
 
 /* MODIFICA ITEM */
@@ -291,9 +325,31 @@ export async function updateItem(itemId: number, data: {
   description?: string;
   quantity: number;
   inventory_id: number;
-}): Promise<InventoryItem> {
-  const response = await api.patch(`/item/${itemId}`, data);
+}, onInsufficient?: 'zero'): Promise<InventoryItem> {
+  const response = await api.patch(`/item/${itemId}`, data, {
+    params: onInsufficient ? { on_insufficient: onInsufficient } : undefined,
+  });
   return response.data as InventoryItem;
+}
+
+/* ASSEGNAZIONI lista -> inventario */
+export async function createAssignment(listItemId: number, sourceItemId: number, qty: number): Promise<Assignment> {
+  const response = await api.post('/assignment/', { list_item_id: listItemId, source_item_id: sourceItemId, qty });
+  return response.data as Assignment;
+}
+
+export async function updateAssignment(id: number, qty: number): Promise<Assignment> {
+  const response = await api.patch(`/assignment/${id}`, { qty });
+  return response.data as Assignment;
+}
+
+export async function deleteAssignment(id: number): Promise<void> {
+  await api.delete(`/assignment/${id}`);
+}
+
+export async function getAssignmentsBySource(itemId: number): Promise<Assignment[]> {
+  const response = await api.get(`/assignment/by-source/${itemId}`);
+  return response.data as Assignment[];
 }
 
 /* CANCELLAZIONE ITEM */

@@ -10,6 +10,9 @@ RUN npm run build
 FROM nginx:1.29
 WORKDIR /app
 
+LABEL org.opencontainers.image.source="https://github.com/napalmz/home-inventory" \
+      org.opencontainers.image.description="Home Inventory frontend: React web app served by nginx for the shared household inventory app."
+
 # Install required tools
 RUN apt-get update \
   && apt-get install -y --no-install-recommends bash curl gettext-base \

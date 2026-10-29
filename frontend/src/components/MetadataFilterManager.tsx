@@ -409,13 +409,13 @@ export default function MetadataFilterManager({
       <Dialog open={isOpen} onClose={closeAndReset} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-6xl space-y-4 max-h-[92vh] overflow-hidden">
+          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-4 sm:p-6 rounded w-full max-w-6xl space-y-4 max-h-[92vh] overflow-y-auto xl:overflow-hidden">
             <Dialog.Title className="text-lg font-semibold">
               {editingTemplateId ? 'Modifica template filtri metadati' : 'Builder filtri metadati'}
             </Dialog.Title>
 
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] h-[78vh]">
-              <div className="space-y-4 min-h-0 flex flex-col">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:h-[78vh]">
+              <div className="space-y-4 xl:min-h-0 flex flex-col">
                 <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                   <div>
                     <label className="mb-1 block text-sm font-medium">Match mode</label>
@@ -446,7 +446,7 @@ export default function MetadataFilterManager({
                   )}
                 </div>
 
-                <div className="rounded border border-gray-200 p-3 dark:border-gray-700 flex-1 min-h-0 overflow-y-auto space-y-3">
+                <div className="rounded border border-gray-200 p-3 dark:border-gray-700 xl:flex-1 xl:min-h-0 xl:overflow-y-auto space-y-3">
                   {rows.map((row, index) => {
                     const options = defsFor(row.kind);
                     const selectedDefinition = options.find((definition) => definition.id === row.definitionId);
@@ -735,9 +735,9 @@ export default function MetadataFilterManager({
                 </div>
               </div>
 
-              <aside className="rounded border border-gray-200 p-4 dark:border-gray-700 overflow-y-auto">
+              <aside className="rounded border border-gray-200 p-4 dark:border-gray-700 xl:overflow-y-auto">
                 <h3 className="mb-3 font-semibold">Template salvati</h3>
-                <div className="space-y-2 max-h-[520px] overflow-auto pr-1">
+                <div className="space-y-2 xl:max-h-[520px] xl:overflow-auto pr-1">
                   {templates.length === 0 ? (
                     <div className="text-sm text-gray-500 dark:text-gray-300">Nessun template disponibile.</div>
                   ) : (

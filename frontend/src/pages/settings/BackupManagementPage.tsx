@@ -70,7 +70,7 @@ export default function BackupManagementPage() {
   } | null>(null);
 
   const [filterText, setFilterText] = useState("");
-  const [backupTypeFilter, setBackupTypeFilter] = useState<"all" | "manual" | "auto">("all");
+  const [backupTypeFilter, setBackupTypeFilter] = useState<"all" | "manual" | "auto" | "uploaded">("all");
   const [sortField, setSortField] = useState<"filename" | "modified" | "size">("modified");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [selectedBackupNames, setSelectedBackupNames] = useState<string[]>([]);
@@ -201,10 +201,12 @@ export default function BackupManagementPage() {
       .filter((b) => {
         const matchText = b.filename.toLowerCase().includes(filterText.toLowerCase());
         const isAuto = b.filename.startsWith("auto_");
+        const isUploaded = b.filename.startsWith("uploaded_");
         const matchType =
           backupTypeFilter === "all" ||
-          (backupTypeFilter === "manual" && !isAuto) ||
-          (backupTypeFilter === "auto" && isAuto);
+          (backupTypeFilter === "manual" && !isAuto && !isUploaded) ||
+          (backupTypeFilter === "auto" && isAuto) ||
+          (backupTypeFilter === "uploaded" && isUploaded);
         return matchText && matchType;
       })
       .sort((a, b) => {
@@ -552,12 +554,13 @@ export default function BackupManagementPage() {
           <label className="block text-sm font-medium">Visualizza:</label>
           <select
             value={backupTypeFilter}
-            onChange={(e) => setBackupTypeFilter(e.target.value as "all" | "manual" | "auto")}
+            onChange={(e) => setBackupTypeFilter(e.target.value as "all" | "manual" | "auto" | "uploaded")}
             className="border rounded px-2 py-1"
           >
             <option value="all">Tutti</option>
             <option value="manual">Manuali</option>
             <option value="auto">Automatici</option>
+            <option value="uploaded">Caricati</option>
           </select>
         </div>
         <div>
@@ -612,6 +615,7 @@ export default function BackupManagementPage() {
       <ul className="space-y-2">
         {displayedBackups.map((backup) => {
             const isAuto = backup.filename.startsWith("auto_");
+            const isUploaded = backup.filename.startsWith("uploaded_");
             return (
               <li
                 key={backup.filename}
@@ -628,6 +632,7 @@ export default function BackupManagementPage() {
                   <div className="flex-1">
                   <div className="break-words">{backup.filename}
                     {isAuto && <span className="inline-block text-xs font-semibold text-yellow-700 bg-yellow-200 rounded px-2 py-0.5 ml-2">Automatico</span>}
+                    {isUploaded && <span className="inline-block text-xs font-semibold text-blue-700 bg-blue-100 rounded px-2 py-0.5 ml-2">Caricato</span>}
                   </div>
                   <div className="text-sm text-gray-600">
                     {(backup.size / 1024).toFixed(2)} KB - {new Date(backup.modified).toLocaleString()}
