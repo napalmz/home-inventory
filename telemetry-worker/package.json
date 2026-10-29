@@ -7,7 +7,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "node -c src/index.js",
+    "build": "node ../scripts/inject-d1-id.js && node -c src/index.js",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {

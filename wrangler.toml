@@ -6,4 +6,4 @@ workers_dev = true
 [[d1_databases]]
 binding = "DB"
 database_name = "home-inventory-telemetry"
-database_id = "fc00031f-4626-4437-88f9-6dc72ab945df"
+database_id = "<YOUR_D1_DATABASE_ID>"

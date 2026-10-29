@@ -94,6 +94,11 @@ def test_instance_id_is_stable(db):
     assert telemetry_service.get_instance_id(db) == telemetry_service.get_instance_id(db)
 
 
+def test_instance_id_env_override(db, monkeypatch):
+    monkeypatch.setenv("TELEMETRY_INSTANCE_ID", "custom-instance-id-123")
+    assert telemetry_service.get_instance_id(db) == "custom-instance-id-123"
+
+
 def test_last_activity_is_none_without_data():
     engine = create_engine(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool

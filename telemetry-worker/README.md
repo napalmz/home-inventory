@@ -19,9 +19,16 @@ npx wrangler d1 execute home-inventory-telemetry --remote --file=schema.sql
 npx wrangler d1 execute home-inventory-telemetry --remote --file=migrations/001_add_channel.sql
 ```
 
+### Automatic Deployments (Cloudflare Dashboard / Git integration)
+
+**IT** — Per le distribuzioni automatiche tramite `dash.cloudflare.com`, imposta la variabile d'ambiente `TELEMETRY_D1_DATABASE_ID` (o `D1_DATABASE_ID`) in **Settings -> Variables and Secrets / Build Environment Variables** con l'ID restituito da `wrangler d1 create`. Il comando `npm run build` sostituirà automaticamente `<YOUR_D1_DATABASE_ID>` in `wrangler.toml` prima del deploy.
+
+**EN** — For automatic deployments via `dash.cloudflare.com`, set the `TELEMETRY_D1_DATABASE_ID` (or `D1_DATABASE_ID`) environment variable in **Settings -> Variables and Secrets / Build Environment Variables** with the ID returned by `wrangler d1 create`. The `npm run build` script will automatically substitute `<YOUR_D1_DATABASE_ID>` in `wrangler.toml` prior to deployment.
+
 Deploy:
 
 ```bash
+npm run build
 npx wrangler deploy
 ```
 
