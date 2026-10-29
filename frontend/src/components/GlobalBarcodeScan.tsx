@@ -83,6 +83,20 @@ export default function GlobalBarcodeScan() {
       setScannerOpen(false);
       setError(null);
       setDone(null);
+      // I QR stampati per un inventario/lista contengono il suo link diretto.
+      // Gli altri QR e i barcode continuano nel normale flusso di lookup item.
+      try {
+        const scannedUrl = new URL(rawCode, window.location.origin);
+        const inventoryPath = scannedUrl.pathname.match(/^\/(inventories|checklists)\/([1-9]\d*)\/?$/);
+        if (scannedUrl.origin === window.location.origin && inventoryPath) {
+          setScan(null);
+          setLoading(false);
+          navigate(`${scannedUrl.pathname}${scannedUrl.search}${scannedUrl.hash}`);
+          return;
+        }
+      } catch {
+        // Un valore che non è un URL resta un normale codice barcode.
+      }
       setLoading(true);
       try {
         const lookup = await lookupBarcode(rawCode, true);
@@ -110,7 +124,7 @@ export default function GlobalBarcodeScan() {
         setLoading(false);
       }
     },
-    [canEdit, currentTarget, loadTargets],
+    [canEdit, currentTarget, loadTargets, navigate],
   );
 
   useKeyboardScanner(!!user?.username && !scannerOpen && scan === null && !loading, (code) => void handleCode(code, null));

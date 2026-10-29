@@ -40,8 +40,8 @@ PLATFORMS="linux/amd64,linux/arm64"
 # Variabili per i tag
 BACKEND_TAG_BASE="napalmzrpi/home-inventory-backend"
 FRONTEND_TAG_BASE="napalmzrpi/home-inventory-frontend"
-BACKEND_GHCR_TAG_BASE="ghcr.io/napalmz/home-inventory-backend"
-FRONTEND_GHCR_TAG_BASE="ghcr.io/napalmz/home-inventory-frontend"
+BACKEND_GHCR_TAG_BASE="ghcr.io/nhws-org/home-inventory-backend"
+FRONTEND_GHCR_TAG_BASE="ghcr.io/nhws-org/home-inventory-frontend"
 
 if [[ "$CHANNEL" == "release" ]]; then
   BACKEND_TAG_VERSION="$BACKEND_TAG_BASE:$BACKEND_VERSION"
@@ -63,8 +63,10 @@ else
   FRONTEND_GHCR_TAG_CHANNEL="$FRONTEND_GHCR_TAG_BASE:dev"
 fi
 
-echo "Tag backend: $BACKEND_TAG_VERSION, $BACKEND_TAG_CHANNEL, $BACKEND_GHCR_TAG_VERSION e $BACKEND_GHCR_TAG_CHANNEL"
-echo "Tag frontend: $FRONTEND_TAG_VERSION, $FRONTEND_TAG_CHANNEL, $FRONTEND_GHCR_TAG_VERSION e $FRONTEND_GHCR_TAG_CHANNEL"
+echo "Tag backend:"
+printf '  - %s\n' "$BACKEND_TAG_VERSION" "$BACKEND_TAG_CHANNEL" "$BACKEND_GHCR_TAG_VERSION" "$BACKEND_GHCR_TAG_CHANNEL"
+echo "Tag frontend:"
+printf '  - %s\n' "$FRONTEND_TAG_VERSION" "$FRONTEND_TAG_CHANNEL" "$FRONTEND_GHCR_TAG_VERSION" "$FRONTEND_GHCR_TAG_CHANNEL"
 
 # Funzione per chiedere conferma
 ask_confirmation() {

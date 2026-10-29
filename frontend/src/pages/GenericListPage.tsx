@@ -31,6 +31,7 @@ import {
 import { AuthContext } from '../auth-context'
 import { Dialog } from '@headlessui/react'
 import { InventoryWithMatches, ChecklistWithMatches } from "../types"
+import InventoryQrDialog from '../components/InventoryQrDialog'
 
 function NewItemModal({ isOpen, onClose, onCreate, isInventory }: {
   isOpen: boolean
@@ -166,6 +167,7 @@ export default function GenericListPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [accessUsers, setAccessUsers] = useState<{ username: string; role?: { name: string } }[]>([]);
   const [accessGroups, setAccessGroups] = useState<{ name: string; role?: { name: string } }[]>([]);
+  const [qrTarget, setQrTarget] = useState<{ name: string; path: string } | null>(null);
 
   useEffect(() => {
     //setLoading(true);
@@ -470,6 +472,17 @@ export default function GenericListPage() {
                   <p className="text-sm text-gray-500 sm:ml-4">
                     Creatore: {inv.owner.username} | Oggetti: {inv.item_count} | Ultima modifica: {new Date(inv.data_mod).toLocaleString()}
                   </p>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setQrTarget({ name: inv.name, path: `/${basePath}/${inv.id}` });
+                    }}
+                    className="self-start rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700 sm:self-auto"
+                    aria-label={`Mostra QR code per ${inv.name}`}
+                  >
+                    QR code
+                  </button>
                   {inv.matching_items && inv.matching_items.length > 0 && (
                     <div className="mt-2 p-2 border rounded bg-yellow-50">
                       <p className="text-xs font-medium text-gray-700">Corrispondenze trovate:</p>
@@ -608,6 +621,7 @@ export default function GenericListPage() {
           {message}
         </div>
       )}
+      {qrTarget && <InventoryQrDialog name={qrTarget.name} path={qrTarget.path} onClose={() => setQrTarget(null)} />}
       {/* Dialog per la gestione accessi */}
       {permissionsTarget && (
         <Dialog open={!!permissionsTarget} onClose={() => setPermissionsTarget(null)} className="relative z-50">
