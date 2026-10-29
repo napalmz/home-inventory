@@ -3,7 +3,7 @@ import { ReactNode, useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
-import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser } from 'react-icons/fi'
+import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser, FiMenu, FiX } from 'react-icons/fi'
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -28,8 +28,15 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       {!isOpen && (
-        <div className="md:hidden fixed top-4 left-4 z-50 dark:text-white">
-          <button onClick={toggleSidebar}>☰</button>
+        <div className="md:hidden fixed top-4 left-4 z-50">
+          <button
+            onClick={toggleSidebar}
+            aria-label="Apri menu navigation"
+            aria-expanded={isOpen}
+            className="p-2 rounded-lg bg-gray-800 text-white shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <FiMenu className="text-xl" />
+          </button>
         </div>
       )}
       {/* Sidebar */}
@@ -40,7 +47,14 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       >
         <div className="flex justify-between items-center mb-4 md:hidden">
           <span className="font-bold text-lg">Menu</span>
-          <button onClick={toggleSidebar}>☰</button>
+          <button
+            onClick={toggleSidebar}
+            aria-label="Chiudi menu navigation"
+            aria-expanded={isOpen}
+            className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <FiX className="text-xl" />
+          </button>
         </div>
 
         {user && user.username ? (
