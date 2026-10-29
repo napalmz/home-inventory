@@ -166,7 +166,9 @@ def _compute_scope_preview_from_loaded_data(
     )
 
 
-def _compute_scope_preview(db: Session, definition_ids: list[int]) -> FilterTemplateScopePreview:
+def _compute_scope_preview(
+    db: Session, definition_ids: list[int], user: User
+) -> FilterTemplateScopePreview:
     if not definition_ids:
         return FilterTemplateScopePreview(
             scope_type="none",
@@ -181,7 +183,11 @@ def _compute_scope_preview(db: Session, definition_ids: list[int]) -> FilterTemp
     for assignment in assignments:
         assignments_by_def.setdefault(assignment.definition_id, []).append(assignment)
 
-    all_inventories = db.query(Inventory).all()
+    # Restringe l'elenco agli inventari visibili dall'utente per evitare Information Disclosure
+    all_inventories = [
+        inv for inv in db.query(Inventory).all()
+        if can_access_inventory(user, inv, action="view")
+    ]
     return _compute_scope_preview_from_loaded_data(definition_ids, assignments_by_def, all_inventories)
 
 
@@ -196,13 +202,13 @@ class FilterTemplateListWithScope(FilterTemplateListResponse):
 def get_scope_preview(
     definition_ids: str = Query(..., description="Lista di definition_id separati da virgola"),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     try:
         ids = [int(item.strip()) for item in definition_ids.split(",") if item.strip()]
     except ValueError:
         raise HTTPException(status_code=400, detail="definition_ids non valido")
-    return _compute_scope_preview(db, ids)
+    return _compute_scope_preview(db, ids, current_user)
 
 
 @router.get("", response_model=List[FilterTemplateListWithScope])
@@ -249,7 +255,11 @@ def list_filter_templates(
         for assignment in assignments:
             assignments_by_def.setdefault(assignment.definition_id, []).append(assignment)
 
-    all_inventories = db.query(Inventory).all()
+    # Restringe l'elenco agli inventari visibili dall'utente per evitare Information Disclosure
+    all_inventories = [
+        inv for inv in db.query(Inventory).all()
+        if can_access_inventory(user, inv, action="view")
+    ]
 
     result: list[FilterTemplateListWithScope] = []
     for template in templates:
