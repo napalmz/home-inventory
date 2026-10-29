@@ -12,4 +12,6 @@ database_id = "<YOUR_D1_DATABASE_ID>"
 # Opzionale: dominio personalizzato, per esempio telemetry.example.com
 # routes = [{ pattern = "telemetry.example.com", custom_domain = true }]
 
-[previews]
+[[previews.d1_databases]]
+binding = "DB"
+database_id = "<YOUR_D1_DATABASE_ID>"
