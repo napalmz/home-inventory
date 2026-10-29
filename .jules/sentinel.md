@@ -24,3 +24,8 @@
 **Vulnerability:** `GET /user/users/shareable/{inventory_id}` was blocked for non-admin moderators due to `role_required(RoleEnum.admin)` attached at the `user.py` `APIRouter` constructor. In addition, the route handler lacked an object-level authorization check (`can_access_inventory`), exposing shareable user lists for arbitrary inventory IDs to any user who could access the route.
 **Learning:** Applying router-level role requirements (`dependencies=[Depends(role_required(...))]`) on mixed routers blocks sub-routes intended for multi-role functionality. Furthermore, context-dependent endpoints must explicitly enforce object-level authorization on target resources.
 **Prevention:** Isolate admin-only endpoints into dedicated subrouters, and ensure all endpoints operating on specific resources validate user permissions against those resources (`can_access_inventory`).
+
+## 2025-05-22 - Information Disclosure in Filter Template Scope Preview
+**Vulnerability:** Filter template scope preview endpoints (`GET /filter-templates/scope-preview` and `GET /filter-templates`) evaluated metadata definition assignments against `db.query(Inventory).all()` without filtering by user access, leaking names and IDs of private inventories belonging to other users.
+**Learning:** Helper functions that compute scope or compatibility metrics across system-wide resources can bypass object-level authorization if they query all containers without contextual user filtering.
+**Prevention:** Always filter system-wide container lists using `can_access_inventory(user, container, action="view")` before including resource summaries or scope metadata in responses returned to non-admin users.

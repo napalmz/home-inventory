@@ -22,7 +22,7 @@ routes.auth.ACCESS_TOKEN_EXPIRE_MINUTES = 30
 from main import app
 from database import Base
 from dependencies import get_db, init_roles_and_admin, initialize_settings
-from models import User, Role, RoleEnum, Inventory, SharedInventory, FilterTemplate
+from models import User, Role, RoleEnum, Inventory, SharedInventory, FilterTemplate, MetadataDefinition, MetadataDefinitionAssignment
 from routes.auth import hash_password, create_access_token
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -239,3 +239,89 @@ def test_inventory_bound_filter_template_authorization(db_session):
         headers={"Authorization": f"Bearer {auth_token}"}
     )
     assert res3.status_code == 403
+
+
+def test_scope_preview_does_not_leak_private_inventories(db_session):
+    viewer_role = db_session.query(Role).filter(Role.name == RoleEnum.viewer.value).first()
+
+    user1 = User(
+        username="scope_owner",
+        hashed_password=hash_password("password123"),
+        role_id=viewer_role.id,
+        is_blocked=False
+    )
+    user2 = User(
+        username="scope_attacker",
+        hashed_password=hash_password("password123"),
+        role_id=viewer_role.id,
+        is_blocked=False
+    )
+    db_session.add_all([user1, user2])
+    db_session.commit()
+
+    # Private inventory for user1 only
+    secret_inv = Inventory(name="Top Secret Vault", owner_id=user1.id, type="INVENTORY")
+    # Shared inventory for user1, shared with user2
+    public_inv = Inventory(name="Public Shared Inventory", owner_id=user1.id, type="INVENTORY")
+    db_session.add_all([secret_inv, public_inv])
+    db_session.commit()
+
+    db_session.add(SharedInventory(user_id=user2.id, inventory_id=public_inv.id))
+    db_session.commit()
+
+    # Create metadata definition and assign globally
+    meta_def = MetadataDefinition(
+        key="color_attr",
+        label="Color Attribute",
+        field_type="TEXT",
+        is_active=True,
+        user_ins=user1.id,
+        user_mod=user1.id
+    )
+    db_session.add(meta_def)
+    db_session.commit()
+
+    assignment = MetadataDefinitionAssignment(
+        definition_id=meta_def.id,
+        scope="GLOBAL",
+        user_ins=user1.id,
+        user_mod=user1.id
+    )
+    db_session.add(assignment)
+    db_session.commit()
+
+    # Create a shared filter template
+    shared_template = FilterTemplate(
+        name="Global Color Template",
+        filter_type="text",
+        criteria={"criteria": [{"definition_id": meta_def.id}]},
+        is_shared=True,
+        user_ins=user1.id,
+        user_mod=user1.id
+    )
+    db_session.add(shared_template)
+    db_session.commit()
+
+    attacker_token = create_access_token({"sub": "scope_attacker"})
+
+    # 1. Attacker queries scope-preview endpoint
+    preview_res = client.get(
+        f"/filter-templates/scope-preview?definition_ids={meta_def.id}",
+        headers={"Authorization": f"Bearer {attacker_token}"}
+    )
+    assert preview_res.status_code == 200
+    preview_data = preview_res.json()
+    visible_inventory_ids = [inv["id"] for inv in preview_data.get("inventories", [])]
+    assert secret_inv.id not in visible_inventory_ids
+
+    # 2. Attacker lists filter templates for public_inv
+    list_res = client.get(
+        f"/filter-templates?inventory_id={public_inv.id}",
+        headers={"Authorization": f"Bearer {attacker_token}"}
+    )
+    assert list_res.status_code == 200
+    templates_data = list_res.json()
+    assert len(templates_data) > 0
+    scope_preview_inventories = templates_data[0].get("scope_preview", {}).get("inventories", [])
+    scope_inventory_ids = [inv["id"] for inv in scope_preview_inventories]
+    assert secret_inv.id not in scope_inventory_ids
