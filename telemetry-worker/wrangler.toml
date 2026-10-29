@@ -7,7 +7,7 @@ workers_dev = true
 binding = "DB"
 database_name = "home-inventory-telemetry"
 # Sostituisci con l'ID restituito da: npx wrangler d1 create home-inventory-telemetry
-database_id = "fc00031f-4626-4437-88f9-6dc72ab945df"
+database_id = "<YOUR_D1_DATABASE_ID>"
 
 # Opzionale: dominio personalizzato, per esempio telemetry.example.com
 # routes = [{ pattern = "telemetry.example.com", custom_domain = true }]
