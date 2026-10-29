@@ -97,6 +97,9 @@ def get_public_stats() -> dict | None:
 
 
 def get_instance_id(db: Session) -> str:
+    env_id = os.getenv("TELEMETRY_INSTANCE_ID", "").strip()
+    if env_id:
+        return env_id
     setting = get_setting(db, INSTANCE_ID_KEY)
     if setting and setting.value:
         return setting.value
