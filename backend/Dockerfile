@@ -51,3 +51,6 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 
 HEALTHCHECK --interval=60s --timeout=5s --retries=3 \
   CMD curl -fs http://localhost:8000/system/health-check || exit 1
+
+LABEL org.opencontainers.image.source="https://github.com/NHWS-Org/home-inventory"
+LABEL org.opencontainers.image.maintainer="napalmz"

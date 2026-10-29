@@ -36,3 +36,6 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
   CMD curl -fs http://localhost || exit 1
+
+LABEL org.opencontainers.image.source="https://github.com/NHWS-Org/home-inventory"
+LABEL org.opencontainers.image.maintainer="napalmz"
