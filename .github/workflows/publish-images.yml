@@ -95,8 +95,8 @@ jobs:
           tags: |
             napalmzrpi/home-inventory-backend:${{ steps.meta.outputs.backend_tag }}
             napalmzrpi/home-inventory-backend:${{ steps.meta.outputs.channel }}
-            ghcr.io/napalmz/home-inventory-backend:${{ steps.meta.outputs.backend_tag }}
-            ghcr.io/napalmz/home-inventory-backend:${{ steps.meta.outputs.channel }}
+            ghcr.io/nhws-org/home-inventory-backend:${{ steps.meta.outputs.backend_tag }}
+            ghcr.io/nhws-org/home-inventory-backend:${{ steps.meta.outputs.channel }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=Home Inventory backend: FastAPI API for the shared household inventory app.
@@ -119,8 +119,8 @@ jobs:
           tags: |
             napalmzrpi/home-inventory-frontend:${{ steps.meta.outputs.frontend_tag }}
             napalmzrpi/home-inventory-frontend:${{ steps.meta.outputs.channel }}
-            ghcr.io/napalmz/home-inventory-frontend:${{ steps.meta.outputs.frontend_tag }}
-            ghcr.io/napalmz/home-inventory-frontend:${{ steps.meta.outputs.channel }}
+            ghcr.io/nhws-org/home-inventory-frontend:${{ steps.meta.outputs.frontend_tag }}
+            ghcr.io/nhws-org/home-inventory-frontend:${{ steps.meta.outputs.channel }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=Home Inventory frontend: React web app served by nginx for the shared household inventory app.
