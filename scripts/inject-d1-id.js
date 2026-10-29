@@ -1,11 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const d1Id = (process.env.TELEMETRY_D1_DATABASE_ID || process.env.D1_DATABASE_ID || '').trim();
 
 if (d1Id) {
   const replaceInFile = (relativeFilePath) => {
-    const fullPath = path.resolve(relativeFilePath);
+    const fullPath = path.resolve(repositoryRoot, relativeFilePath);
     if (fs.existsSync(fullPath)) {
       let content = fs.readFileSync(fullPath, 'utf8');
       if (content.includes('<YOUR_D1_DATABASE_ID>')) {
@@ -16,7 +19,6 @@ if (d1Id) {
     }
   };
 
-  replaceInFile('wrangler.toml');
   replaceInFile('telemetry-worker/wrangler.toml');
 } else {
   console.log('No TELEMETRY_D1_DATABASE_ID or D1_DATABASE_ID environment variable found. Keeping wrangler.toml placeholder.');
