@@ -1,23 +1,8 @@
-import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-os.environ["SECRET_KEY"] = "testsecretkey32byteslongforsecurity!"
-os.environ["ALGORITHM"] = "HS256"
-os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
-os.environ["ADMIN_PASSWORD"] = "adminpassword"
-
-import dependencies
-import routes.auth
-dependencies.SECRET_KEY = "testsecretkey32byteslongforsecurity!"
-dependencies.ALGORITHM = "HS256"
-dependencies.ACCESS_TOKEN_EXPIRE_MINUTES = 30
-routes.auth.SECRET_KEY = "testsecretkey32byteslongforsecurity!"
-routes.auth.ALGORITHM = "HS256"
-routes.auth.ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 from main import app
 from database import Base
