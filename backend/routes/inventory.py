@@ -115,6 +115,18 @@ def _current_item_version_num(db: Session, item_id: int) -> int:
         or 0
     )
 
+def _get_item_version_map(db: Session, item_ids: list[int]) -> dict[int, int]:
+    """Ottiene in batch l'ultimo numero di versione per una lista di id item (evita problema N+1)."""
+    if not item_ids:
+        return {}
+    results = (
+        db.query(ItemVersion.item_id, func.max(ItemVersion.version_num))
+        .filter(ItemVersion.item_id.in_(item_ids))
+        .group_by(ItemVersion.item_id)
+        .all()
+    )
+    return {item_id: max_ver or 0 for item_id, max_ver in results}
+
 #############################################################################
 # Lista degli inventari visibili all'utente
 def list_inventories_base(
@@ -168,6 +180,10 @@ def list_inventories_base(
                     break
 
         return raw_text, display_text
+
+    # Pre-caricamento in batch delle versioni degli item per evitare query N+1
+    all_item_ids = [item.id for inv in visible_inventories for item in inv.items]
+    item_version_map = _get_item_version_map(db, all_item_ids)
 
     result = []
     filtro_lower = filtro.lower()
@@ -227,7 +243,7 @@ def list_inventories_base(
                                 )
                                 for value in item.metadata_values
                             ],
-                            version_num=_current_item_version_num(db, item.id),
+                            version_num=item_version_map.get(item.id, 0),
                         ).model_dump(),
                         "highlighted": {
                             "name": name_highlight,
@@ -323,7 +339,9 @@ def list_items_base(
         raise HTTPException(status_code=404, detail="Inventario non trovato")
     if not can_access_inventory(user, inventory, action="view"):
         raise HTTPException(status_code=403, detail="Accesso negato")
-    #return inventory.items
+    item_ids = [item.id for item in inventory.items]
+    item_version_map = _get_item_version_map(db, item_ids)
+
     return [
         ItemResponse(
             id=item.id,
@@ -346,7 +364,7 @@ def list_items_base(
                 )
                 for value in item.metadata_values
             ],
-            version_num=_current_item_version_num(db, item.id),
+            version_num=item_version_map.get(item.id, 0),
         )
         for item in inventory.items
     ]
