@@ -3,7 +3,7 @@ import { ReactNode, useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../useAuth'
 import { getApiVersion } from '../api'
-import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser } from 'react-icons/fi'
+import { FiLogOut, FiCompass, FiBox, FiCheckSquare, FiSettings, FiLogIn, FiUser, FiMenu, FiX } from 'react-icons/fi'
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -29,7 +29,14 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
     <div className="flex h-screen overflow-hidden">
       {!isOpen && (
         <div className="md:hidden fixed top-4 left-4 z-50 dark:text-white">
-          <button onClick={toggleSidebar}>☰</button>
+          <button
+            onClick={toggleSidebar}
+            aria-label="Apri menu"
+            aria-expanded={false}
+            className="p-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          >
+            <FiMenu className="text-xl" />
+          </button>
         </div>
       )}
       {/* Sidebar */}
@@ -40,7 +47,14 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       >
         <div className="flex justify-between items-center mb-4 md:hidden">
           <span className="font-bold text-lg">Menu</span>
-          <button onClick={toggleSidebar}>☰</button>
+          <button
+            onClick={toggleSidebar}
+            aria-label="Chiudi menu"
+            aria-expanded={true}
+            className="p-1 rounded hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          >
+            <FiX className="text-xl" />
+          </button>
         </div>
 
         {user && user.username ? (
