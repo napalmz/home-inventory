@@ -7,19 +7,22 @@ import MetadataDefinitionsPage from "./settings/MetadataDefinitionsPage";
 //import InfoPage from "./settings/InfoPage";
 import BackupManagementPage from "./settings/BackupManagementPage";
 import AuditLogPage from "./settings/AuditLogPage";
-
-const tabs = [
-  { name: "Generale", component: <GeneralSettings /> },
-  { name: "Utenti", component: <UserManagementPage /> },
-  //{ name: "Ruoli", component: <RoleManagementPage /> },
-  { name: "Gruppi", component: <GroupManagementPage /> },
-  { name: "Metadati", component: <MetadataDefinitionsPage /> },
-  { name: "Backup", component: <BackupManagementPage /> },
-  { name: "Audit", component: <AuditLogPage /> },
-  //{ name: "Info", component: <InfoPage /> },
-];
+import BarcodeManagementPage from "./settings/BarcodeManagementPage";
+import { useAuth } from "../useAuth";
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const tabs = [
+    { name: "Generale", component: <GeneralSettings /> },
+    { name: "Utenti", component: <UserManagementPage /> },
+    //{ name: "Ruoli", component: <RoleManagementPage /> },
+    { name: "Gruppi", component: <GroupManagementPage /> },
+    { name: "Metadati", component: <MetadataDefinitionsPage /> },
+    { name: "Backup", component: <BackupManagementPage /> },
+    { name: "Barcode", component: <BarcodeManagementPage />, adminOnly: true },
+    { name: "Audit", component: <AuditLogPage /> },
+    //{ name: "Info", component: <InfoPage /> },
+  ].filter((tab) => !('adminOnly' in tab) || user?.role.name === 'admin');
   const [activeTab, setActiveTab] = useState("Generale");
 
   const currentTab = tabs.find((tab) => tab.name === activeTab);

@@ -310,6 +310,71 @@ export async function lookupBarcode(code: string, external = true): Promise<Barc
   return response.data as BarcodeLookupResult;
 }
 
+export interface AdminBarcodeRecord {
+  id: number;
+  code: string;
+  format: string | null;
+  item_id: number;
+  item_name: string;
+  inventory_id: number;
+  inventory_name: string;
+  data_mod: string;
+}
+
+export interface AdminBarcodeCacheEntry {
+  code: string;
+  found: boolean;
+  name: string | null;
+  brand: string | null;
+  quantity_label: string | null;
+  image_url: string | null;
+  source: string | null;
+  fetched_at: string;
+}
+
+export interface AdminBarcodeDebugResult {
+  raw_code: string;
+  normalized_code: string;
+  format: string | null;
+  is_valid_gtin: boolean;
+  is_isbn: boolean;
+  lookup_enabled: boolean;
+  source_checks: { source: string; outcome: 'found' | 'missing' | 'error' | 'pending'; detail?: string }[];
+  force_refresh: boolean;
+  matches: { barcode_id: number; item_id: number; item_name: string; inventory_id: number; inventory_name: string }[];
+  product: { name: string | null; brand: string | null; quantity_label: string | null; image_url: string | null; source: string | null } | null;
+  cache: { found: boolean; name: string | null; brand: string | null; source: string | null; fetched_at: string } | null;
+  checked_at: string;
+}
+
+export async function getAdminBarcodes(query = ''): Promise<AdminBarcodeRecord[]> {
+  const response = await api.get('/barcode/admin/codes', { params: { query } });
+  return response.data as AdminBarcodeRecord[];
+}
+
+export async function getAdminBarcodeCache(query = ''): Promise<AdminBarcodeCacheEntry[]> {
+  const response = await api.get('/barcode/admin/cache', { params: { query } });
+  return response.data as AdminBarcodeCacheEntry[];
+}
+
+export async function debugAdminBarcode(code: string, format: string | null, forceRefresh = false): Promise<AdminBarcodeDebugResult> {
+  const response = await api.post('/barcode/admin/debug', { code, format, force_refresh: forceRefresh });
+  return response.data as AdminBarcodeDebugResult;
+}
+
+export async function correctAdminBarcode(barcodeId: number, code: string, format: string | null): Promise<void> {
+  await api.put(`/barcode/admin/codes/${barcodeId}`, { code, format });
+}
+
+export async function deleteAdminBarcodeCache(code: string): Promise<void> {
+  await api.delete(`/barcode/admin/cache/${encodeURIComponent(code)}`);
+}
+
+export async function clearAdminBarcodeCache(): Promise<number> {
+  const response = await api.delete('/barcode/admin/cache');
+  return response.data.deleted as number;
+}
+
 export async function addItemBarcode(itemId: number, code: string, format?: string | null): Promise<ItemBarcode> {
   const response = await api.post(`/item/${itemId}/barcodes`, { code, format: format ?? null });
   return response.data as ItemBarcode;

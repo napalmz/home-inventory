@@ -4,6 +4,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
@@ -29,6 +30,29 @@ USER_AGENT = "home-inventory/1.0 (https://github.com/napalmz/home-inventory)"
 HTTP_TIMEOUT_SECONDS = 4
 CACHE_TTL_FOUND = timedelta(days=30)
 CACHE_TTL_NOT_FOUND = timedelta(days=1)
+_ACTIVE_SOURCE_CHECK: ContextVar[dict[str, str] | None] = ContextVar("barcode_source_check", default=None)
+
+
+def _record_source_error(detail: str) -> None:
+    check = _ACTIVE_SOURCE_CHECK.get()
+    if check is not None:
+        check["detail"] = detail[:300]
+
+
+def _http_error_detail(exc: urllib.error.HTTPError) -> str:
+    detail = f"HTTP {exc.code} {exc.reason}"
+    try:
+        payload = json.loads(exc.read().decode("utf-8"))
+        error = payload.get("error") if isinstance(payload, dict) else None
+        message = error.get("message") if isinstance(error, dict) else None
+        reasons = [entry.get("reason") for entry in error.get("errors", []) if isinstance(entry, dict) and entry.get("reason")] if isinstance(error, dict) else []
+        if message:
+            detail += f": {message}"
+        if reasons:
+            detail += f" ({', '.join(reasons)})"
+    except (ValueError, UnicodeDecodeError, OSError):
+        pass
+    return detail[:300]
 
 
 def lookup_enabled() -> bool:
@@ -104,8 +128,19 @@ def _fetch_product(base_url: str, code: str) -> tuple[str, Optional[dict]]:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        _record_source_error(_http_error_detail(exc))
         return ("missing", None) if exc.code == 404 else ("error", None)
-    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+    except urllib.error.URLError as exc:
+        _record_source_error(f"Errore di rete: {exc.reason}")
+        return "error", None
+    except TimeoutError:
+        _record_source_error(f"Timeout dopo {HTTP_TIMEOUT_SECONDS} secondi")
+        return "error", None
+    except ValueError:
+        _record_source_error("La risposta non contiene JSON valido")
+        return "error", None
+    except OSError as exc:
+        _record_source_error(f"Errore di connessione ({type(exc).__name__})")
         return "error", None
     product = payload.get("product") if payload.get("status") == 1 else None
     return ("found", product) if product else ("missing", None)
@@ -120,8 +155,19 @@ def _fetch_book(base_url: str, code: str) -> tuple[str, Optional[dict]]:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        _record_source_error(_http_error_detail(exc))
         return ("missing", None) if exc.code == 404 else ("error", None)
-    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+    except urllib.error.URLError as exc:
+        _record_source_error(f"Errore di rete: {exc.reason}")
+        return "error", None
+    except TimeoutError:
+        _record_source_error(f"Timeout dopo {HTTP_TIMEOUT_SECONDS} secondi")
+        return "error", None
+    except ValueError:
+        _record_source_error("La risposta non contiene JSON valido")
+        return "error", None
+    except OSError as exc:
+        _record_source_error(f"Errore di connessione ({type(exc).__name__})")
         return "error", None
     book = payload.get(key) if isinstance(payload, dict) else None
     if not book or not book.get("title"):
@@ -152,8 +198,19 @@ def _fetch_google_book(code: str) -> tuple[str, Optional[dict]]:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        _record_source_error(_http_error_detail(exc))
         return ("missing", None) if exc.code == 404 else ("error", None)
-    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+    except urllib.error.URLError as exc:
+        _record_source_error(f"Errore di rete: {exc.reason}")
+        return "error", None
+    except TimeoutError:
+        _record_source_error(f"Timeout dopo {HTTP_TIMEOUT_SECONDS} secondi")
+        return "error", None
+    except ValueError:
+        _record_source_error("La risposta non contiene JSON valido")
+        return "error", None
+    except OSError as exc:
+        _record_source_error(f"Errore di connessione ({type(exc).__name__})")
         return "error", None
     items = payload.get("items") if isinstance(payload, dict) else None
     info = (items[0].get("volumeInfo") if items else None) or {}
@@ -178,7 +235,11 @@ def _sources_for(code: str) -> list[tuple[str, Callable[[str], tuple[str, Option
     return [(name, lambda c, u=base_url: _fetch_product(u, c)) for name, base_url in LOOKUP_SOURCES]
 
 
-def lookup_product(db: Session, code: str) -> Optional[BarcodeProductCache]:
+def lookup_product(
+    db: Session,
+    code: str,
+    source_checks: list[dict[str, str]] | None = None,
+) -> Optional[BarcodeProductCache]:
     """Restituisce la riga di cache (found=True) oppure None. Non solleva mai per errori di rete."""
     if not lookup_enabled() or not is_valid_gtin(code):
         return None
@@ -194,7 +255,15 @@ def lookup_product(db: Session, code: str) -> Optional[BarcodeProductCache]:
     found_source = None
     all_missing = True
     for source, fetch in _sources_for(code):
-        outcome, product = fetch(code)
+        check = {"source": source, "outcome": "pending"}
+        token = _ACTIVE_SOURCE_CHECK.set(check)
+        try:
+            outcome, product = fetch(code)
+        finally:
+            _ACTIVE_SOURCE_CHECK.reset(token)
+        check["outcome"] = outcome
+        if source_checks is not None:
+            source_checks.append(check)
         if outcome == "found":
             found_product, found_source = product, source
             break
