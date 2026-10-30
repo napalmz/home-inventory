@@ -17,6 +17,7 @@ import { HistoryModal } from "../components/HistoryModal";
 import MetadataFilterManager from "../components/MetadataFilterManager";
 import { ITEMS_CHANGED_EVENT } from "../components/GlobalBarcodeScan";
 import ItemBarcodesEditor from "../components/ItemBarcodesEditor";
+import { useBottomSheetDrag } from "../components/useBottomSheetDrag";
 import { AddFromInventoryDialog, AssignExistingListItemDialog, AssignToListDialog, EditAssignmentDialog, ListLinkField, SourceAssignmentsDialog } from "../components/AssignmentDialogs";
 
 interface Props {
@@ -145,9 +146,6 @@ function MetadataFieldsSection({
 
   return (
     <div className="mt-4 rounded border border-gray-200 p-3 dark:border-gray-700">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
-        Metadati
-      </h3>
       <div className="space-y-3">
         {definitions.map((definition) => {
           const currentValue = getTypedValueForDefinition(definition, drafts[definition.id]);
@@ -193,8 +191,8 @@ function MetadataFieldsSection({
                 />
               )}
               {definition.field_type === 'DATE' && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-2">
+                  <div className="space-y-2">
                     <input
                       type="date"
                       className="w-full border rounded p-1 dark:bg-gray-800"
@@ -204,7 +202,7 @@ function MetadataFieldsSection({
                     {currentValue && (
                       <button
                         type="button"
-                        className="rounded border px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="min-h-11 w-full rounded border px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={() => onChange(definition, '')}
                       >
                         Svuota
@@ -342,6 +340,12 @@ export function SwipeableItemRow({
     }
   };
 
+  const actionGridColumns = isEditMode && !isViewer
+    ? (isInventory ? 'grid-cols-6' : 'grid-cols-4')
+    : isInventory && !isViewer
+      ? 'grid-cols-5'
+      : 'grid-cols-2';
+
   return (
     <div
       ref={combinedRef}
@@ -389,10 +393,10 @@ export function SwipeableItemRow({
           }
         }}
       >
-        <div className="flex flex-col w-full md:w-auto md:flex-row md:items-center">
+        <div className="flex w-full flex-row items-start gap-2 md:w-auto md:items-center">
           {isEditMode && (
-            <div className="mr-2 flex items-center">
-              <span className="text-xl">
+            <div className="flex shrink-0 items-center md:mr-1">
+              <span className="text-base">
                 {selectedItems.includes(item.id) ? '☑️' : '⬜️'}
               </span>
             </div>
@@ -420,7 +424,7 @@ export function SwipeableItemRow({
                 type="button"
                 disabled={isViewer}
                 onClick={(e) => { e.stopPropagation(); setAssignDialog('edit'); }}
-                className={`mt-1 self-start rounded px-2 py-1 text-xs ${
+                className={`mt-1 min-h-11 max-w-full self-start rounded-xl px-3 py-2 text-sm ${
                   item.quantity === 0 && ((item.assignment.source_stock ?? 0) < item.assignment.qty || (item.assignment.source_net_qty ?? 0) < 0)
                     ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
                     : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
@@ -435,7 +439,7 @@ export function SwipeableItemRow({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setAssignDialog('link'); }}
-                className="mt-1 self-start rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                className="mt-1 min-h-11 self-start rounded-xl bg-blue-100 px-3 py-2 text-sm text-blue-800 dark:bg-blue-900 dark:text-blue-200"
               >
                 📥 Assegna
               </button>
@@ -444,7 +448,7 @@ export function SwipeableItemRow({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setAssignDialog('sources'); }}
-                className={`mt-1 self-start rounded px-2 py-1 text-xs ${
+                className={`mt-1 min-h-11 max-w-full self-start rounded-xl px-3 py-2 text-sm ${
                   (item.net_qty ?? 0) < 0
                     ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                     : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
@@ -456,41 +460,45 @@ export function SwipeableItemRow({
               </button>
             )}
             {item.metadata_values && item.metadata_values.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div className="mt-1 flex flex-wrap gap-1">
                 {item.metadata_values
                   .filter((value) => value.definition_label && formatItemMetadataValue(value))
                   .map((value) => (
                     <span
                       key={value.id}
-                      className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-100"
+                      className="rounded-full bg-slate-100 px-2 py-0.5 text-sm text-slate-700 dark:bg-slate-700 dark:text-slate-100"
                     >
                       {value.definition_label}: {formatItemMetadataValue(value)}
                     </span>
                   ))}
               </div>
             )}
-            <div className="text-xs text-gray-400">
+            <div className="mt-1 text-xs text-gray-400">
               Ultima modifica: {item.username_mod} - {new Date(item.data_mod).toLocaleString()}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-2 md:mt-0 w-full md:w-auto justify-end">
+        <div className={`mt-2 grid w-full ${actionGridColumns} gap-1.5 md:mt-0 md:flex md:w-auto md:items-center md:justify-end`}>
           <button
-            className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 whitespace-nowrap"
+            type="button"
+            className="col-span-1 min-h-11 w-full rounded-lg bg-gray-200 px-1 text-base text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 md:min-h-0 md:w-auto md:rounded md:px-3 md:py-1 md:text-sm md:whitespace-nowrap"
             onClick={(e) => {
               e.stopPropagation();
               setIsItemHistoryOpen(true);
             }}
             title="Visualizza cronologia item"
+            aria-label="Visualizza cronologia item"
           >
             <span className="inline md:hidden">🕓</span>
             <span className="hidden md:inline">Cronologia</span>
           </button>
           {isInventory && !isViewer && !isEditMode && (
             <button
-              className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 whitespace-nowrap"
+              type="button"
+            className="col-span-1 min-h-11 w-full rounded-lg bg-gray-200 px-1 text-base text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 md:min-h-0 md:w-auto md:rounded md:px-3 md:py-1 md:text-sm md:whitespace-nowrap"
               onClick={(e) => { e.stopPropagation(); setAssignDialog('assign'); }}
               title="Assegna a una lista"
+              aria-label="Assegna a una lista"
             >
               <span className="inline md:hidden">📋</span>
               <span className="hidden md:inline">📋 Assegna</span>
@@ -499,21 +507,25 @@ export function SwipeableItemRow({
           {isEditMode && !isViewer && (
             <>
               <button
-                className="px-2 py-1 bg-yellow-500 text-white rounded text-sm"
+                type="button"
+                className="col-span-1 min-h-11 w-full rounded-lg bg-yellow-500 px-1 text-lg text-white md:min-h-0 md:w-auto md:rounded md:px-2 md:py-1 md:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   cloneItem();
                 }}
+                aria-label="Clona item"
               >
                 <span className="inline md:hidden">📄</span>
                 <span className="hidden md:inline">📄 Clona</span>
               </button>
               <button
-                className="px-2 py-1 bg-blue-500 text-white rounded text-sm"
+                type="button"
+                className="col-span-1 min-h-11 w-full rounded-lg bg-blue-500 px-1 text-lg text-white md:min-h-0 md:w-auto md:rounded md:px-2 md:py-1 md:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   setItemBeingEdited(item);
                 }}
+                aria-label="Modifica item"
               >
                 <span className="inline md:hidden">✏️</span>
                 <span className="hidden md:inline">✏️ Modifica</span>
@@ -521,7 +533,7 @@ export function SwipeableItemRow({
             </>
           )}
           {isChecklist ? (
-            <div className="flex items-center justify-center h-full w-full">
+            <div className="col-span-1 flex min-h-11 w-full items-center justify-center md:h-full">
               <input
                 type="checkbox"
                 checked={item.quantity > 0}
@@ -530,18 +542,21 @@ export function SwipeableItemRow({
                   if (isViewer) return;
                   toggleChecked(e.target.checked);
                 }}
-                className="w-7 h-7 accent-blue-600 focus:ring-2 rounded shadow-sm border-2 border-gray-400 dark:border-gray-600"
-                style={{ minWidth: '1.75rem', minHeight: '1.75rem' }}
+                className="h-10 w-10 accent-blue-600 focus:ring-2 rounded shadow-sm border-2 border-gray-400 dark:border-gray-600"
+                style={{ minWidth: '2.5rem', minHeight: '2.5rem' }}
                 aria-label="Completato"
               />
             </div>
           ) : isInventory && !isViewer ? (
-            <div className="flex items-center gap-2">
+            <div className="col-span-3 grid w-full grid-cols-3 gap-1.5 md:col-span-1 md:flex md:w-auto md:items-center">
               <button
-                className="px-2 py-1 bg-gray-400 rounded hover:bg-gray-600 text-sm"
+                type="button"
+                aria-label="Diminuisci quantità"
+                disabled={item.quantity <= 0}
+                className="min-h-11 w-full rounded-lg bg-gray-400 text-lg hover:bg-gray-600 disabled:opacity-40 md:min-h-0 md:w-auto md:rounded md:px-3 md:py-1 md:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const updated = { ...item, quantity: item.quantity - 1 };
+                  const updated = { ...item, quantity: Math.max(0, item.quantity - 1) };
                   updateItem(item.id, updated).then((upd) => {
                     if (upd) {
                       setItems(prev => prev.map(i => i.id === upd.id ? upd : i));
@@ -552,9 +567,11 @@ export function SwipeableItemRow({
               >
                 -
               </button>
-              <span className="min-w-[24px] text-center">{item.quantity}</span>
+              <span className="flex min-h-11 items-center justify-center rounded-lg border border-gray-200 text-base font-semibold dark:border-gray-700 md:min-h-0 md:min-w-[24px] md:rounded-none md:border-0 md:text-base md:font-normal">{item.quantity}</span>
               <button
-                className="px-2 py-1 bg-gray-400 rounded hover:bg-gray-600 rounded text-sm"
+                type="button"
+                aria-label="Aumenta quantità"
+                className="min-h-11 w-full rounded-lg bg-gray-400 text-lg hover:bg-gray-600 md:min-h-0 md:w-auto md:rounded md:px-3 md:py-1 md:text-sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   const updated = { ...item, quantity: item.quantity + 1 };
@@ -624,6 +641,7 @@ export default function InventoryDetailPage() {
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemQuantity, setNewItemQuantity] = useState(isChecklist ? 0 : 1);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'quantity'>(() => {
     const stored = localStorage.getItem('item_sortBy');
@@ -638,6 +656,7 @@ export default function InventoryDetailPage() {
     return 'asc';
   });
   const [itemBeingEdited, setItemBeingEdited] = useState<Item | null>(null);
+  const detailTopRef = useRef<HTMLDivElement>(null);
   const filtroParam = filterText;
   const [isCloning, setIsCloning] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -651,6 +670,19 @@ export default function InventoryDetailPage() {
   const [metadataFilterSummary, setMetadataFilterSummary] = useState<string | null>(null);
   const [filterTemplates, setFilterTemplates] = useState<FilterTemplateListItem[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | ''>('');
+
+  const editingMetadataRecap = metadataDefinitions
+    .filter((definition) => definition.is_active)
+    .flatMap((definition) => {
+      const rawValue = getTypedValueForDefinition(definition, editingMetadataDrafts[definition.id]).trim();
+      if (!rawValue) return [];
+      const value = definition.field_type === 'BOOLEAN'
+        ? (rawValue === 'true' ? 'Sì' : 'No')
+        : definition.field_type === 'LIST'
+          ? (definition.list_options?.find((option) => option.value === rawValue)?.label ?? rawValue)
+          : rawValue;
+      return [{ id: definition.id, label: definition.label, value }];
+    });
 
 useEffect(() => {
   const fetchData = async () => {
@@ -946,46 +978,49 @@ useEffect(() => {
     void applyTemplateToList(selectedTemplateId);
   }, [selectedTemplateId, inventory?.id, items]);
 
+  const addItemSheetDrag = useBottomSheetDrag(() => setisInsertMode(false));
+  const editItemSheetDrag = useBottomSheetDrag(() => setItemBeingEdited(null));
+
   return (
-    <div className="relative p-4">
-      <div className="sticky top-0 bg-white dark:bg-gray-900 z-10 pb-2">
+    <div ref={detailTopRef} className="relative p-3 sm:p-4">
+      <div className="sticky top-0 z-10 bg-white pb-1 dark:bg-gray-900">
         <Link
           to={`/${basePath}${filtroParam ? `?filtro=${encodeURIComponent(filtroParam)}` : ""}`}
-          className="text-blue-500 hover:underline mb-2 inline-block"
+          className="mb-1 inline-block text-sm text-blue-500 hover:underline"
         >
           ← Torna all'elenco {isChecklist ? "delle liste" : "degli inventari"}
         </Link>
         {inventory && (
           <>
-            <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-              <h2 className="text-xl font-bold flex items-center gap-2">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="flex items-center gap-1.5 text-lg font-bold sm:gap-2 sm:text-xl">
                 {isChecklist ? "Lista: " : "Inventario: "}
                 {inventory.name}
-                <span className="text-sm font-mono bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded">
+                <span className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-200 sm:px-2 sm:py-1 sm:text-sm">
                   v{inventory.version_num}
                 </span>
               </h2>
               <button
                 onClick={() => setIsHistoryOpen(true)}
-                className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 whitespace-nowrap"
+                className="h-10 w-10 shrink-0 rounded-lg bg-gray-200 px-1 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 sm:h-auto sm:w-auto sm:rounded sm:px-3 sm:py-1 sm:text-sm sm:whitespace-nowrap"
                 title="Visualizza cronologia modifiche"
               >
                 <span className="inline md:hidden">📋</span>
                 <span className="hidden md:inline">Cronologia</span>
               </button>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <p className="mb-1 text-xs text-gray-600 dark:text-gray-400 sm:mb-2 sm:text-sm">
               Creato da: {inventory.owner.username ? `${inventory.owner.username}` : "Sconosciuto"} | Data modifica:{" "}
               {new Date(inventory.data_mod).toLocaleString()}
             </p>
-            <hr className="mb-2" />
+            <hr className="mb-1 sm:mb-2" />
           </>
         )}
       </div>
 
       {inventory ? (
         <div>
-          <div className="sm:sticky sm:top-16 z-10 bg-white dark:bg-gray-900 mb-3 flex flex-wrap gap-2 items-center px-1 py-2 border-b">
+          <div className="z-10 mb-2 flex flex-wrap items-center gap-1.5 border-b bg-white px-1 py-1.5 dark:bg-gray-900 sm:sticky sm:top-16 sm:mb-3 sm:gap-2 sm:py-2">
             <label className="hidden sm:inline text-sm font-medium">Ordina per:</label>
             <select
               value={sortBy}
@@ -994,7 +1029,7 @@ useEffect(() => {
                 localStorage.setItem('item_sortBy', value);
                 setSortBy(value);
               }}
-              className="border rounded p-1 flex-1 min-w-0 sm:flex-none"
+              className="min-h-10 min-w-0 flex-1 rounded border px-2 py-1 sm:min-h-0 sm:flex-none"
             >
               <option value="date">Data modifica</option>
               <option value="name">Nome</option>
@@ -1006,13 +1041,13 @@ useEffect(() => {
                 localStorage.setItem('item_sortOrder', newOrder);
                 setSortOrder(newOrder);
               }}
-              className="border rounded p-1 px-2"
+              className="min-h-10 min-w-10 rounded border px-2 sm:min-h-0 sm:min-w-0 sm:py-1"
               title={`Ordina in ordine ${sortOrder === 'asc' ? 'decrescente' : 'crescente'}`}
             >
               {sortOrder === 'asc' ? '⬆️' : '⬇️'}
             </button>
             <div className="w-full sm:w-auto">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <input
                   type="text"
                   placeholder="Filtra la lista..."
@@ -1023,12 +1058,12 @@ useEffect(() => {
                       setFilterText('');
                     }
                   }}
-                  className="border rounded p-1 min-w-0 flex-1 sm:flex-none sm:w-auto"
+                  className="min-h-10 min-w-0 flex-1 rounded border px-2 py-1 sm:min-h-0 sm:flex-none sm:w-auto"
                 />
                 <select
                   value={barcodeFilter}
                   onChange={(e) => setBarcodeFilter(e.target.value as 'all' | 'with' | 'without')}
-                  className="border rounded p-1 w-28 sm:w-auto"
+                  className="min-h-10 w-28 rounded border px-1.5 py-1 sm:min-h-0 sm:w-auto"
                   title="Filtra per barcode"
                 >
                   <option value="all">🏷️ Tutti</option>
@@ -1041,7 +1076,7 @@ useEffect(() => {
                     setBarcodeFilter('all');
                     window.history.replaceState(null, '', location.pathname);
                   }}
-                  className="px-2 py-1 sm:px-4 sm:py-2 bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
+                  className="min-h-10 min-w-10 rounded bg-gray-300 px-2 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-300 sm:min-w-0 sm:px-4 sm:py-2"
                 >
                   <span className="inline sm:hidden">❌</span>
                   <span className="hidden sm:inline">Cancella filtro</span>
@@ -1049,7 +1084,7 @@ useEffect(() => {
               </div>
             </div>
             {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex w-full items-center gap-1.5 sm:w-auto sm:gap-2">
                 <label className="hidden sm:inline text-sm font-medium whitespace-nowrap">Template filtro:</label>
                 <select
                   value={selectedTemplateId}
@@ -1065,7 +1100,7 @@ useEffect(() => {
                     setSelectedTemplateId(templateId);
                     await applyTemplateToList(templateId);
                   }}
-                  className="border rounded p-1 flex-1 min-w-0 sm:flex-none sm:min-w-[220px]"
+                  className="min-h-10 min-w-0 flex-1 rounded border px-2 py-1 sm:min-h-0 sm:flex-none sm:min-w-[220px]"
                 >
                   <option value="">Template filtro: nessuno</option>
                   {filterTemplates.map((template) => (
@@ -1075,16 +1110,16 @@ useEffect(() => {
               </div>
             )}
             {isEditMode && (
-                <div className="mb-2 ml-auto flex gap-2">
+                <div className="mb-1 grid w-full grid-cols-2 gap-2 sm:ml-auto sm:w-auto">
                 <button
                     onClick={() => setSelectedItems(sortedItems.map(item => item.id))}
-                    className="px-2 py-1 text-sm bg-blue-500 text-white rounded"
+                    className="min-h-10 w-full rounded bg-blue-500 px-2 py-1 text-sm text-white"
                 >
                     Seleziona tutti
                 </button>
                 <button
                     onClick={() => setSelectedItems([])}
-                    className="px-2 py-1 text-sm bg-gray-500 text-white rounded"
+                    className="min-h-10 w-full rounded bg-gray-500 px-2 py-1 text-sm text-white"
                 >
                     Deseleziona tutti
                 </button>
@@ -1139,13 +1174,10 @@ useEffect(() => {
         <p>Caricamento {isChecklist ? "checklist" : "inventaro"}...</p>
       )}
 
-      <div
-        className={`z-40 gap-2 flex ${
-          isMobile
-            ? 'fixed bottom-2 right-2 flex-col'
-            : 'fixed top-4 right-4 flex-row'
-        }`}
-      >
+      {!isMobile && <div className="fixed right-4 top-4 z-40 flex gap-2">
+        <button type="button" onClick={() => detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="rounded-full bg-gray-700 px-4 py-2 text-white shadow-lg hover:bg-gray-800" title="Torna in cima alla lista">
+          ↑ In cima
+        </button>
         {isEditMode && selectedItems.length > 0 && (
           <button
             onClick={async () => {
@@ -1236,13 +1268,108 @@ useEffect(() => {
             </button>
           </>
         )}
-      </div>
+      </div>}
+
+      {isMobile && user?.role.name !== 'viewer' && (isInventory || isChecklist) && (
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-[calc(env(safe-area-inset-right)+1rem)] z-40 flex flex-col items-end">
+          {isMoreActionsOpen && (
+            <>
+              <button type="button" aria-label="Chiudi altre azioni" onClick={() => setIsMoreActionsOpen(false)} className="fixed inset-0 z-30" />
+              <div onClick={() => setIsMoreActionsOpen(false)} className="relative z-40 mb-2 flex w-56 flex-col gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+                {isEditMode && selectedItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!window.confirm('Sei sicuro di voler eliminare gli oggetti selezionati?')) return;
+                      for (const selectedId of selectedItems) await deleteItem(selectedId);
+                      setSelectedItems([]);
+                      setIsEditMode(false);
+                      const getItems = isInventory ? getInventoryItems : getChecklistItems;
+                      const refreshed = inventory && await getItems(inventory.id);
+                      if (refreshed) setItems(refreshed);
+                    }}
+                    className="min-h-11 w-full rounded-xl bg-red-600 px-3 text-left text-sm font-medium text-white"
+                  >🗑️ Elimina selezionati ({selectedItems.length})</button>
+                )}
+                {isChecklist && (
+                  <button type="button" onClick={() => setIsAddFromInventoryOpen(true)} className="min-h-11 w-full rounded-xl bg-emerald-600 px-3 text-left text-sm font-medium text-white">
+                    📥 Aggiungi da inventario
+                  </button>
+                )}
+                <MetadataFilterManager
+                  inventoryId={inventory?.id ?? Number(id)}
+                  currentContainerType={isChecklist ? 'CHECKLIST' : 'INVENTORY'}
+                  definitions={metadataDefinitions}
+                  allDefinitions={allMetadataDefinitions}
+                  onTemplatesChanged={setFilterTemplates}
+                  triggerLabel="🧩 Filtri metadati"
+                  triggerClassName="!min-h-11 !w-full !rounded-xl !px-3 !py-2 !text-left !text-sm !font-medium !shadow-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const header = `${inventory?.name} (${now.toLocaleString()})`;
+                    const withQty = items.filter((item) => item.quantity > 0).sort((a, b) => a.name.localeCompare(b.name));
+                    const zeroQty = items.filter((item) => item.quantity === 0).sort((a, b) => a.name.localeCompare(b.name));
+                    const lines = [...withQty, ...zeroQty].map((item) => `- ${item.quantity}x ${item.name}${item.description ? ` (${item.description})` : ''}`);
+                    window.open(`https://wa.me/?text=${encodeURIComponent([header, ...lines].join('\n'))}`, '_blank');
+                  }}
+                  className="min-h-11 w-full rounded-xl bg-green-700 px-3 text-left text-sm font-medium text-white"
+                >📲 Condividi su WhatsApp</button>
+                {user?.role.name === 'admin' && (
+                  <button type="button" onClick={() => setIsShareModalOpen(true)} className="min-h-11 w-full rounded-xl bg-green-600 px-3 text-left text-sm font-medium text-white">
+                    📤 Importa / esporta
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          <div className="relative z-40 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setisInsertMode(true)}
+              aria-label="Aggiungi item"
+              title="Aggiungi item"
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-lg"
+            >＋</button>
+            <button
+              type="button"
+              onClick={() => { setIsEditMode((current) => !current); setSelectedItems([]); }}
+              aria-label={isEditMode ? 'Esci dalla modifica' : 'Modifica item'}
+              title={isEditMode ? 'Esci dalla modifica' : 'Modifica item'}
+              className={`flex h-12 w-12 items-center justify-center rounded-xl text-lg text-white shadow-lg ${isEditMode ? 'bg-yellow-700' : 'bg-yellow-500'}`}
+            >{isEditMode ? '✖️' : '✏️'}</button>
+            <button
+              type="button"
+              onClick={() => detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              aria-label="Torna in cima alla lista"
+              title="Torna in cima alla lista"
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-600 text-lg text-white shadow-lg"
+            >↑</button>
+            <button
+              type="button"
+              onClick={() => setIsMoreActionsOpen((open) => !open)}
+              aria-label={isMoreActionsOpen ? 'Chiudi altre azioni' : 'Altre azioni'}
+              aria-expanded={isMoreActionsOpen}
+              title="Altre azioni"
+              className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-700 text-lg text-white shadow-lg dark:bg-gray-600"
+            >⋯</button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={isInsertMode} onClose={() => setisInsertMode(false)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-2xl">
-            <Dialog.Title className="text-lg font-semibold mb-4">Nuovo oggetto</Dialog.Title>
+        <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
+          <Dialog.Panel
+            style={{ transform: `translateY(${addItemSheetDrag.offset}px)`, transition: addItemSheetDrag.isDragging ? 'none' : 'transform 220ms ease-out' }}
+            className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] shadow-2xl dark:bg-gray-900 dark:text-white sm:rounded-2xl sm:p-6"
+          >
+            <button type="button" aria-label="Chiudi o trascina verso il basso" {...addItemSheetDrag.gripProps} className="mx-auto mb-3 flex h-8 w-16 touch-none items-center justify-center sm:hidden">
+              <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+            </button>
+            <Dialog.Title className="mb-4 text-lg font-semibold">Nuovo oggetto</Dialog.Title>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -1286,11 +1413,11 @@ useEffect(() => {
             >
               <div className="mb-2">
                 <label className="block text-sm font-medium">Nome</label>
-                <input type="text" className="w-full border rounded p-1" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+                <input type="text" className="min-h-12 w-full border rounded p-3" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
               </div>
               <div className="mb-2">
                 <label className="block text-sm font-medium">Descrizione</label>
-                <input type="text" className="w-full border rounded p-1" value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} />
+                <input type="text" className="min-h-12 w-full border rounded p-3" value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} />
               </div>
               {isChecklist && user?.role.name !== "viewer" && (
                 <ListLinkField
@@ -1305,25 +1432,27 @@ useEffect(() => {
               {isInventory && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium">Quantità</label>
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setNewItemQuantity((prev) => Math.max(0, prev - 1))}
-                      className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
+                      aria-label="Diminuisci quantità"
+                      className="min-h-12 w-full bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                     >
                       −
                     </button>
                     <input
                       type="number"
                       min="0"
-                      className="w-16 border rounded p-2 text-center"
+                      className="min-h-12 w-full border rounded p-2 text-center"
                       value={newItemQuantity}
                       onChange={(e) => setNewItemQuantity(Math.max(0, Number(e.target.value)))}
                     />
                     <button
                       type="button"
                       onClick={() => setNewItemQuantity((prev) => prev + 1)}
-                      className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
+                      aria-label="Aumenta quantità"
+                      className="min-h-12 w-full bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                     >
                       +
                     </button>
@@ -1367,18 +1496,18 @@ useEffect(() => {
                   });
                 }}
               />
-              <div className="flex justify-end gap-2">
+              <div className="grid w-full grid-cols-2 gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setisInsertMode(false);
                     setNewItemMetadataDrafts({});
                   }}
-                  className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
+                  className="min-h-12 w-full rounded-xl bg-gray-400 px-4 font-medium hover:bg-gray-600"
                 >
                   Chiudi
                 </button>
-                <button type="submit" className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                <button type="submit" className="min-h-12 w-full rounded-xl bg-blue-500 px-4 font-medium text-white hover:bg-blue-600">
                   Aggiungi
                 </button>
               </div>
@@ -1388,10 +1517,16 @@ useEffect(() => {
       </Dialog>
 
       <Dialog open={!!itemBeingEdited} onClose={() => setItemBeingEdited(null)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-2xl">
-            <Dialog.Title className="text-lg font-semibold mb-4">Modifica oggetto</Dialog.Title>
+        <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
+          <Dialog.Panel
+            style={{ transform: `translateY(${editItemSheetDrag.offset}px)`, transition: editItemSheetDrag.isDragging ? 'none' : 'transform 220ms ease-out' }}
+            className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] shadow-2xl dark:bg-gray-900 dark:text-white sm:rounded-2xl sm:p-6"
+          >
+            <button type="button" aria-label="Chiudi o trascina verso il basso" {...editItemSheetDrag.gripProps} className="mx-auto mb-3 flex h-8 w-16 touch-none items-center justify-center sm:hidden">
+              <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+            </button>
+            <Dialog.Title className="mb-4 text-lg font-semibold">{isCloning ? "Clona oggetto" : "Modifica oggetto"}</Dialog.Title>
             {itemBeingEdited && (
               <form
               onSubmit={async (e) => {
@@ -1467,7 +1602,7 @@ useEffect(() => {
                   <label className="block text-sm font-medium">Nome</label>
                   <input
                     type="text"
-                    className="w-full border rounded p-1"
+                    className="min-h-12 w-full border rounded p-3"
                     value={itemBeingEdited.name}
                     onChange={(e) =>
                       setItemBeingEdited({ ...itemBeingEdited, name: e.target.value })
@@ -1478,7 +1613,7 @@ useEffect(() => {
                   <label className="block text-sm font-medium">Descrizione</label>
                   <input
                     type="text"
-                    className="w-full border rounded p-1"
+                    className="min-h-12 w-full border rounded p-3"
                     value={itemBeingEdited.description || ""}
                     onChange={(e) =>
                       setItemBeingEdited({ ...itemBeingEdited, description: e.target.value })
@@ -1488,7 +1623,7 @@ useEffect(() => {
                 {isInventory && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium">Quantità</label>
-                    <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() =>
@@ -1496,14 +1631,15 @@ useEffect(() => {
                             prev ? { ...prev, quantity: Math.max(0, prev.quantity - 1) } : prev
                           )
                         }
-                        className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
+                        aria-label="Diminuisci quantità"
+                        className="min-h-12 w-full bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                       >
                         −
                       </button>
                       <input
                         type="number"
                         min="0"
-                        className="w-16 border rounded p-2 text-center"
+                        className="min-h-12 w-full border rounded p-2 text-center"
                         value={itemBeingEdited.quantity}
                         onChange={(e) =>
                           setItemBeingEdited({
@@ -1519,7 +1655,8 @@ useEffect(() => {
                             prev ? { ...prev, quantity: prev.quantity + 1 } : prev
                           )
                         }
-                        className="px-3 py-2 bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
+                        aria-label="Aumenta quantità"
+                        className="min-h-12 w-full bg-gray-400 rounded hover:bg-gray-600 text-xl leading-none"
                       >
                         +
                       </button>
@@ -1569,47 +1706,84 @@ useEffect(() => {
                   />
                 )}
                 {!isCloning && (
-                  <ItemBarcodesEditor
-                    itemId={itemBeingEdited.id}
-                    barcodes={itemBeingEdited.barcodes ?? []}
-                    onChange={(barcodes) => {
-                      setItemBeingEdited((prev) => (prev ? { ...prev, barcodes } : prev));
-                      setItems((current) =>
-                        current.map((item) => (item.id === itemBeingEdited.id ? { ...item, barcodes } : item)),
-                      );
-                    }}
-                  />
+                  <details className="mb-3 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <span className="min-w-0">
+                        <span className="block font-medium">Codici a barre / QR</span>
+                        <span className="block break-all text-sm text-gray-500 dark:text-gray-400">
+                          {(itemBeingEdited.barcodes?.length ?? 0) === 1
+                            ? '1 codice assegnato'
+                            : `${itemBeingEdited.barcodes?.length ?? 0} codici assegnati`}
+                          {(itemBeingEdited.barcodes?.length ?? 0) > 0 && ` · ${itemBeingEdited.barcodes?.map((barcode) => barcode.code).join(', ')}`}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-gray-500" aria-hidden="true">⌄</span>
+                    </summary>
+                    <div className="border-t border-gray-200 px-4 pt-3 dark:border-gray-700">
+                      <ItemBarcodesEditor
+                        itemId={itemBeingEdited.id}
+                        barcodes={itemBeingEdited.barcodes ?? []}
+                        onChange={(barcodes) => {
+                          setItemBeingEdited((prev) => (prev ? { ...prev, barcodes } : prev));
+                          setItems((current) =>
+                            current.map((item) => (item.id === itemBeingEdited.id ? { ...item, barcodes } : item)),
+                          );
+                        }}
+                      />
+                    </div>
+                  </details>
                 )}
-                {metadataLoading ? (
-                  <div className="mt-4 text-sm text-gray-500 dark:text-gray-300">Caricamento metadati...</div>
-                ) : (
-                  <MetadataFieldsSection
-                    definitions={metadataDefinitions.filter((definition) => definition.is_active)}
-                    drafts={editingMetadataDrafts}
-                    onChange={(definition, value) => {
-                      setEditingMetadataDrafts((current) => {
-                        const nextDraft = createEmptyMetadataDraft(definition.field_type);
-                        nextDraft.definition_id = definition.id;
+                {metadataDefinitions.some((definition) => definition.is_active) && (
+                  <details className="mb-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <span className="min-w-0">
+                        <span className="block font-medium">Metadati</span>
+                        {metadataLoading ? (
+                          <span className="block text-sm text-gray-500 dark:text-gray-400">Caricamento valori…</span>
+                        ) : editingMetadataRecap.length > 0 ? (
+                          <span className="block text-sm text-gray-600 dark:text-gray-300">
+                            {editingMetadataRecap.map((metadata) => `${metadata.label}: ${metadata.value}`).join(' · ')}
+                          </span>
+                        ) : (
+                          <span className="block text-sm text-gray-500 dark:text-gray-400">Nessun metadato valorizzato</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-gray-500" aria-hidden="true">⌄</span>
+                    </summary>
+                    <div className="border-t border-gray-200 px-4 pt-1 dark:border-gray-700">
+                      {metadataLoading ? (
+                        <div className="py-3 text-sm text-gray-500 dark:text-gray-300">Caricamento metadati…</div>
+                      ) : (
+                        <MetadataFieldsSection
+                          definitions={metadataDefinitions.filter((definition) => definition.is_active)}
+                          drafts={editingMetadataDrafts}
+                          onChange={(definition, value) => {
+                            setEditingMetadataDrafts((current) => {
+                              const nextDraft = createEmptyMetadataDraft(definition.field_type);
+                              nextDraft.definition_id = definition.id;
 
-                        if (definition.field_type === 'TEXT' || definition.field_type === 'LIST') {
-                          nextDraft.value_text = value || null;
-                        } else if (definition.field_type === 'NUMBER') {
-                          nextDraft.value_number = value === '' ? null : value;
-                        } else if (definition.field_type === 'BOOLEAN') {
-                          nextDraft.value_boolean = value === '' ? null : value === 'true';
-                        } else {
-                          nextDraft.value_date = value || null;
-                        }
+                              if (definition.field_type === 'TEXT' || definition.field_type === 'LIST') {
+                                nextDraft.value_text = value || null;
+                              } else if (definition.field_type === 'NUMBER') {
+                                nextDraft.value_number = value === '' ? null : value;
+                              } else if (definition.field_type === 'BOOLEAN') {
+                                nextDraft.value_boolean = value === '' ? null : value === 'true';
+                              } else {
+                                nextDraft.value_date = value || null;
+                              }
 
-                        return {
-                          ...current,
-                          [definition.id]: nextDraft,
-                        };
-                      });
-                    }}
-                  />
+                              return {
+                                ...current,
+                                [definition.id]: nextDraft,
+                              };
+                            });
+                          }}
+                        />
+                      )}
+                    </div>
+                  </details>
                 )}
-                <div className="flex justify-end gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -1618,13 +1792,13 @@ useEffect(() => {
                       setEditingMetadataDrafts({});
                       setEditingMetadataValues([]);
                     }}
-                    className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
+                    className="min-h-12 w-full rounded-xl bg-gray-400 px-4 font-medium hover:bg-gray-600"
                   >
                     Chiudi
                   </button>
                   <button
                     type="submit"
-                    className={`px-3 py-1 text-white rounded hover:opacity-90 ${isCloning ? "bg-yellow-500 hover:bg-yellow-600" : "bg-green-600 hover:bg-green-700"}`}
+                    className={`min-h-12 w-full rounded-xl px-4 font-medium text-white hover:opacity-90 ${isCloning ? "bg-yellow-500 hover:bg-yellow-600" : "bg-green-600 hover:bg-green-700"}`}
                   >
                     {isCloning ? "Clona" : "Salva modifiche"}
                   </button>

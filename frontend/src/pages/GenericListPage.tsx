@@ -557,7 +557,7 @@ export default function GenericListPage() {
         className={`z-40 gap-2 flex ${
           window.innerWidth >= 768
             ? 'fixed top-4 right-4 flex-row'
-            : 'fixed bottom-2 right-2 flex-col'
+            : 'fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-[calc(env(safe-area-inset-right)+1rem)] flex-col'
         }`}
       >
         {editMode && selectedItems.length > 0 && (

@@ -197,12 +197,16 @@ export default function MetadataFilterManager({
   definitions,
   allDefinitions,
   onTemplatesChanged,
+  triggerLabel,
+  triggerClassName = '',
 }: {
   inventoryId: number;
   currentContainerType: 'INVENTORY' | 'CHECKLIST';
   definitions: MetadataDefinition[];
   allDefinitions?: MetadataDefinition[];
   onTemplatesChanged?: (templates: FilterTemplateListItem[]) => void;
+  triggerLabel?: string;
+  triggerClassName?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [templates, setTemplates] = useState<FilterTemplateListItem[]>([]);
@@ -400,10 +404,12 @@ export default function MetadataFilterManager({
           resetCreate();
           setIsOpen(true);
         }}
-        className="py-2 px-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700"
+        className={`py-2 px-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 ${triggerClassName}`}
       >
-        <span className="inline md:hidden">🧩</span>
-        <span className="hidden md:inline">Filtri metadata</span>
+        {triggerLabel ?? <>
+          <span className="inline md:hidden">🧩</span>
+          <span className="hidden md:inline">Filtri metadata</span>
+        </>}
       </button>
 
       <Dialog open={isOpen} onClose={closeAndReset} className="relative z-50">

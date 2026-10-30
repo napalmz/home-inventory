@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dialog } from '@headlessui/react';
+import { useBottomSheetDrag } from './useBottomSheetDrag';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat } from '@zxing/library';
 
@@ -217,6 +218,8 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
     onClose();
   };
 
+  const sheetDrag = useBottomSheetDrag(closeAndReset);
+
   const submitManual = () => {
     const code = manualCode.trim();
     if (!code) return;
@@ -227,9 +230,21 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
   return (
     <Dialog open={open} onClose={closeAndReset} className="relative z-[60]">
       <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-4 rounded w-full max-w-lg">
-          <Dialog.Title className="text-lg font-semibold mb-2">Scansiona codice</Dialog.Title>
+      <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
+        <Dialog.Panel
+          style={{ transform: `translateY(${sheetDrag.offset}px)`, transition: sheetDrag.isDragging ? 'none' : 'transform 220ms ease-out' }}
+          className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl dark:bg-gray-900 dark:text-white sm:rounded-2xl"
+        >
+          <div className="shrink-0 px-4 pb-3 pt-2 sm:p-5 sm:pb-3">
+            <button type="button" aria-label="Chiudi o trascina verso il basso" {...sheetDrag.gripProps} className="mx-auto mb-2 flex h-8 w-16 touch-none items-center justify-center sm:hidden">
+              <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+            </button>
+            <div className="flex items-center justify-between gap-3">
+              <Dialog.Title className="text-lg font-semibold">Scansiona codice</Dialog.Title>
+              <button type="button" onClick={closeAndReset} aria-label="Chiudi scanner" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-2xl text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">×</button>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 sm:px-5">
           {error ? (
             <p className="text-sm text-red-600 mb-3">{error}</p>
           ) : (
@@ -286,7 +301,7 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
             </div>
           )}
           <form
-            className="flex gap-2 mb-3"
+            className="mb-3 grid grid-cols-[1fr_auto] gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               submitManual();
@@ -296,22 +311,17 @@ export default function BarcodeScanner({ open, onClose, onDetected }: Props) {
               type="text"
               inputMode="text"
               placeholder="Oppure digita / incolla il codice"
-              className="flex-1 border rounded p-2"
+              className="min-h-12 min-w-0 rounded-xl border px-3"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
             />
-            <button type="submit" className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-              OK
+            <button type="submit" className="min-h-12 rounded-xl bg-blue-600 px-5 font-medium text-white hover:bg-blue-700">
+              Leggi
             </button>
           </form>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={closeAndReset}
-              className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600"
-            >
-              Chiudi
-            </button>
+          </div>
+          <div className="shrink-0 border-t border-gray-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] dark:border-gray-700 dark:bg-gray-900 sm:pb-4">
+            <button type="button" onClick={closeAndReset} className="min-h-12 w-full rounded-xl bg-gray-300 px-4 font-medium text-gray-900 hover:bg-gray-400 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">Chiudi</button>
           </div>
         </Dialog.Panel>
       </div>

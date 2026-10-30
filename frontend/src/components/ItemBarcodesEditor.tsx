@@ -55,7 +55,6 @@ export default function ItemBarcodesEditor({ itemId, barcodes, onChange }: Props
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium mb-1">Codici a barre / QR</label>
       {barcodes.length === 0 && <p className="text-sm text-gray-500 mb-1">Nessun codice associato</p>}
       <ul className="mb-2 space-y-1">
         {barcodes.map((barcode) => (
@@ -66,9 +65,9 @@ export default function ItemBarcodesEditor({ itemId, barcodes, onChange }: Props
           </li>
         ))}
       </ul>
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <input
-          className="flex-1 border rounded p-1"
+          className="col-span-2 min-h-12 w-full border rounded px-3"
           placeholder="Digita o incolla un codice"
           value={manualCode}
           onChange={(e) => setManualCode(e.target.value)}
@@ -79,11 +78,11 @@ export default function ItemBarcodesEditor({ itemId, barcodes, onChange }: Props
             }
           }}
         />
-        <button type="button" disabled={busy || !manualCode.trim()} onClick={() => void add(manualCode, null)} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">
+        <button type="button" disabled={busy || !manualCode.trim()} onClick={() => void add(manualCode, null)} className="min-h-12 w-full bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50">
           Aggiungi
         </button>
-        <button type="button" disabled={busy} onClick={() => setScannerOpen(true)} className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700" title="Scansiona">
-          📷
+        <button type="button" disabled={busy} onClick={() => setScannerOpen(true)} className="min-h-12 w-full bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700" title="Scansiona">
+          📷 Scansiona
         </button>
       </div>
       {error && <p className="text-red-600 text-sm mt-1">{error}</p>}

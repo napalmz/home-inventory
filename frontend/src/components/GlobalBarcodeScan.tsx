@@ -15,6 +15,7 @@ import type { BarcodeLookupResult, BarcodeMatch } from '../types';
 import BarcodeScanner from './BarcodeScanner';
 import { useAuth } from '../useAuth';
 import { useKeyboardScanner } from '../useKeyboardScanner';
+import { useBottomSheetDrag } from './useBottomSheetDrag';
 
 export const ITEMS_CHANGED_EVENT = 'barcode-items-changed';
 
@@ -224,25 +225,12 @@ export default function GlobalBarcodeScan() {
       return `Codice ${scan.code} associato a "${item?.name ?? ''}"`;
     });
 
-  const startManage = async (nextMode: Mode) => {
-    setError(null);
-    setMode(nextMode);
-    if (targets.length === 0) {
-      try {
-        const all = await loadTargets();
-        const preferred =
-          all.find((t) => currentTarget && t.kind === currentTarget.kind && t.id === currentTarget.id) ?? all[0];
-        setTargetKeySel(preferred ? targetKey(preferred) : '');
-      } catch (err) {
-        setError(errorMessage(err));
-      }
-    }
-  };
-
   const rescan = () => {
     closeAll();
     setScannerOpen(true);
   };
+
+  const scanSheetDrag = useBottomSheetDrag(closeAll);
 
   if (!user?.username) return null;
 
@@ -277,7 +265,7 @@ export default function GlobalBarcodeScan() {
         onClick={() => setScannerOpen(true)}
         title="Scansiona barcode / QR code"
         aria-label="Scansiona barcode / QR code"
-        className="fixed top-4 right-4 md:top-auto md:bottom-4 z-30 w-12 h-12 md:w-14 md:h-14 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-2xl shadow-lg flex items-center justify-center"
+        className="fixed top-4 right-4 z-30 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600 text-xl text-white shadow-lg hover:bg-purple-700 md:top-auto md:bottom-4 md:h-14 md:w-14"
       >
         📷
       </button>
@@ -285,126 +273,137 @@ export default function GlobalBarcodeScan() {
       <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={(c, f) => void handleCode(c, f)} />
 
       <Dialog open={loading || scan !== null || error !== null} onClose={() => !busy && !loading && closeAll()} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            {loading && <p>Ricerca codice...</p>}
-
-            {!loading && !scan && error && (
-              <>
-                <p className="text-red-600 mb-4">{error}</p>
-                <div className="flex justify-end">
-                  <button onClick={closeAll} className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600">Chiudi</button>
-                </div>
-              </>
-            )}
-
-            {!loading && scan && (
-              <>
-                <Dialog.Title className="text-lg font-semibold mb-1">
-                  {matches.length > 1 ? 'Seleziona l\'oggetto' : matches.length === 1 ? 'Oggetto trovato' : 'Codice nuovo'}
-                </Dialog.Title>
-                <p className="text-sm font-mono text-gray-500 dark:text-gray-400 mb-3 break-all">{scan.code}</p>
-
+        <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
+          <Dialog.Panel
+            style={{ transform: `translateY(${scanSheetDrag.offset}px)`, transition: scanSheetDrag.isDragging ? 'none' : 'transform 220ms ease-out' }}
+            className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl dark:bg-gray-900 dark:text-white sm:rounded-2xl"
+          >
+            <div className="shrink-0 px-5 pb-3 pt-3 sm:px-6 sm:pt-5">
+              <button type="button" aria-label="Chiudi o trascina verso il basso" {...scanSheetDrag.gripProps} className="mx-auto mb-3 flex h-8 w-16 touch-none items-center justify-center sm:hidden">
+                <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+              </button>
+              <div className="flex items-center justify-between gap-3">
+                {loading ? (
+                  <Dialog.Title className="text-lg font-semibold">Ricerca codice…</Dialog.Title>
+                ) : scan ? (
+                  <div>
+                    <Dialog.Title className="text-lg font-semibold">
+                      {matches.length > 0 ? (matches.length > 1 ? 'Prodotti trovati' : 'Prodotto trovato') : 'Nuovo codice'}
+                    </Dialog.Title>
+                    <p className="mt-1 break-all font-mono text-xs text-gray-500 dark:text-gray-400">{scan.code}</p>
+                  </div>
+                ) : (
+                  <Dialog.Title className="text-lg font-semibold">Scansione non riuscita</Dialog.Title>
+                )}
+                {!loading && <button type="button" onClick={closeAll} aria-label="Chiudi" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-2xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">×</button>}
+              </div>
+            </div>
+            <div className="overflow-y-auto px-5 pb-5 sm:px-6">
+              {loading && <p className="py-2 text-sm text-gray-600 dark:text-gray-300">Attendi mentre cerco il codice…</p>}
+              {!loading && !scan && error && <p className="rounded-xl bg-red-50 p-4 text-red-700 dark:bg-red-950/40 dark:text-red-300" role="alert">{error}</p>}
+              {!loading && scan && (
+                <>
                 {done ? (
                   <>
-                    <p className="mb-4 text-green-700 dark:text-green-400">✅ {done}</p>
-                    <div className="flex justify-end gap-2">
-                      <button onClick={closeAll} className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600">Chiudi</button>
-                      <button onClick={rescan} className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">Scansiona altro</button>
+                    <div className="rounded-2xl bg-green-50 p-4 text-green-800 dark:bg-green-950/40 dark:text-green-300" role="status">✅ {done}</div>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button onClick={closeAll} className="min-h-12 rounded-xl border border-gray-300 px-4 font-medium dark:border-gray-700">Chiudi</button>
+                      <button onClick={rescan} className="min-h-12 rounded-xl bg-purple-600 px-4 font-medium text-white hover:bg-purple-700">Scansiona altro</button>
                     </div>
                   </>
                 ) : mode === 'menu' ? (
                   <>
                     {matches.length === 0 && (
-                      <p className="text-sm mb-3">Nessun oggetto ha questo codice.</p>
+                      <p className="mb-3 rounded-xl bg-gray-100 p-3 text-sm dark:bg-gray-800">Nessun oggetto ha questo codice.</p>
                     )}
-                    <ul className="mb-4 space-y-2">
+                    <ul className="space-y-3">
                       {matches.map((m) => {
                         const qty = matchQty[m.item_id] ?? m.quantity ?? 0;
                         return (
-                          <li key={m.item_id} className="border rounded p-3">
-                            <div className="font-medium">{m.name}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                              {isChecklistMatch(m) ? '☑️ Lista' : '📦 Inventario'}: {m.inventory_name ?? m.inventory_id}
+                          <li key={m.item_id} className="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                            <div className="mb-3 flex items-start gap-3">
+                              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-xl dark:bg-blue-950/50">{isChecklistMatch(m) ? '☑️' : '📦'}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold">{m.name}</div>
+                                <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                                {isChecklistMatch(m) ? 'Lista' : 'Inventario'}: {m.inventory_name ?? m.inventory_id}
                               {' · '}
                               {isChecklistMatch(m) ? (qty ? 'Completato' : 'Da fare') : `Quantità: ${qty}`}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                               {canEdit && isChecklistMatch(m) && (
-                                <button disabled={busy} onClick={() => void setQuantity(m, qty ? 0 : 1)} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+                                <button disabled={busy} onClick={() => void setQuantity(m, qty ? 0 : 1)} className="col-span-2 min-h-12 rounded-xl bg-green-600 px-3 font-medium text-white hover:bg-green-700 disabled:opacity-50">
                                   {qty ? 'Segna da fare' : 'Segna completato'}
                                 </button>
                               )}
                               {canEdit && !isChecklistMatch(m) && (
                                 <>
-                                  <button disabled={busy} onClick={() => void setQuantity(m, qty + 1)} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">+1</button>
-                                  <button disabled={busy || !qty} onClick={() => void setQuantity(m, qty - 1)} className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50">−1</button>
+                                  <button disabled={busy} onClick={() => void setQuantity(m, qty + 1)} className="min-h-12 rounded-xl bg-green-600 px-3 font-medium text-white hover:bg-green-700 disabled:opacity-50">+1 pezzo</button>
+                                  <button disabled={busy || !qty} onClick={() => void setQuantity(m, qty - 1)} className="min-h-12 rounded-xl bg-orange-500 px-3 font-medium text-white hover:bg-orange-600 disabled:opacity-50">−1 pezzo</button>
                                   <input
                                     type="number"
                                     min="0"
-                                    placeholder="Qtà"
-                                    className="w-16 border rounded p-1 text-center dark:bg-gray-800"
+                                    aria-label={`Quantità per ${m.name}`}
+                                    placeholder="Quantità"
+                                    className="min-h-12 min-w-0 rounded-xl border border-gray-300 px-3 text-center dark:border-gray-700 dark:bg-gray-800"
                                     value={quantities[m.item_id] ?? ''}
                                     onChange={(e) => setQuantities((prev) => ({ ...prev, [m.item_id]: e.target.value }))}
                                   />
                                   <button
                                     disabled={busy || !(quantities[m.item_id] ?? '').trim()}
                                     onClick={() => void setQuantity(m, Number(quantities[m.item_id]))}
-                                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                                    className="min-h-12 rounded-xl border border-blue-600 px-3 font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950/40"
                                   >
-                                    Imposta
+                                    Imposta quantità
                                   </button>
                                 </>
                               )}
-                              <button onClick={() => openMatch(m)} className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600">
-                                {canEdit ? 'Apri / modifica' : 'Apri'}
+                              <button onClick={() => openMatch(m)} className="col-span-2 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-purple-600 px-3 font-medium text-white hover:bg-purple-700">
+                                Apri prodotto <span aria-hidden="true">→</span>
                               </button>
                             </div>
                           </li>
                         );
                       })}
                     </ul>
-                    {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-                    {canEdit && (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <button onClick={() => void startManage('create')} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
-                          Crea nuovo oggetto
-                        </button>
-                        <button onClick={() => void startManage('associate')} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
-                          Associa ad altro oggetto
-                        </button>
-                      </div>
-                    )}
-                    <div className="flex justify-end gap-2">
-                      <button onClick={closeAll} className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600">Chiudi</button>
-                      <button onClick={rescan} className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">Scansiona altro</button>
-                    </div>
+                    {error && <p className="mb-2 mt-3 text-sm text-red-600" role="alert">{error}</p>}
+                    <button onClick={rescan} className="mt-3 min-h-12 w-full rounded-xl border border-gray-300 px-4 font-medium dark:border-gray-700">Scansiona un altro codice</button>
                   </>
                 ) : (
                   <>
                     {product && (
-                      <div className="flex gap-3 items-center border rounded p-2 mb-3 bg-blue-50 dark:bg-gray-800">
-                        {product.image_url && <img src={product.image_url} alt="" className="w-14 h-14 object-contain rounded bg-white" />}
-                        <div className="text-sm">
-                          <div className="font-medium">{product.name ?? 'Prodotto senza nome'}</div>
-                          <div className="text-gray-600 dark:text-gray-300">{[product.brand, product.quantity_label].filter(Boolean).join(' - ')}</div>
-                          <div className="text-xs text-gray-500">Fonte: {product.source}</div>
+                      <div className="mb-4 flex items-center gap-3 rounded-2xl bg-blue-50 p-4 dark:bg-gray-800">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt="" className="h-14 w-14 shrink-0 rounded-xl bg-white object-contain" />
+                        ) : (
+                          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white text-2xl dark:bg-gray-700" aria-hidden="true">📦</span>
+                        )}
+                        <div className="min-w-0 text-sm">
+                          <div className="font-semibold">{product.name ?? 'Prodotto senza nome'}</div>
+                          {[product.brand, product.quantity_label].filter(Boolean).length > 0 && <div className="mt-1 text-gray-600 dark:text-gray-300">{[product.brand, product.quantity_label].filter(Boolean).join(' · ')}</div>}
+                          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Fonte: {product.source}</div>
                         </div>
                       </div>
                     )}
-                    <div className="flex gap-2 mb-3">
+                    <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
                       <button
+                        type="button"
                         onClick={() => setMode('create')}
-                        className={`px-3 py-1 rounded ${mode === 'create' ? 'bg-blue-500 text-white' : 'bg-gray-300 dark:bg-gray-700'}`}
+                        aria-pressed={mode === 'create'}
+                        className={`min-h-11 rounded-lg px-3 font-medium ${mode === 'create' ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}
                       >
-                        Crea nuovo
+                        Crea prodotto
                       </button>
                       <button
+                        type="button"
                         onClick={() => setMode('associate')}
-                        className={`px-3 py-1 rounded ${mode === 'associate' ? 'bg-blue-500 text-white' : 'bg-gray-300 dark:bg-gray-700'}`}
+                        aria-pressed={mode === 'associate'}
+                        className={`min-h-11 rounded-lg px-3 font-medium ${mode === 'associate' ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}
                       >
-                        Associa a esistente
+                        Collega esistente
                       </button>
                     </div>
 
@@ -417,50 +416,50 @@ export default function GlobalBarcodeScan() {
                           void submitCreate();
                         }}
                       >
-                        <div className="mb-2">
-                          <label className="block text-sm font-medium">Nome</label>
-                          <input autoFocus className="w-full border rounded p-1 dark:bg-gray-800" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                        <div className="mb-3">
+                          <label htmlFor="barcode-new-name" className="mb-1 block text-sm font-medium">Nome</label>
+                          <input id="barcode-new-name" autoFocus className="min-h-12 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-800" value={newName} onChange={(e) => setNewName(e.target.value)} />
                         </div>
-                        <div className="mb-2">
-                          <label className="block text-sm font-medium">Descrizione</label>
-                          <input className="w-full border rounded p-1 dark:bg-gray-800" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
+                        <div className="mb-3">
+                          <label htmlFor="barcode-new-description" className="mb-1 block text-sm font-medium">Descrizione</label>
+                          <input id="barcode-new-description" className="min-h-12 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-800" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
                         </div>
                         {target?.kind !== 'checklists' && (
-                          <div className="mb-3">
-                            <label className="block text-sm font-medium">Quantità</label>
+                          <div className="mb-4">
+                            <label htmlFor="barcode-new-quantity" className="mb-1 block text-sm font-medium">Quantità iniziale</label>
                             <input
+                              id="barcode-new-quantity"
                               type="number"
                               min="0"
-                              className="w-20 border rounded p-1 text-center dark:bg-gray-800"
+                              className="min-h-12 w-28 rounded-xl border border-gray-300 px-3 text-center dark:border-gray-700 dark:bg-gray-800"
                               value={newQuantity}
                               onChange={(e) => setNewQuantity(Math.max(0, Number(e.target.value)))}
                             />
                           </div>
                         )}
-                        {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={matches.length > 0 ? () => setMode('menu') : closeAll} className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600">
-                            {matches.length > 0 ? 'Indietro' : 'Annulla'}
-                          </button>
-                          <button type="submit" disabled={busy || !newName.trim() || !target} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">Crea</button>
+                        {error && <p className="mb-3 text-sm text-red-600" role="alert">{error}</p>}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button type="button" onClick={closeAll} className="min-h-12 rounded-xl border border-gray-300 px-4 font-medium dark:border-gray-700">Annulla</button>
+                          <button type="submit" disabled={busy || !newName.trim() || !target} className="min-h-12 rounded-xl bg-purple-600 px-4 font-medium text-white hover:bg-purple-700 disabled:opacity-50">Crea prodotto</button>
                         </div>
                       </form>
                     ) : (
                       <div>
                         <input
-                          className="w-full border rounded p-1 mb-2 dark:bg-gray-800"
+                          aria-label="Cerca prodotto da collegare"
+                          className="mb-2 min-h-12 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-800"
                           placeholder="Cerca oggetto..."
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
                         />
-                        <ul className="border rounded max-h-56 overflow-y-auto mb-3">
-                          {candidates.length === 0 && <li className="p-2 text-sm text-gray-500">Nessun oggetto</li>}
+                        <ul className="mb-3 max-h-56 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                          {candidates.length === 0 && <li className="p-3 text-sm text-gray-500">Nessun prodotto trovato.</li>}
                           {candidates.map((item) => (
                             <li key={item.id}>
                               <button
                                 type="button"
                                 onClick={() => setSelectedItemId(item.id)}
-                                className={`w-full text-left px-2 py-1 ${selectedItemId === item.id ? 'bg-blue-500 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                className={`min-h-12 w-full px-3 text-left ${selectedItemId === item.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                               >
                                 {item.name}
                                 {(item.barcodes?.length ?? 0) > 0 && <span className="ml-2 text-xs opacity-70">🏷️ {item.barcodes?.length}</span>}
@@ -468,16 +467,15 @@ export default function GlobalBarcodeScan() {
                             </li>
                           ))}
                         </ul>
-                        {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={matches.length > 0 ? () => setMode('menu') : closeAll} className="px-3 py-1 bg-gray-400 rounded hover:bg-gray-600">
-                            {matches.length > 0 ? 'Indietro' : 'Annulla'}
-                          </button>
+                        {selectedItemId !== null && <p className="mb-3 text-sm text-gray-600 dark:text-gray-300" aria-live="polite">Prodotto selezionato: {targetItems.find((item) => item.id === selectedItemId)?.name}</p>}
+                        {error && <p className="mb-3 text-sm text-red-600" role="alert">{error}</p>}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button type="button" onClick={closeAll} className="min-h-12 rounded-xl border border-gray-300 px-4 font-medium dark:border-gray-700">Annulla</button>
                           <button
                             type="button"
                             disabled={busy || selectedItemId === null}
                             onClick={() => void submitAssociate()}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                            className="min-h-12 rounded-xl bg-purple-600 px-5 font-medium text-white hover:bg-purple-700 disabled:opacity-50"
                           >
                             Associa
                           </button>
@@ -486,8 +484,9 @@ export default function GlobalBarcodeScan() {
                     )}
                   </>
                 )}
-              </>
-            )}
+                </>
+              )}
+            </div>
           </Dialog.Panel>
         </div>
       </Dialog>

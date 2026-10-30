@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog } from '@headlessui/react';
+import { useBottomSheetDrag } from './useBottomSheetDrag';
 import {
   createAssignment, createItem, deleteAssignment, deleteItem, getAssignmentsBySource,
   getChecklists, getInventories, getInventoryItems, updateAssignment,
@@ -17,11 +18,19 @@ function errorMessage(err: unknown): string {
 }
 
 function Shell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const sheetDrag = useBottomSheetDrag(onClose);
+
   return (
     <Dialog open onClose={onClose} className="relative z-[70]">
       <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-end sm:items-center justify-center sm:p-4">
-        <Dialog.Panel className="w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-xl sm:rounded-xl bg-white p-4 space-y-3 dark:bg-gray-800 dark:text-gray-100">
+      <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
+        <Dialog.Panel
+          style={{ transform: `translateY(${sheetDrag.offset}px)`, transition: sheetDrag.isDragging ? 'none' : 'transform 220ms ease-out' }}
+          className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl dark:bg-gray-800 dark:text-gray-100 sm:max-w-md sm:rounded-2xl sm:p-6"
+        >
+          <button type="button" aria-label="Chiudi o trascina verso il basso" {...sheetDrag.gripProps} className="mx-auto mb-3 flex h-8 w-16 touch-none items-center justify-center sm:hidden">
+            <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+          </button>
           <Dialog.Title className="text-lg font-semibold">{title}</Dialog.Title>
           {children}
         </Dialog.Panel>
@@ -32,11 +41,11 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
 
 function QtyStepper({ value, onChange, max }: { value: number; onChange: (v: number) => void; max?: number }) {
   return (
-    <div className="flex items-center justify-center gap-4">
-      <button type="button" className="h-11 w-11 rounded bg-gray-300 text-xl text-gray-900 dark:bg-gray-600 dark:text-gray-100"
+    <div className="grid w-full grid-cols-3 gap-2">
+      <button type="button" aria-label="Diminuisci quantità" className="min-h-12 w-full rounded bg-gray-300 text-xl text-gray-900 dark:bg-gray-600 dark:text-gray-100"
         onClick={() => onChange(Math.max(1, value - 1))}>−</button>
-      <span className="min-w-[2rem] text-center text-xl font-semibold">{value}</span>
-      <button type="button" className="h-11 w-11 rounded bg-gray-300 text-xl text-gray-900 disabled:opacity-40 dark:bg-gray-600 dark:text-gray-100"
+      <span className="flex min-h-12 items-center justify-center rounded border border-gray-300 text-xl font-semibold dark:border-gray-600">{value}</span>
+      <button type="button" aria-label="Aumenta quantità" className="min-h-12 w-full rounded bg-gray-300 text-xl text-gray-900 disabled:opacity-40 dark:bg-gray-600 dark:text-gray-100"
         disabled={max != null && value >= max}
         onClick={() => onChange(max != null ? Math.min(max, value + 1) : value + 1)}>+</button>
     </div>
@@ -47,13 +56,13 @@ function Actions({ onClose, onConfirm, label, busy, disabled }: {
   onClose: () => void; onConfirm?: () => void; label?: string; busy?: boolean; disabled?: boolean;
 }) {
   return (
-    <div className="flex gap-2 pt-1">
-      <button type="button" onClick={onClose} className="flex-1 rounded bg-gray-300 py-3 text-gray-900 dark:bg-gray-600 dark:text-gray-100">
+    <div className={`grid w-full gap-2 pt-1 ${onConfirm ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      <button type="button" onClick={onClose} className="min-h-12 w-full rounded-xl bg-gray-300 px-3 font-medium text-gray-900 dark:bg-gray-600 dark:text-gray-100">
         {onConfirm ? 'Annulla' : 'Chiudi'}
       </button>
       {onConfirm && (
         <button type="button" onClick={onConfirm} disabled={busy || disabled}
-          className="flex-1 rounded bg-blue-600 text-white py-3 disabled:opacity-50">
+          className="min-h-12 w-full rounded-xl bg-blue-600 px-3 font-medium text-white disabled:opacity-50">
           {busy ? '...' : label}
         </button>
       )}
@@ -175,9 +184,9 @@ export function InventoryPickerDialog({ onClose, onPick }: {
         <p className="text-sm text-gray-500 dark:text-gray-400">Disponibile dopo le altre assegnazioni: {available}</p>
         <QtyStepper value={qty} onChange={setQty} max={Math.max(1, available)} />
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex gap-2">
-          <button type="button" className="flex-1 rounded bg-gray-300 py-3 text-gray-900 dark:bg-gray-600 dark:text-gray-100" onClick={() => setPicked(null)}>Indietro</button>
-          <button type="button" className="flex-1 rounded bg-blue-600 text-white py-3 disabled:opacity-50" onClick={submit} disabled={busy || available < 1}>
+        <div className="grid w-full grid-cols-2 gap-2">
+          <button type="button" className="min-h-12 w-full rounded-xl bg-gray-300 px-3 font-medium text-gray-900 dark:bg-gray-600 dark:text-gray-100" onClick={() => setPicked(null)}>Indietro</button>
+          <button type="button" className="min-h-12 w-full rounded-xl bg-blue-600 px-3 font-medium text-white disabled:opacity-50" onClick={submit} disabled={busy || available < 1}>
             {busy ? '...' : 'Conferma'}
           </button>
         </div>
@@ -288,14 +297,14 @@ export function ListLinkField({ current, onPick, onClear, onClearAndDelete }: {
           <div className="text-sm">
             📦 ×{current.qty} · {current.name}{current.inventoryName ? ` (${current.inventoryName})` : ''}
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className={`grid w-full gap-2 ${onClearAndDelete ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <button type="button" disabled={busy} onClick={() => run(onClear)}
-              className="rounded border border-gray-400 px-2 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-500 dark:text-gray-100 dark:hover:bg-gray-700">
+              className="min-h-12 w-full rounded-xl border border-gray-400 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-500 dark:text-gray-100 dark:hover:bg-gray-700">
               Scollega, mantieni nella lista
             </button>
             {onClearAndDelete && (
               <button type="button" disabled={busy} onClick={() => run(onClearAndDelete)}
-                className="rounded border border-red-500 px-2 py-2 text-sm text-red-600 disabled:opacity-50">
+                className="min-h-12 w-full rounded-xl border border-red-500 px-3 py-2 text-sm font-medium text-red-600 disabled:opacity-50">
                 Scollega e cancella dalla lista
               </button>
             )}
@@ -303,7 +312,7 @@ export function ListLinkField({ current, onPick, onClear, onClearAndDelete }: {
           {error && <p className="text-sm text-red-600">{error}</p>}
         </>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className="w-full rounded bg-gray-200 py-2 text-gray-900 dark:bg-gray-700 dark:text-gray-100">
+        <button type="button" onClick={() => setOpen(true)} className="min-h-12 w-full rounded-xl bg-gray-200 px-3 py-2 font-medium text-gray-900 dark:bg-gray-700 dark:text-gray-100">
           📥 Collega a un item di inventario
         </button>
       )}

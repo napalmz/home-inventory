@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext, useMemo, ReactNode, useCallback } from 'react';
 import { Dialog } from '@headlessui/react';
+import { useBottomSheetDrag } from './useBottomSheetDrag';
 import { ItemVersion, InventoryVersion } from '../types';
 import {
   getItemHistory,
@@ -53,6 +54,7 @@ export function HistoryModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedVersionNums, setSelectedVersionNums] = useState<number[]>([]);
+  const sheetDrag = useBottomSheetDrag(onClose);
 
   const fieldLabel = (field: string) => {
     const labels: Record<string, string> = {
@@ -267,39 +269,48 @@ export function HistoryModal({
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white dark:bg-gray-900 rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col">
-          <div className="p-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <Dialog.Title className="text-xl font-bold dark:text-white">
-              Cronologia: {entityName}
-            </Dialog.Title>
+      <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
+        <Dialog.Panel
+          style={{ transform: `translateY(${sheetDrag.offset}px)`, transition: sheetDrag.isDragging ? 'none' : 'transform 220ms ease-out' }}
+          className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-white pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-2xl dark:bg-gray-900 sm:rounded-2xl sm:pb-0"
+        >
+          <div className="shrink-0 border-b border-gray-200 px-4 pb-3 pt-2 dark:border-gray-700 sm:p-6 sm:pb-4">
+            <button type="button" aria-label="Chiudi o trascina verso il basso" {...sheetDrag.gripProps} className="mx-auto mb-2 flex h-8 w-16 touch-none items-center justify-center sm:hidden">
+              <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+            </button>
+            <div className="flex items-center justify-between gap-3">
+              <Dialog.Title className="min-w-0 text-lg font-bold dark:text-white sm:text-xl">
+                Cronologia: {entityName}
+              </Dialog.Title>
+              <button type="button" onClick={onClose} aria-label="Chiudi cronologia" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-2xl text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">×</button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
             {loading && <div className="text-center text-gray-500">Caricamento...</div>}
             {error && <div className="text-center text-red-500 mb-4">{error}</div>}
 
             {!loading && versions.length > 0 && (
               <div className="space-y-3">
                 {isAdmin && (
-                  <div className="flex items-center justify-end gap-2">
+                      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:justify-end">
                     <button
                       onClick={() => setSelectedVersionNums(displayedVersions.map((v) => v.version_num))}
-                      className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-sm rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                      className="min-h-11 w-full rounded-xl bg-gray-200 px-2 text-sm hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 sm:min-h-0 sm:w-auto sm:rounded sm:px-3 sm:py-1"
                     >
                       Seleziona tutte
                     </button>
                     <button
                       onClick={() => setSelectedVersionNums([])}
-                      className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-sm rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                      className="min-h-11 w-full rounded-xl bg-gray-200 px-2 text-sm hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 sm:min-h-0 sm:w-auto sm:rounded sm:px-3 sm:py-1"
                     >
                       Deseleziona
                     </button>
                     <button
                       onClick={handleDeleteSelected}
                       disabled={selectedVersionNums.length === 0}
-                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="col-span-2 min-h-11 w-full rounded-xl bg-red-600 px-2 text-sm text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed sm:col-span-1 sm:min-h-0 sm:w-auto sm:rounded sm:px-3 sm:py-1"
                     >
                       Elimina selezionate ({selectedVersionNums.length})
                     </button>
@@ -346,11 +357,11 @@ export function HistoryModal({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full gap-2 sm:w-auto sm:items-center">
                         {canRollback && version.operation !== 'DELETE' && version.version_num !== latestVersionNum && (
                           <button
                             onClick={() => handleRollback(version.version_num)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 whitespace-nowrap"
+                            className="min-h-11 flex-1 rounded-xl bg-blue-500 px-3 text-sm text-white hover:bg-blue-600 sm:min-h-0 sm:flex-none sm:rounded sm:py-1 sm:whitespace-nowrap"
                           >
                             Ripristina
                           </button>
@@ -358,7 +369,7 @@ export function HistoryModal({
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteSingle(version.version_num)}
-                            className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 whitespace-nowrap"
+                            className="min-h-11 flex-1 rounded-xl bg-red-600 px-3 text-sm text-white hover:bg-red-700 sm:min-h-0 sm:flex-none sm:rounded sm:py-1 sm:whitespace-nowrap"
                           >
                             Elimina
                           </button>
@@ -375,10 +386,10 @@ export function HistoryModal({
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex justify-end">
+          <div className="shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-black dark:text-white rounded hover:bg-gray-400 dark:hover:bg-gray-600"
+              className="min-h-12 w-full rounded-xl bg-gray-300 px-4 font-medium text-black hover:bg-gray-400 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
             >
               Chiudi
             </button>
