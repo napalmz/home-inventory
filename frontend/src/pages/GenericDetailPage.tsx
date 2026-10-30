@@ -10,6 +10,8 @@ import {
   bulkUpsertItemMetadataValues, deleteItemMetadataValue, createAssignment, deleteAssignment } from "../api";
 import { Inventory, InventoryItem, Item, User, MetadataDefinition, ItemMetadataValue, ItemMetadataValueUpsert, FilterTemplate, FilterTemplateListItem } from "../types";
 import { Dialog } from "@headlessui/react";
+import { FiArrowLeft, FiClock } from 'react-icons/fi';
+import { createPortal } from 'react-dom';
 import { useContext } from "react";
 import { AuthContext } from "../auth-context";
 import { useSwipeable } from 'react-swipeable';
@@ -623,6 +625,7 @@ export default function InventoryDetailPage() {
   const authContext = useContext(AuthContext);
   const user = authContext?.user ?? null;
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const importExportSheetDrag = useBottomSheetDrag(() => setIsShareModalOpen(false));
   const [csvTextarea, setCsvTextarea] = useState('');
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const { id } = useParams();
@@ -983,16 +986,34 @@ useEffect(() => {
 
   return (
     <div ref={detailTopRef} className="relative p-3 sm:p-4">
-      <div className="sticky top-0 z-10 bg-white pb-1 dark:bg-gray-900">
+      {inventory && (
+        <div className="fixed inset-x-4 top-20 z-50 md:hidden">
+          <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2">
+            <Link
+              to={`/${basePath}${filtroParam ? `?filtro=${encodeURIComponent(filtroParam)}` : ""}`}
+              aria-label={`Torna all'elenco ${isChecklist ? 'delle liste' : 'degli inventari'}`}
+              className="grid h-11 w-12 place-items-center rounded-xl bg-gray-100 text-xl text-blue-700 dark:bg-gray-800 dark:text-blue-300"
+            ><FiArrowLeft aria-hidden="true" /></Link>
+            <h1 className="truncate text-center text-lg font-bold" title={inventory.name}>{inventory.name}</h1>
+            <button type="button" onClick={() => setIsHistoryOpen(true)} aria-label="Apri log modifiche" title="Log modifiche" className="grid h-11 w-12 place-items-center rounded-xl bg-gray-100 text-lg text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+              <FiClock aria-hidden="true" />
+            </button>
+          </div>
+          <p className="mt-1 truncate px-1 text-xs leading-tight text-gray-600 dark:text-gray-300">
+            Creato da: {inventory.owner.username ? `${inventory.owner.username}` : "Sconosciuto"} | Data modifica: {new Date(inventory.data_mod).toLocaleString()}
+          </p>
+        </div>
+      )}
+      <div className="relative z-10 bg-white pb-1 dark:bg-gray-900 md:sticky md:top-0">
         <Link
           to={`/${basePath}${filtroParam ? `?filtro=${encodeURIComponent(filtroParam)}` : ""}`}
-          className="mb-1 inline-block text-sm text-blue-500 hover:underline"
+          className="mb-1 hidden text-sm text-blue-500 hover:underline md:inline-block"
         >
           ← Torna all'elenco {isChecklist ? "delle liste" : "degli inventari"}
         </Link>
         {inventory && (
           <>
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <div className="mb-1 hidden flex-wrap items-center justify-between gap-2 md:flex">
               <h2 className="flex items-center gap-1.5 text-lg font-bold sm:gap-2 sm:text-xl">
                 {isChecklist ? "Lista: " : "Inventario: "}
                 {inventory.name}
@@ -1009,11 +1030,11 @@ useEffect(() => {
                 <span className="hidden md:inline">Cronologia</span>
               </button>
             </div>
-            <p className="mb-1 text-xs text-gray-600 dark:text-gray-400 sm:mb-2 sm:text-sm">
+            <p className="mb-1 hidden text-xs text-gray-600 dark:text-gray-400 sm:mb-2 sm:text-sm md:block">
               Creato da: {inventory.owner.username ? `${inventory.owner.username}` : "Sconosciuto"} | Data modifica:{" "}
               {new Date(inventory.data_mod).toLocaleString()}
             </p>
-            <hr className="mb-1 sm:mb-2" />
+            <hr className="mb-1 hidden sm:mb-2 md:block" />
           </>
         )}
       </div>
@@ -1174,8 +1195,8 @@ useEffect(() => {
         <p>Caricamento {isChecklist ? "checklist" : "inventaro"}...</p>
       )}
 
-      {!isMobile && <div className="fixed right-4 top-4 z-40 flex gap-2">
-        <button type="button" onClick={() => detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="rounded-full bg-gray-700 px-4 py-2 text-white shadow-lg hover:bg-gray-800" title="Torna in cima alla lista">
+      {!isMobile && <div className="fixed right-4 top-4 z-40 flex flex-wrap justify-end gap-2">
+        <button type="button" onClick={() => detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="flex h-10 min-w-12 items-center justify-center rounded-xl bg-gray-700 px-3 py-2 text-white shadow-lg hover:bg-gray-800" title="Torna in cima alla lista">
           ↑ In cima
         </button>
         {isEditMode && selectedItems.length > 0 && (
@@ -1191,7 +1212,7 @@ useEffect(() => {
               const refreshed = inventory && await getItems(inventory.id);
               if (refreshed) setItems(refreshed);
             }}
-            className="py-2 px-4 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700"
+            className="flex h-10 min-w-12 items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-white shadow-lg hover:bg-red-700"
           >
             <span className="inline md:hidden">🗑️ {( selectedItems.length )}</span>
             <span className="hidden md:inline">Elimina {( selectedItems.length )}</span>
@@ -1200,7 +1221,7 @@ useEffect(() => {
         {isChecklist && user?.role.name !== 'viewer' && (
           <button
             onClick={() => setIsAddFromInventoryOpen(true)}
-            className="py-2 px-4 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700"
+            className="flex h-10 min-w-12 items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-white shadow-lg hover:bg-emerald-700"
             title="Aggiungi da inventario"
           >
             <span className="inline md:hidden">📥</span>
@@ -1214,6 +1235,7 @@ useEffect(() => {
             definitions={metadataDefinitions}
             allDefinitions={allMetadataDefinitions}
             onTemplatesChanged={setFilterTemplates}
+            triggerClassName="!flex !h-10 !min-h-10 !min-w-12 !items-center !justify-center !rounded-xl !px-3 !py-2"
           />
         )}
         {(isInventory || isChecklist) && user?.role.name !== 'viewer' && (
@@ -1230,7 +1252,7 @@ useEffect(() => {
               //window.location.href = `https://wa.me/?text=${text}`;
               window.open(`https://wa.me/?text=${text}`, '_blank');
             }}
-            className="py-2 px-4 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800"
+            className="flex h-10 min-w-12 items-center justify-center rounded-xl bg-green-700 px-3 py-2 text-white shadow-lg hover:bg-green-800"
           >
             <span className="inline md:hidden">📲</span>
             <span className="hidden md:inline">📲 WhatsApp</span>
@@ -1239,7 +1261,7 @@ useEffect(() => {
         {(isInventory || isChecklist) && user?.role.name === 'admin' && (
           <button
             onClick={() => setIsShareModalOpen(true)}
-            className="py-2 px-4 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700"
+            className="flex h-10 min-w-12 items-center justify-center rounded-xl bg-green-600 px-3 py-2 text-white shadow-lg hover:bg-green-700"
           >
             <span className="inline md:hidden">📤</span>
             <span className="hidden md:inline">Import/Export</span>
@@ -1252,7 +1274,7 @@ useEffect(() => {
                 setIsEditMode((prev) => !prev);
                 setSelectedItems([]);
               }}
-              className={`py-2 px-4 rounded-full shadow-lg text-white ${
+              className={`flex h-10 min-w-12 items-center justify-center rounded-xl px-3 py-2 text-white shadow-lg ${
                 isEditMode ? "bg-yellow-700" : "bg-yellow-500 hover:bg-yellow-600"
               }`}
             >
@@ -1261,7 +1283,7 @@ useEffect(() => {
             </button>
             <button
               onClick={() => setisInsertMode(true)}
-              className="py-2 px-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600"
+              className="flex h-10 min-w-12 items-center justify-center rounded-xl bg-blue-500 px-3 py-2 text-white shadow-lg hover:bg-blue-600"
             >
               <span className="inline md:hidden">➕</span>
               <span className="hidden md:inline">Nuovo</span>
@@ -1271,11 +1293,10 @@ useEffect(() => {
       </div>}
 
       {isMobile && user?.role.name !== 'viewer' && (isInventory || isChecklist) && (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-[calc(env(safe-area-inset-right)+1rem)] z-40 flex flex-col items-end">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] left-1/2 z-40 flex -translate-x-1/2 flex-col items-center">
           {isMoreActionsOpen && (
             <>
-              <button type="button" aria-label="Chiudi altre azioni" onClick={() => setIsMoreActionsOpen(false)} className="fixed inset-0 z-30" />
-              <div onClick={() => setIsMoreActionsOpen(false)} className="relative z-40 mb-2 flex w-56 flex-col gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-800">
+              <div className="relative z-40 mb-2 flex w-56 flex-col gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-800">
                 {isEditMode && selectedItems.length > 0 && (
                   <button
                     type="button"
@@ -1287,12 +1308,13 @@ useEffect(() => {
                       const getItems = isInventory ? getInventoryItems : getChecklistItems;
                       const refreshed = inventory && await getItems(inventory.id);
                       if (refreshed) setItems(refreshed);
+                      setIsMoreActionsOpen(false);
                     }}
                     className="min-h-11 w-full rounded-xl bg-red-600 px-3 text-left text-sm font-medium text-white"
                   >🗑️ Elimina selezionati ({selectedItems.length})</button>
                 )}
                 {isChecklist && (
-                  <button type="button" onClick={() => setIsAddFromInventoryOpen(true)} className="min-h-11 w-full rounded-xl bg-emerald-600 px-3 text-left text-sm font-medium text-white">
+                  <button type="button" onClick={() => { setIsMoreActionsOpen(false); setIsAddFromInventoryOpen(true); }} className="min-h-11 w-full rounded-xl bg-emerald-600 px-3 text-left text-sm font-medium text-white">
                     📥 Aggiungi da inventario
                   </button>
                 )}
@@ -1304,10 +1326,12 @@ useEffect(() => {
                   onTemplatesChanged={setFilterTemplates}
                   triggerLabel="🧩 Filtri metadati"
                   triggerClassName="!min-h-11 !w-full !rounded-xl !px-3 !py-2 !text-left !text-sm !font-medium !shadow-none"
+                  onDialogClose={() => setIsMoreActionsOpen(false)}
                 />
                 <button
                   type="button"
                   onClick={() => {
+                    setIsMoreActionsOpen(false);
                     const now = new Date();
                     const header = `${inventory?.name} (${now.toLocaleString()})`;
                     const withQty = items.filter((item) => item.quantity > 0).sort((a, b) => a.name.localeCompare(b.name));
@@ -1318,34 +1342,34 @@ useEffect(() => {
                   className="min-h-11 w-full rounded-xl bg-green-700 px-3 text-left text-sm font-medium text-white"
                 >📲 Condividi su WhatsApp</button>
                 {user?.role.name === 'admin' && (
-                  <button type="button" onClick={() => setIsShareModalOpen(true)} className="min-h-11 w-full rounded-xl bg-green-600 px-3 text-left text-sm font-medium text-white">
+                  <button type="button" onClick={() => { setIsMoreActionsOpen(false); setIsShareModalOpen(true); }} className="min-h-11 w-full rounded-xl bg-green-600 px-3 text-left text-sm font-medium text-white">
                     📤 Importa / esporta
                   </button>
                 )}
               </div>
             </>
           )}
-          <div className="relative z-40 flex gap-2">
+          <div className="relative z-40 flex gap-1 rounded-2xl bg-white/90 p-1 shadow-lg backdrop-blur dark:bg-gray-900/90">
             <button
               type="button"
               onClick={() => setisInsertMode(true)}
               aria-label="Aggiungi item"
               title="Aggiungi item"
-              className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-lg"
-            >＋</button>
+              className="flex h-10 min-w-12 items-center justify-center rounded-xl bg-blue-500 px-3 py-2 text-lg text-white shadow-lg hover:bg-blue-600"
+            >➕</button>
             <button
               type="button"
               onClick={() => { setIsEditMode((current) => !current); setSelectedItems([]); }}
               aria-label={isEditMode ? 'Esci dalla modifica' : 'Modifica item'}
               title={isEditMode ? 'Esci dalla modifica' : 'Modifica item'}
-              className={`flex h-12 w-12 items-center justify-center rounded-xl text-lg text-white shadow-lg ${isEditMode ? 'bg-yellow-700' : 'bg-yellow-500'}`}
+              className={`flex h-10 w-12 items-center justify-center rounded-xl text-lg text-white shadow-lg ${isEditMode ? 'bg-yellow-700' : 'bg-yellow-500'}`}
             >{isEditMode ? '✖️' : '✏️'}</button>
             <button
               type="button"
               onClick={() => detailTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               aria-label="Torna in cima alla lista"
               title="Torna in cima alla lista"
-              className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-600 text-lg text-white shadow-lg"
+              className="flex h-10 w-12 items-center justify-center rounded-xl bg-gray-600 text-lg text-white shadow-lg"
             >↑</button>
             <button
               type="button"
@@ -1353,10 +1377,15 @@ useEffect(() => {
               aria-label={isMoreActionsOpen ? 'Chiudi altre azioni' : 'Altre azioni'}
               aria-expanded={isMoreActionsOpen}
               title="Altre azioni"
-              className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-700 text-lg text-white shadow-lg dark:bg-gray-600"
+              className="flex h-10 w-12 items-center justify-center rounded-xl bg-gray-700 text-lg text-white shadow-lg dark:bg-gray-600"
             >⋯</button>
           </div>
         </div>
+      )}
+
+      {isMobile && isMoreActionsOpen && createPortal(
+        <button type="button" aria-label="Chiudi altre azioni" onClick={() => setIsMoreActionsOpen(false)} className="fixed inset-0 z-[39]" />,
+        document.body,
       )}
 
       <Dialog open={isInsertMode} onClose={() => setisInsertMode(false)} className="relative z-50">
@@ -1810,8 +1839,14 @@ useEffect(() => {
       </Dialog>
       <Dialog open={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white dark:bg-gray-900 dark:text-white p-6 rounded w-full max-w-lg space-y-4">
+        <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
+          <Dialog.Panel
+            style={{ transform: `translateY(${importExportSheetDrag.offset}px)`, transition: importExportSheetDrag.isDragging ? 'none' : 'transform 220ms ease-out' }}
+            className="max-h-[92dvh] w-full space-y-4 overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] text-gray-900 shadow-2xl dark:bg-gray-900 dark:text-white sm:max-w-lg sm:rounded-xl sm:p-6 sm:pb-6"
+          >
+            <button type="button" aria-label="Chiudi o trascina verso il basso" {...importExportSheetDrag.gripProps} className="mx-auto mb-2 flex h-8 w-16 touch-none items-center justify-center sm:hidden">
+              <span className="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
+            </button>
             <Dialog.Title className="text-lg font-semibold mb-2">Importa / Esporta CSV</Dialog.Title>
             <button
               onClick={() => {

@@ -260,12 +260,12 @@ export default function GlobalBarcodeScan() {
 
   return (
     <>
-      {/* mobile: in alto a destra (in basso ci sono le azioni di pagina); desktop: in basso a destra */}
+      {/* Il lettore barcode resta nell'angolo alto destro su mobile. */}
       <button
         onClick={() => setScannerOpen(true)}
         title="Scansiona barcode / QR code"
         aria-label="Scansiona barcode / QR code"
-        className="fixed top-4 right-4 z-30 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600 text-xl text-white shadow-lg hover:bg-purple-700 md:top-auto md:bottom-4 md:h-14 md:w-14"
+        className="fixed right-4 top-4 z-[45] flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600 text-xl text-white shadow-lg hover:bg-purple-700 md:bottom-4 md:top-auto md:z-30 md:h-14 md:w-14"
       >
         📷
       </button>
