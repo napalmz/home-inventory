@@ -14,19 +14,19 @@ const d1Id = (
 ).trim();
 
 const fallbackId = '00000000-0000-0000-0000-000000000000';
-const targetId = d1Id || fallbackId;
 
 const replaceInFile = (relativeFilePath) => {
   const fullPath = path.resolve(repositoryRoot, relativeFilePath);
   if (fs.existsSync(fullPath)) {
     let content = fs.readFileSync(fullPath, 'utf8');
-    if (content.includes('<YOUR_D1_DATABASE_ID>') || (d1Id && content.includes(fallbackId))) {
-      content = content.replace(/<YOUR_D1_DATABASE_ID>/g, targetId);
-      if (d1Id) {
-        content = content.replace(new RegExp(fallbackId, 'g'), d1Id);
-      }
+    if (content.includes('<YOUR_D1_DATABASE_ID>')) {
+      content = content.replace(/<YOUR_D1_DATABASE_ID>/g, d1Id || fallbackId);
       fs.writeFileSync(fullPath, content, 'utf8');
-      console.log(`Injected D1 database ID (${targetId}) into ${relativeFilePath}`);
+      console.log(`Injected D1 database ID into ${relativeFilePath}`);
+    } else if (d1Id && content.includes(fallbackId)) {
+      content = content.replace(new RegExp(fallbackId, 'g'), d1Id);
+      fs.writeFileSync(fullPath, content, 'utf8');
+      console.log(`Injected D1 database ID into ${relativeFilePath}`);
     }
   }
 };
