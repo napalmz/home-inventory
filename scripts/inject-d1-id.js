@@ -20,6 +20,7 @@ if (d1Id) {
   };
 
   replaceInFile('telemetry-worker/wrangler.toml');
+  replaceInFile('wrangler.toml');
 } else {
   console.log('No TELEMETRY_D1_DATABASE_ID or D1_DATABASE_ID environment variable found. Keeping wrangler.toml placeholder.');
 }
