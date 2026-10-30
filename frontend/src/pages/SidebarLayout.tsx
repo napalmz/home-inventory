@@ -68,12 +68,12 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       {!isOpen && (
-        <div className="md:hidden fixed top-4 left-4 z-50">
+        <div className="md:hidden fixed top-4 left-4 z-50 dark:text-white">
           <button
             onClick={toggleSidebar}
             aria-label="Apri menu navigation"
             aria-expanded={isOpen}
-            className="p-2 rounded-lg bg-gray-800 text-white shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2 rounded-lg bg-gray-800 text-white shadow-md hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           >
             <FiMenu className="text-xl" />
           </button>
@@ -91,7 +91,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
             onClick={toggleSidebar}
             aria-label="Chiudi menu navigation"
             aria-expanded={isOpen}
-            className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           >
             <FiX className="text-xl" />
           </button>
