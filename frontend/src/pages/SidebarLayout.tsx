@@ -31,7 +31,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         <div className="md:hidden fixed top-4 left-4 z-50 dark:text-white">
           <button
             onClick={toggleSidebar}
-            aria-label="Apri menu"
+            aria-label="Open menu"
             aria-expanded={false}
             className="p-2 rounded-lg bg-gray-800 text-white hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           >
@@ -49,7 +49,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           <span className="font-bold text-lg">Menu</span>
           <button
             onClick={toggleSidebar}
-            aria-label="Chiudi menu"
+            aria-label="Close menu"
             aria-expanded={true}
             className="p-1 rounded hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           >
