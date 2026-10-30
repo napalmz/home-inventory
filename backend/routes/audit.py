@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from models import ItemVersion, InventoryVersion, User, Inventory
 from schemas import ItemVersionResponse, InventoryVersionResponse
 from routes.auth import get_current_user
+from routes.inventory import can_access_inventory
 from dependencies import get_db
 from typing import List, Optional, cast
 
@@ -70,18 +71,13 @@ def get_item_audit_logs(
         normalized_to = to_date.astimezone(timezone.utc).replace(tzinfo=None) if to_date.tzinfo else to_date
         query = query.filter(ItemVersion.changed_at <= normalized_to)
 
-    # Permessi: solo admin vede tutto, altri vedono solo i loro inventari
+    # Permessi: solo admin vede tutto, altri vedono solo i loro inventari e quelli condivisi con loro
     if current_user.role.name != "admin":
-        visible_inventory_ids = (
-            db.query(Inventory.id)
-            .filter(
-                or_(
-                    Inventory.owner_id == current_user.id,
-                )
-            )
-            .all()
-        )
-        ids = [inv_id[0] for inv_id in visible_inventory_ids]
+        all_inventories = db.query(Inventory).all()
+        ids = [
+            inv.id for inv in all_inventories
+            if can_access_inventory(current_user, inv, action="view")
+        ]
         if ids:
             query = query.filter(ItemVersion.inventory_id.in_(ids))
         else:
