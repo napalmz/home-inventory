@@ -29,3 +29,8 @@
 **Vulnerability:** Filter template scope preview endpoints (`GET /filter-templates/scope-preview` and `GET /filter-templates`) evaluated metadata definition assignments against `db.query(Inventory).all()` without filtering by user access, leaking names and IDs of private inventories belonging to other users.
 **Learning:** Helper functions that compute scope or compatibility metrics across system-wide resources can bypass object-level authorization if they query all containers without contextual user filtering.
 **Prevention:** Always filter system-wide container lists using `can_access_inventory(user, container, action="view")` before including resource summaries or scope metadata in responses returned to non-admin users.
+
+## 2025-05-23 - Broken Object-Level Authorization and Missing Multi-Tenant Filtering in Inventory Audit Logs
+**Vulnerability:** In `GET /audit/logs/inventories`, non-admin query results were filtered solely by `InventoryVersion.owner_id == current_user.id`. This bypassed object-level authorization rules: users with valid shared access (direct or via group associations) could not view audit logs for shared inventories, and any change in inventory ownership or access model caused discrepancies with item audit logs.
+**Learning:** Filtering audit history solely by static `owner_id` fields instead of dynamic object-level authorization checks (`can_access_inventory`) breaks the shared inventory authorization model.
+**Prevention:** Consistently use the centralized authorization function `can_access_inventory(user, inventory, action="view")` across all audit log and historical query endpoints for container-level resources.
