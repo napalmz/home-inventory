@@ -3,7 +3,7 @@ Route centralizzato per audit log e query storiche
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, false, func
+from sqlalchemy import and_, or_, desc, false, true, func
 from datetime import datetime, timezone
 from models import ItemVersion, InventoryVersion, User, Inventory
 from schemas import ItemVersionResponse, InventoryVersionResponse
@@ -125,6 +125,7 @@ def get_item_audit_logs(
 
 @router.get("/logs/inventories", response_model=List[InventoryVersionResponse])
 def get_inventory_audit_logs(
+    inventory_id: Optional[int] = None,
     user_id: Optional[int] = None,
     user_scope: Optional[str] = None,
     operation: Optional[str] = None,
@@ -136,10 +137,12 @@ def get_inventory_audit_logs(
 ):
     """
     Recupera i log di audit degli inventari/liste filtrati.
-    Solo admin può vedere tutti; gli altri vedono solo i loro.
+    Solo admin può vedere tutti; gli altri vedono solo gli inventari accessibili o di loro proprietà.
     """
     query = db.query(InventoryVersion)
 
+    if inventory_id:
+        query = query.filter(InventoryVersion.inventory_id == inventory_id)
     if user_id:
         query = query.filter(InventoryVersion.changed_by_id == user_id)
     if user_scope:
@@ -175,8 +178,27 @@ def get_inventory_audit_logs(
         normalized_to = to_date.astimezone(timezone.utc).replace(tzinfo=None) if to_date.tzinfo else to_date
         query = query.filter(InventoryVersion.changed_at <= normalized_to)
 
-    # Permessi
+    # Permessi: admin vede tutto; gli altri vedono gli inventari attivi accessibili o cancellati di cui sono owner
     if current_user.role.name != "admin":
-        query = query.filter(InventoryVersion.owner_id == current_user.id)
+        all_inventories = db.query(Inventory).all()
+        accessible_ids = [
+            inv.id for inv in all_inventories
+            if can_access_inventory(current_user, inv, action="view")
+        ]
+        all_existing_ids = [inv.id for inv in all_inventories]
+        # Consenti inventari attivi accessibili oppure versioni di inventari cancellati posseduti dall'utente
+        deleted_owned_condition = and_(
+            InventoryVersion.owner_id == current_user.id,
+            ~InventoryVersion.inventory_id.in_(all_existing_ids) if all_existing_ids else true(),
+        )
+        if accessible_ids:
+            query = query.filter(
+                or_(
+                    InventoryVersion.inventory_id.in_(accessible_ids),
+                    deleted_owned_condition,
+                )
+            )
+        else:
+            query = query.filter(deleted_owned_condition)
 
     return query.order_by(desc(InventoryVersion.changed_at)).all()
